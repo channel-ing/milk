@@ -184,12 +184,14 @@
             throw new Error('未连接云端');
         }
         var objectKey = _syncObjectKey();
-        var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {});
-        // 注意：不加 Content-Type 头。因为 V4 签名只签了 host，加额外 header 会导致 CanonicalHeaders 不匹配。
-        // OSS 允许无 Content-Type 的 PUT，会按默认存储。
+        // 阿里云 V4 签名要求：如果请求头有 Content-Type，就必须签入 CanonicalHeaders。
+        // 用 Blob 明确指定 MIME，让签名内容和实际请求一致。
+        var contentType = 'application/json;charset=UTF-8';
+        var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {}, contentType);
+        var blob = new Blob([jsonString], { type: contentType });
         var res = await fetch(url, {
             method: 'PUT',
-            body: jsonString
+            body: blob
         });
         if (!res.ok) {
             var text = '';

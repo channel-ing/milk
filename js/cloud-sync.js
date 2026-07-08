@@ -199,8 +199,9 @@
      * @param {string} method  HTTP 方法
      * @param {string} objectKey  对象 key，可为空
      * @param {object} extraQuery  额外查询参数（如 {'max-keys': '1'}）
+     * @param {string} [contentType]  可选的 Content-Type（PUT 请求需要，会被签入 CanonicalHeaders）
      */
-    async function _buildV4SignedUrl(cfg, method, objectKey, extraQuery) {
+    async function _buildV4SignedUrl(cfg, method, objectKey, extraQuery, contentType) {
         var now = new Date();
         var dateTime = _iso8601(now);
         var dateStamp = _dateStamp(now);
@@ -236,7 +237,20 @@
         var canonicalUri = '/' + cfg.bucket + '/' + (objectKey ? _ossEncode(objectKey, false) : '');
         // requestPath：实际请求的路径，虚拟主机风格下不含 bucket 名
         var requestPath = '/' + (objectKey ? _ossEncode(objectKey, false) : '');
-        var canonicalHeaders = 'host:' + host + '\n';
+
+        // Canonical Headers：按字典序，必须包含 request 里出现的所有 content-type / content-md5 / x-oss-* header
+        // host 是"额外签名"的，必然存在
+        var canonicalHeadersMap = { 'host': host };
+        if (contentType) {
+            canonicalHeadersMap['content-type'] = contentType;
+        }
+        var chKeys = Object.keys(canonicalHeadersMap).sort();
+        var canonicalHeaders = chKeys.map(function (k) {
+            return k + ':' + canonicalHeadersMap[k];
+        }).join('\n') + '\n';
+
+        // Additional Headers：只包含额外签名的 header 名（即 host）
+        // 注意：content-type 属于"必签"header，不算 additional
         var additionalHeaders = 'host';
 
         // Canonical Request 结构（V4）：

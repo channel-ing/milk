@@ -90,7 +90,11 @@
         // 避免 app 启动加载数据时被误认为"数据变化"，把 pending 表覆盖到云端。
         ready: false,
         // 本次会话是否已经弹过失败告警 toast（避免连续刷屏）
-        failAlertShown: false
+        failAlertShown: false,
+        // 是否有恢复流程正在进行（暂停所有同步）
+        restoreInProgress: false,
+        // 是否有梦角选择器正在等待用户操作（本地是空的，未选择前不允许同步覆盖云端）
+        awaitingRestoreChoice: false
     };
 
     // 防抖延迟（数据变化后）
@@ -248,9 +252,13 @@
             var sid = payload.sessionId;
             if (!sid) return;
             var name = _extractPartnerName(payload) || '未命名梦角';
-            // 拉旧 index
+            // 拉旧 index（首次不存在会 404，属正常，静默处理）
             var index = null;
-            try { index = await _downloadFromOSS(_indexObjectKey()); } catch (e) {}
+            try {
+                index = await _downloadFromOSS(_indexObjectKey());
+            } catch (e) {
+                // 静默：首次运行 index 不存在
+            }
             if (!index || !index.sessions) index = { version: 1, sessions: {} };
             index.sessions[sid] = {
                 name: name,
@@ -260,7 +268,7 @@
             await _uploadToOSS(JSON.stringify(index), _indexObjectKey());
         } catch (e) {
             // index 更新失败不影响主同步，静默
-            console.warn('[cloud-sync-engine] 更新 index 失败', e);
+            console.debug && console.debug('[cloud-sync-engine] 更新 index 失败', e);
         }
     }
 
@@ -289,71 +297,103 @@
 
     // ==== 恢复指定 sessionId 的数据到本地 ====
     // 会先清掉本地所有当前 session 的相关数据，再写入云端数据，最后切换 SESSION_ID
+    // 注意：会保留云端同步配置（密钥）不被清除
     async function restoreSession(targetSessionId) {
         if (!targetSessionId) throw new Error('未指定要恢复的梦角');
-        var objectKey = 'sync/' + targetSessionId + '/text-data.json';
-        var remote = await _downloadFromOSS(objectKey);
-        if (!remote) throw new Error('云端找不到该梦角的数据');
 
-        // 1) 清掉本地所有 CHAT_APP 相关 key（IndexedDB）
-        //    注意：只清带 APP_PREFIX 的键，避免误删其他站点数据
-        var keys = await localforage.keys();
-        for (var i = 0; i < keys.length; i++) {
-            if (keys[i].indexOf(APP_PREFIX_STR) === 0) {
-                try { await localforage.removeItem(keys[i]); } catch (e) {}
-            }
+        // 关键：进入恢复模式，禁止一切同步（否则清空过程中触发的防抖会把半状态数据上传，
+        // 可能污染云端其他梦角的 index，甚至覆盖当前梦角自己的完整数据）
+        _state.restoreInProgress = true;
+        _state.awaitingRestoreChoice = false;
+        if (_state.pendingTimer) {
+            clearTimeout(_state.pendingTimer);
+            _state.pendingTimer = null;
         }
-        // 2) 清 localStorage 里 app 相关的
+
         try {
-            var lsKeys = [];
-            for (var j = 0; j < localStorage.length; j++) {
-                var lk = localStorage.key(j);
-                if (lk) lsKeys.push(lk);
+            var objectKey = 'sync/' + targetSessionId + '/text-data.json';
+            var remote = await _downloadFromOSS(objectKey);
+            if (!remote) throw new Error('云端找不到该梦角的数据');
+
+            // 需要保留的 key（不清空）：全局配置，不属于任何梦角
+            var PRESERVE_KEYS = [
+                APP_PREFIX_STR + 'cloudSyncConfig',   // 阿里云密钥
+                APP_PREFIX_STR + 'tour_seen',          // 新手引导已看过
+                APP_PREFIX_STR + 'MIGRATION_V2_DONE'   // 数据迁移标记
+            ];
+            function _isPreserved(k) {
+                return PRESERVE_KEYS.indexOf(k) !== -1;
             }
-            for (var m = 0; m < lsKeys.length; m++) {
-                // 只清我们知道的键（不误删其他）
-                if (TEXT_LS_KEYS.indexOf(lsKeys[m]) !== -1) {
-                    localStorage.removeItem(lsKeys[m]);
-                    continue;
+
+            // 1) 清掉本地所有 CHAT_APP 相关 key（IndexedDB），但保留全局配置
+            var keys = await localforage.keys();
+            for (var i = 0; i < keys.length; i++) {
+                if (keys[i].indexOf(APP_PREFIX_STR) === 0 && !_isPreserved(keys[i])) {
+                    try { await localforage.removeItem(keys[i]); } catch (e) {}
                 }
-                for (var p = 0; p < TEXT_LS_PREFIXES.length; p++) {
-                    if (lsKeys[m].indexOf(TEXT_LS_PREFIXES[p]) === 0) {
+            }
+            // 2) 清 localStorage 里 app 相关的
+            try {
+                var lsKeys = [];
+                for (var j = 0; j < localStorage.length; j++) {
+                    var lk = localStorage.key(j);
+                    if (lk) lsKeys.push(lk);
+                }
+                for (var m = 0; m < lsKeys.length; m++) {
+                    if (TEXT_LS_KEYS.indexOf(lsKeys[m]) !== -1) {
                         localStorage.removeItem(lsKeys[m]);
-                        break;
+                        continue;
+                    }
+                    for (var p = 0; p < TEXT_LS_PREFIXES.length; p++) {
+                        if (lsKeys[m].indexOf(TEXT_LS_PREFIXES[p]) === 0) {
+                            localStorage.removeItem(lsKeys[m]);
+                            break;
+                        }
                     }
                 }
-            }
-        } catch (e) {}
+            } catch (e) {}
 
-        // 3) 写入云端数据（键名已经带了目标 SESSION_ID 的前缀，直接写入即可）
-        var count = 0;
-        if (remote.indexedDB) {
-            for (var k in remote.indexedDB) {
-                if (!Object.prototype.hasOwnProperty.call(remote.indexedDB, k)) continue;
-                try {
-                    await localforage.setItem(k, remote.indexedDB[k]);
-                    count++;
-                } catch (e) {}
+            // 3) 写入云端数据（键名带有目标 SESSION_ID 前缀，直接写入即可）
+            var count = 0;
+            if (remote.indexedDB) {
+                for (var k in remote.indexedDB) {
+                    if (!Object.prototype.hasOwnProperty.call(remote.indexedDB, k)) continue;
+                    try {
+                        await localforage.setItem(k, remote.indexedDB[k]);
+                        count++;
+                    } catch (e) {}
+                }
             }
+            if (remote.localStorage) {
+                for (var lk2 in remote.localStorage) {
+                    if (!Object.prototype.hasOwnProperty.call(remote.localStorage, lk2)) continue;
+                    try {
+                        var v = remote.localStorage[lk2];
+                        if (v == null) localStorage.removeItem(lk2);
+                        else localStorage.setItem(lk2, v);
+                        count++;
+                    } catch (e) {}
+                }
+            }
+
+            // 4) 切换 SESSION_ID
+            try {
+                await localforage.setItem(APP_PREFIX_STR + 'lastSessionId', targetSessionId);
+            } catch (e) {}
+
+            // 恢复完成后不清除 restoreInProgress 标记，让即将到来的 reload 处理一切
+            // （如果 reload 因某种原因失败，页面下次刷新时也会正常初始化）
+            return { count: count, savedAt: remote.savedAt, sessionId: targetSessionId };
+        } catch (e) {
+            // 失败时解除锁定
+            _state.restoreInProgress = false;
+            // 也清掉可能因清空触发的防抖
+            if (_state.pendingTimer) {
+                clearTimeout(_state.pendingTimer);
+                _state.pendingTimer = null;
+            }
+            throw e;
         }
-        if (remote.localStorage) {
-            for (var lk2 in remote.localStorage) {
-                if (!Object.prototype.hasOwnProperty.call(remote.localStorage, lk2)) continue;
-                try {
-                    var v = remote.localStorage[lk2];
-                    if (v == null) localStorage.removeItem(lk2);
-                    else localStorage.setItem(lk2, v);
-                    count++;
-                } catch (e) {}
-            }
-        }
-
-        // 4) 切换 SESSION_ID：写到 app 存储位置（localforage 里的 lastSessionId）
-        try {
-            await localforage.setItem(APP_PREFIX_STR + 'lastSessionId', targetSessionId);
-        } catch (e) {}
-
-        return { count: count, savedAt: remote.savedAt, sessionId: targetSessionId };
     }
 
     // ==== 主同步动作（异步，不抛错） ====
@@ -400,6 +440,10 @@
         if (!window.CloudSync || !window.CloudSync.isConnected()) return;
         // 未就绪时不同步：避免 app 启动加载数据时被误触发
         if (!_state.ready && reason === 'change') return;
+        // 恢复进行中：完全暂停同步（避免半状态被上传覆盖云端好数据）
+        if (_state.restoreInProgress) return;
+        // 等待用户选择要恢复哪个梦角时：暂停同步（本地是空的，别上传空数据覆盖云端）
+        if (_state.awaitingRestoreChoice) return;
         if (_state.pendingTimer) {
             clearTimeout(_state.pendingTimer);
             _state.pendingTimer = null;
@@ -537,11 +581,15 @@
             }
             _state.restoreOffered = true;
 
+            // 关键：在用户做出选择之前，禁止同步——否则本地空数据会被上传，
+            // 覆盖云端 index 里已有的梦角登记。
+            _state.awaitingRestoreChoice = true;
+
             // 交给 UI 层展示选择器
             if (typeof window.__cloudSyncShowRestorePicker === 'function') {
                 window.__cloudSyncShowRestorePicker(list, { autoTriggered: true });
             }
-            _state.ready = true;
+            // 不设 ready=true，直到用户做出选择（选完会 reload，或取消时 UI 层解除锁定）
         } catch (e) {
             console.warn('[cloud-sync-engine] 启动检测失败', e);
             _state.ready = true;
@@ -577,11 +625,19 @@
     }
 
     // ==== 暴露 ====
+    // 供 UI 调用：用户在"自动触发的选择器"里点了取消 / 关闭
+    // 释放"等待选择"锁，允许后续正常同步
+    function cancelRestorePrompt() {
+        _state.awaitingRestoreChoice = false;
+        _state.ready = true;
+    }
+
     global.CloudSyncEngine = {
         requestSync: requestSync,
         requestSyncNow: requestSyncNow,
         listCloudSessions: listCloudSessions,
         restoreSession: restoreSession,
+        cancelRestorePrompt: cancelRestorePrompt,
         getSyncStatus: getSyncStatus,
         onSyncStatusChange: onSyncStatusChange
     };

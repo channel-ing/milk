@@ -135,6 +135,13 @@
 
     /**
      * 测试连接：向 Bucket 发送一个 GET (?prefix=&max-keys=1) 请求，验证凭据可用
+     *
+     * 说明：浏览器出于安全考虑禁止 JavaScript 设置 Date 请求头，因此改用阿里云的
+     * URL 签名方式（把签名信息放到查询参数里），避免 "OSS authentication requires
+     * a valid Date." 错误。
+     *
+     * 参考：https://help.aliyun.com/document_detail/31952.html
+     *
      * @returns {Promise<{ok:boolean, code?:string, message?:string}>}
      */
     async function testConnection(cfg) {
@@ -143,33 +150,31 @@
             return { ok: false, code: 'MISSING_CONFIG', message: '请填写完整的密钥信息' };
         }
         var host = cfg.bucket + '.' + cfg.region + '.aliyuncs.com';
-        var url = 'https://' + host + '/?max-keys=1';
-        var date = _gmtDate();
+        // URL 签名：Expires 用秒级时间戳（120 秒有效期）
+        var expires = Math.floor(Date.now() / 1000) + 120;
+        var canonicalResource = '/' + cfg.bucket + '/';
+        var stringToSign = 'GET\n\n\n' + expires + '\n' + canonicalResource;
         try {
-            var auth = await _buildAuthHeader('GET', cfg.bucket, '', date, '', cfg.accessKeyId, cfg.accessKeySecret);
-            var res = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': auth,
-                    'Date': date
-                }
-            });
+            var signature = await _hmacSha1Base64(cfg.accessKeySecret, stringToSign);
+            var params = '?max-keys=1'
+                + '&OSSAccessKeyId=' + encodeURIComponent(cfg.accessKeyId)
+                + '&Expires=' + expires
+                + '&Signature=' + encodeURIComponent(signature);
+            var url = 'https://' + host + '/' + params;
+            var res = await fetch(url, { method: 'GET' });
             if (res.ok) {
                 return { ok: true };
             }
-            // 尝试解析 OSS 错误
             var text = '';
             try { text = await res.text(); } catch (e) {}
             var codeMatch = /<Code>([^<]+)<\/Code>/.exec(text);
             var msgMatch = /<Message>([^<]+)<\/Message>/.exec(text);
             var code = codeMatch ? codeMatch[1] : ('HTTP_' + res.status);
             var message = msgMatch ? msgMatch[1] : ('请求失败：HTTP ' + res.status);
-            // 常见错误的中文说明
             var friendly = _friendlyError(code, message, res.status);
             return { ok: false, code: code, message: friendly };
         } catch (e) {
             console.warn('[cloud-sync] 测试连接失败', e);
-            // 网络错误 / CORS
             var msg = String(e && e.message || e);
             if (/Failed to fetch|NetworkError|CORS/i.test(msg)) {
                 return {

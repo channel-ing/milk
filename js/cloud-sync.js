@@ -222,7 +222,9 @@
         query['x-oss-credential'] = credential;
         query['x-oss-date'] = dateTime;
         query['x-oss-expires'] = '120';
-        query['x-oss-signed-headers'] = 'host';
+        // 注意：query 参数名是 x-oss-additional-headers，不是 x-oss-signed-headers
+        // 且当只签名 host（默认）时可以不添加此参数；此处按官方 Java example 加上
+        query['x-oss-additional-headers'] = 'host';
 
         // 排序后拼接 canonical query string
         var keys = Object.keys(query).sort();
@@ -230,16 +232,26 @@
             return _ossEncode(k, true) + '=' + _ossEncode(query[k], true);
         }).join('&');
 
-        var canonicalUri = '/' + (objectKey ? _ossEncode(objectKey, false) : '');
+        // canonicalUri：签名计算用，必须包含 bucket 名（V4 要求）
+        var canonicalUri = '/' + cfg.bucket + '/' + (objectKey ? _ossEncode(objectKey, false) : '');
+        // requestPath：实际请求的路径，虚拟主机风格下不含 bucket 名
+        var requestPath = '/' + (objectKey ? _ossEncode(objectKey, false) : '');
         var canonicalHeaders = 'host:' + host + '\n';
-        var signedHeaders = 'host';
+        var additionalHeaders = 'host';
 
+        // Canonical Request 结构（V4）：
+        //   HTTP Verb \n
+        //   Canonical URI \n
+        //   Canonical Query String \n
+        //   Canonical Headers（每行以 \n 结尾）\n   ← 这里的 \n 由 join 补充，使 canonicalHeaders 后有空行
+        //   Additional Headers \n
+        //   Hashed Payload
         var canonicalRequest = [
             method,
             canonicalUri,
             canonicalQuery,
-            canonicalHeaders,
-            signedHeaders,
+            canonicalHeaders,       // 已含尾部 \n；join('\n') 后形成空行
+            additionalHeaders,
             'UNSIGNED-PAYLOAD'
         ].join('\n');
 
@@ -259,7 +271,7 @@
         var signature = _bytesToHex(sigBytes);
 
         var finalQuery = canonicalQuery + '&x-oss-signature=' + _ossEncode(signature, true);
-        return 'https://' + host + canonicalUri + '?' + finalQuery;
+        return 'https://' + host + requestPath + '?' + finalQuery;
     }
 
     /**

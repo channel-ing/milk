@@ -43,11 +43,12 @@
         return null;
     }
 
-    // "文字类"数据的键名匹配规则（按 SESSION_ID 前缀过滤后再匹配）
-    // 图片/音频类不在此列表 → 留给阶段三
-    var TEXT_KEY_NEEDLES = [
+    // ==== 键名分类 ====
+
+    // 1) 带 SESSION_ID 前缀的文字类键（媒体类不在此列，留阶段三）
+    var SESSION_TEXT_NEEDLES = [
         // 聊天
-        'chatMessages', 'sessionList', 'chatSettings', 'showPartnerNameInChat',
+        'chatMessages', 'chatSettings', 'showPartnerNameInChat',
         'envelopeData', 'pending_envelope',
         // 回复 / 氛围
         'customReplies', 'customPokes', 'customStatuses', 'customMottos',
@@ -57,13 +58,39 @@
         'anniversaries',
         // 心情手账（不含图片）
         'moodCalendar', 'customMoodOptions', 'moodTrash',
-        // 主题配置（不含图片本身）
-        'customThemes', 'themeSchemes', 'partnerPersonas',
-        // 陪伴日记文字（背景图独立存，未来阶段三处理）
-        'companionData', 'companionDiary'
+        // 主题人设
+        'partnerPersonas',
+        // 贴纸库（文字索引，实际图片阶段三处理）
+        'stickerLibrary', 'myStickerLibrary',
+        // 陪伴日记文字
+        'companionData', 'companionDiary',
+        // 信件
+        'partnerLetterNextTime'
     ];
 
-    // localStorage 中的文字类键
+    // 媒体类键（带 SESSION_ID 前缀，阶段三才处理，这里只列出以便排除）
+    var SESSION_MEDIA_NEEDLES = [
+        'chatBackground', 'backgroundGallery',
+        'partnerAvatar', 'myAvatar',
+        'companionDiaryBg', 'companionDiaryBgGallery'
+    ];
+
+    // 2) 全局键（无 SESSION_ID 前缀）- 文字类，需要同步
+    var GLOBAL_TEXT_KEYS = [
+        APP_PREFIX_STR + 'sessionList',    // 梦角列表（最重要！）
+        APP_PREFIX_STR + 'customThemes',   // 主题
+        APP_PREFIX_STR + 'themeSchemes'    // 主题方案
+    ];
+
+    // 不同步的全局键（系统状态，不属于用户数据）
+    var GLOBAL_SKIP_KEYS = [
+        APP_PREFIX_STR + 'cloudSyncConfig',
+        APP_PREFIX_STR + 'tour_seen',
+        APP_PREFIX_STR + 'MIGRATION_V2_DONE',
+        APP_PREFIX_STR + 'lastSessionId'
+    ];
+
+    // 3) localStorage 中的文字类键
     var TEXT_LS_KEYS = [
         'groupChatSettings',
         'disabledReplyItems', 'pokeSym_my', 'pokeSym_partner',
@@ -72,7 +99,6 @@
         'dg_custom_data', 'dg_status_pool', 'weekly_fortune', 'daily_fortune',
         'voiceTtsConfig'
     ];
-    // localStorage 前缀匹配
     var TEXT_LS_PREFIXES = ['customWeather_'];
 
     // 同步状态（内存）
@@ -133,21 +159,29 @@
         };
     }
 
-    // ==== 判断某个 localforage key 是否属于"文字类" ====
+    // ==== 判断某个 localforage key 是否需要同步 ====
     function _isTextKey(key) {
-        // 只处理带 APP_PREFIX 的键
         if (key.indexOf(APP_PREFIX_STR) !== 0) return false;
 
-        // SESSION_ID 隔离：只同步当前 SESSION 的数据
-        var sid = (typeof SESSION_ID !== 'undefined' && SESSION_ID) ? SESSION_ID : null;
-        if (sid) {
-            var expectedPrefix = APP_PREFIX_STR + sid + '_';
-            if (key.indexOf(expectedPrefix) !== 0) return false;
+        // 全局文字键（直接匹配）
+        if (GLOBAL_TEXT_KEYS.indexOf(key) !== -1) return true;
+
+        // 跳过的全局键（密钥、系统状态）
+        if (GLOBAL_SKIP_KEYS.indexOf(key) !== -1) return false;
+
+        // 跳过媒体类键（带 SESSION_ID 前缀，阶段三处理）
+        for (var m = 0; m < SESSION_MEDIA_NEEDLES.length; m++) {
+            if (key.indexOf(SESSION_MEDIA_NEEDLES[m]) !== -1) return false;
         }
 
-        // 是否匹配任一文字类键名
-        for (var i = 0; i < TEXT_KEY_NEEDLES.length; i++) {
-            if (key.indexOf(TEXT_KEY_NEEDLES[i]) !== -1) return true;
+        // 带 SESSION_ID 前缀的文字类键
+        var sid = (typeof SESSION_ID !== 'undefined' && SESSION_ID) ? SESSION_ID : null;
+        if (sid) {
+            var sessionPrefix = APP_PREFIX_STR + sid + '_';
+            if (key.indexOf(sessionPrefix) !== 0) return false;
+        }
+        for (var i = 0; i < SESSION_TEXT_NEEDLES.length; i++) {
+            if (key.indexOf(SESSION_TEXT_NEEDLES[i]) !== -1) return true;
         }
         return false;
     }

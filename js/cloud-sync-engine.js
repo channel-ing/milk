@@ -366,7 +366,7 @@
                     try { await localforage.removeItem(keys[i]); } catch (e) {}
                 }
             }
-            // 2) 清 localStorage 里 app 相关的
+            // 2) 清 localStorage 里 app 相关的（包括紧急备份！）
             try {
                 var lsKeys = [];
                 for (var j = 0; j < localStorage.length; j++) {
@@ -374,6 +374,13 @@
                     if (lk) lsKeys.push(lk);
                 }
                 for (var m = 0; m < lsKeys.length; m++) {
+                    // 紧急备份 / crash recovery 数据：必须清掉，否则 app 重启会用旧数据覆盖我们刚恢复的数据
+                    if (lsKeys[m] === 'BACKUP_V1_critical' ||
+                        lsKeys[m] === 'BACKUP_V1_timestamp' ||
+                        lsKeys[m] === '_cdRecLogs') {
+                        localStorage.removeItem(lsKeys[m]);
+                        continue;
+                    }
                     if (TEXT_LS_KEYS.indexOf(lsKeys[m]) !== -1) {
                         localStorage.removeItem(lsKeys[m]);
                         continue;

@@ -432,10 +432,18 @@
             '</div>';
         document.body.appendChild(m);
 
+        function _closePicker() {
+            m.remove();
+            // 如果是自动弹出的（本地空+云端有），用户取消 → 通知引擎解除等待锁
+            if (opts.autoTriggered && window.CloudSyncEngine && window.CloudSyncEngine.cancelRestorePrompt) {
+                window.CloudSyncEngine.cancelRestorePrompt();
+            }
+        }
+
         m.addEventListener('click', function (e) {
-            if (e.target === m) m.remove();
+            if (e.target === m) _closePicker();
         });
-        m.querySelector('#cs-picker-cancel').addEventListener('click', function () { m.remove(); });
+        m.querySelector('#cs-picker-cancel').addEventListener('click', _closePicker);
 
         var items = m.querySelectorAll('.cs-session-item');
         for (var i = 0; i < items.length; i++) {
@@ -443,13 +451,25 @@
                 item.addEventListener('click', async function () {
                     var idx = parseInt(item.getAttribute('data-idx'), 10);
                     var s = list[idx];
-                    if (!confirm('将本浏览器切换为「' + (s.name || '未命名梦角') + '」，当前所有数据会被替换，不可撤销。\n\n确定继续？')) return;
+                    var name = s.name || '未命名梦角';
+
+                    // 特别提示：如果选中的就是当前梦角
+                    var isCurrent = (typeof SESSION_ID !== 'undefined') && (s.sessionId === SESSION_ID);
+                    var confirmMsg;
+                    if (isCurrent) {
+                        confirmMsg = '你选择的是当前正在使用的梦角「' + name + '」。\n\n' +
+                                     '恢复操作会用云端数据覆盖本地。如果本地有云端还没同步的最新改动，会丢失。\n\n' +
+                                     '是否继续？';
+                    } else {
+                        confirmMsg = '将本浏览器切换为「' + name + '」，当前所有数据会被替换，不可撤销。\n\n确定继续？';
+                    }
+                    if (!confirm(confirmMsg)) return;
 
                     item.style.opacity = '0.5';
                     item.textContent = '正在恢复…';
                     try {
                         var result = await window.CloudSyncEngine.restoreSession(s.sessionId);
-                        alert('已恢复「' + (s.name || '未命名梦角') + '」，共 ' + result.count + ' 项数据。\n\n即将刷新页面以生效。');
+                        alert('已恢复「' + name + '」，共 ' + result.count + ' 项数据。\n\n即将刷新页面以生效。');
                         m.remove();
                         location.reload();
                     } catch (e) {

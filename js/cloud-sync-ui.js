@@ -373,24 +373,22 @@
     function watchDataModal() {
         var dataModal = document.getElementById('data-modal');
         if (!dataModal) {
-            // DOM 还没准备好，稍后重试
             setTimeout(watchDataModal, 500);
             return;
         }
-        // 弹窗显示时插入我们的板块
+        // data.js 用 setTimeout(init,0) 注册它自己的 observer，所以我们的 observer 会先触发。
+        // 延迟 120ms，等 data.js 的 ensureHTML/writeHTML 执行完毕再插入，否则会被覆盖。
         var observer = new MutationObserver(function () {
-            if (dataModal.style.display && dataModal.style.display !== 'none') {
-                injectStyles();
-                insertCloudSection();
-                updateStatusBadge();
+            var d = dataModal.style.display;
+            if (d === 'flex' || d === 'block') {
+                setTimeout(function () {
+                    injectStyles();
+                    insertCloudSection();
+                    updateStatusBadge();
+                }, 120);
             }
         });
-        observer.observe(dataModal, { attributes: true, attributeFilter: ['style', 'class'] });
-
-        // 首次尝试（如果本就是打开的）
-        injectStyles();
-        insertCloudSection();
-        updateStatusBadge();
+        observer.observe(dataModal, { attributes: true, attributeFilter: ['style'] });
     }
 
     // ==== 启动 ====

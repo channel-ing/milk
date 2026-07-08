@@ -41,8 +41,9 @@
             '#' + MODAL_ID + ' .cs-input:focus, #' + MODAL_ID + ' .cs-select:focus { outline: none; border-color: var(--accent-color, #c5a47e); background: var(--secondary-bg, #fff); }',
             '#' + MODAL_ID + ' .cs-hint { font-size: 11px; color: var(--text-secondary, #aaa); margin-top: 5px; line-height: 1.5; }',
             '#' + MODAL_ID + ' .cs-help-link { color: var(--accent-color, #c5a47e); font-size: 12px; text-decoration: underline; cursor: pointer; margin-bottom: 12px; display: inline-block; }',
-            '#' + MODAL_ID + ' .cs-actions { display: flex; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color, #eee); background: var(--secondary-bg, #fafafa); flex-shrink: 0; }',
-            '#' + MODAL_ID + ' .cs-btn { flex: 1; padding: 11px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }',
+            '#' + MODAL_ID + ' .cs-actions { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border-color, #eee); background: var(--secondary-bg, #fafafa); flex-shrink: 0; }',
+            '#' + MODAL_ID + ' .cs-btn { flex: 1; padding: 11px 6px; border-radius: 10px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }',
+            '#' + MODAL_ID + ' #cs-disconnect.cs-btn { padding: 10px; font-size: 13px; }',
             '#' + MODAL_ID + ' .cs-btn-primary { background: var(--accent-color, #c5a47e); color: #fff; }',
             '#' + MODAL_ID + ' .cs-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }',
             '#' + MODAL_ID + ' .cs-btn-secondary { background: var(--input-bg, #f0f0f0); color: var(--text-color, #333); }',
@@ -135,14 +136,13 @@
         if (m) return m;
         m = document.createElement('div');
         m.id = MODAL_ID;
-        m.className = 'modal';
-        m.style.display = 'none';
+        m.style.cssText = 'display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
         m.innerHTML =
-            '<div class="modal-content" style="max-width:460px;max-height:90vh;display:flex;flex-direction:column;">' +
-                '<div class="modal-title" style="flex-shrink:0;">' +
+            '<div class="modal-content" style="max-width:460px;width:100%;max-height:90vh;display:flex;flex-direction:column;background:var(--secondary-bg,#fff);border-radius:16px;overflow:hidden;opacity:1;transform:none;">' +
+                '<div class="modal-title" style="flex-shrink:0;padding:16px 20px;">' +
                     '<i class="fas fa-cloud"></i><span>云端同步设置</span>' +
                 '</div>' +
-                '<div class="cs-form">' +
+                    '<div class="cs-form" style="flex:1;overflow-y:auto;">' +
                     '<span class="cs-help-link" id="cs-open-help"><i class="fas fa-circle-question"></i> 如何申请阿里云密钥？</span>' +
                     '<div class="cs-test-result" id="cs-test-result"></div>' +
                     '<div class="cs-field">' +
@@ -161,11 +161,11 @@
                     '<div class="cs-field">' +
                         '<label class="cs-label">AccessKey Secret</label>' +
                         '<input class="cs-input" id="cs-ak-secret" type="password" autocomplete="off" />' +
-                        '<div class="cs-hint">密钥仅保存在你的浏览器本地，Anthropic 与阿里云之外的任何服务器都不会拿到。</div>' +
+                        '<div class="cs-hint">密钥仅保存在你的浏览器本地，不会上传到任何服务器（除了阿里云本身）。</div>' +
                     '</div>' +
+                    '<button class="cs-btn cs-btn-danger" id="cs-disconnect" style="display:none;width:100%;margin-top:6px;">断开连接</button>' +
                 '</div>' +
                 '<div class="cs-actions">' +
-                    '<button class="cs-btn cs-btn-danger" id="cs-disconnect" style="display:none;">断开连接</button>' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-cancel">取消</button>' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-test">测试连接</button>' +
                     '<button class="cs-btn cs-btn-primary" id="cs-save">保存并连接</button>' +
@@ -310,14 +310,13 @@
         if (m) return m;
         m = document.createElement('div');
         m.id = HELP_MODAL_ID;
-        m.className = 'modal';
-        m.style.display = 'none';
+        m.style.cssText = 'display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
         m.innerHTML =
-            '<div class="modal-content" style="max-width:480px;max-height:88vh;display:flex;flex-direction:column;">' +
-                '<div class="modal-title" style="flex-shrink:0;">' +
+            '<div class="modal-content" style="max-width:480px;width:100%;max-height:88vh;display:flex;flex-direction:column;background:var(--secondary-bg,#fff);border-radius:16px;overflow:hidden;opacity:1;transform:none;">' +
+                '<div class="modal-title" style="flex-shrink:0;padding:16px 20px;">' +
                     '<i class="fas fa-circle-question"></i><span>如何申请阿里云 OSS 密钥</span>' +
                 '</div>' +
-                '<div class="cs-help-body" style="overflow-y:auto;">' +
+                '<div class="cs-help-body" style="flex:1;overflow-y:auto;">' +
                     '<h4>1. 开通对象存储 OSS</h4>' +
                     '<ol>' +
                         '<li>打开 <a href="https://www.aliyun.com" target="_blank" rel="noopener">aliyun.com</a>，用手机号登录并完成实名认证</li>' +

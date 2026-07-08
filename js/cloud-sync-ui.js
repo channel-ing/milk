@@ -117,6 +117,11 @@
             badge.className = 'cs-status-badge cs-status-connected';
             badge.textContent = '已连接';
             desc.textContent = cfg.bucket + '（' + _regionLabel(cfg.region) + '）';
+        } else if (cfg && cfg.bucket) {
+            // 密钥已保存但未验证
+            badge.className = 'cs-status-badge cs-status-error';
+            badge.textContent = '未验证';
+            desc.textContent = cfg.bucket + '（连接未验证，点击重试）';
         } else {
             badge.className = 'cs-status-badge cs-status-disconnected';
             badge.textContent = '未连接';
@@ -197,14 +202,19 @@
         return m;
     }
 
+    // 表单临时草稿（弹窗关闭后仍保留，直到成功保存或用户明确清除）
+    var _formDraft = null;
+
     function openConfigModal() {
         injectStyles();
         var m = ensureConfigModal();
         var cfg = (window.CloudSync && window.CloudSync.getConfig()) || {};
-        m.querySelector('#cs-bucket').value    = cfg.bucket || '';
-        m.querySelector('#cs-region').value    = cfg.region || 'oss-cn-hangzhou';
-        m.querySelector('#cs-ak-id').value     = cfg.accessKeyId || '';
-        m.querySelector('#cs-ak-secret').value = cfg.accessKeySecret || '';
+        // 优先用草稿（用户上次填了但没成功保存的），否则用已保存的配置
+        var initial = _formDraft || cfg;
+        m.querySelector('#cs-bucket').value    = initial.bucket || '';
+        m.querySelector('#cs-region').value    = initial.region || 'oss-cn-hangzhou';
+        m.querySelector('#cs-ak-id').value     = initial.accessKeyId || '';
+        m.querySelector('#cs-ak-secret').value = initial.accessKeySecret || '';
         m.querySelector('#cs-test-result').className = 'cs-test-result';
         m.querySelector('#cs-test-result').textContent = '';
         m.querySelector('#cs-disconnect').style.display =
@@ -214,7 +224,10 @@
 
     function closeConfigModal() {
         var m = document.getElementById(MODAL_ID);
-        if (m) m.style.display = 'none';
+        if (!m) return;
+        // 关闭时把当前输入内容存到草稿，下次打开还在
+        try { _formDraft = _readForm(); } catch (e) {}
+        m.style.display = 'none';
     }
 
     function _readForm() {
@@ -274,11 +287,29 @@
         try {
             var result = await window.CloudSync.testConnection(cfg);
             if (!result.ok) {
-                _showResult('err', '✗ ' + (result.message || '连接失败，未保存'));
+                // 测试失败也让用户可以强制保存（可能是权限刚授权还没生效等临时情况）
+                var msg = result.message || '连接失败';
+                var forceSave = confirm(
+                    '连接测试失败：\n\n' + msg + '\n\n' +
+                    '这可能是权限刚授权还没生效、或者暂时的网络问题。\n' +
+                    '是否仍然保存密钥？（保存后可稍后重试连接）'
+                );
+                if (!forceSave) {
+                    _showResult('err', '✗ ' + msg);
+                    return;
+                }
+                // 用户选择强制保存：不设 connectedAt，标记为"未验证"
+                cfg.connectedAt = null;
+                cfg.savedAt = new Date().toISOString();
+                await window.CloudSync.saveConfig(cfg);
+                _formDraft = null;
+                _showResult('err', '⚠ 密钥已保存，但连接未验证。稍后请重新测试。');
+                updateStatusBadge();
                 return;
             }
             cfg.connectedAt = new Date().toISOString();
             await window.CloudSync.saveConfig(cfg);
+            _formDraft = null; // 保存成功，清掉草稿
             _showResult('ok', '✓ 已连接并保存');
             updateStatusBadge();
             if (typeof showNotification === 'function') {
@@ -371,6 +402,27 @@
 
     // ==== 与数据管理页的挂接 ====
     // 数据管理弹窗每次打开时（点击设置里的入口）会触发 rebuild；用 MutationObserver 监听插入时机
+    // 静默重测（用于面板打开时，如果处于"已保存但未验证"状态，后台尝试再连一次）
+    async function _silentRetest() {
+        if (!window.CloudSync) return;
+        var cfg = window.CloudSync.getConfig();
+        if (!cfg || !cfg.bucket) return;
+        if (window.CloudSync.isConnected()) return; // 已连接，不用重测
+        try {
+            var result = await window.CloudSync.testConnection(cfg);
+            if (result.ok) {
+                cfg.connectedAt = new Date().toISOString();
+                await window.CloudSync.saveConfig(cfg);
+                updateStatusBadge();
+                if (typeof showNotification === 'function') {
+                    showNotification('云端连接已恢复', 'success', 2000);
+                }
+            }
+        } catch (e) {
+            // 静默失败，保持"未验证"状态
+        }
+    }
+
     function watchDataModal() {
         var dataModal = document.getElementById('data-modal');
         if (!dataModal) {
@@ -386,6 +438,7 @@
                     injectStyles();
                     insertCloudSection();
                     updateStatusBadge();
+                    _silentRetest();
                 }, 120);
             }
         });

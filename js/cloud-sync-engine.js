@@ -426,16 +426,23 @@
                 }
             }
 
-            // 4) 确保 sessionList 里有目标 session，且 lastSessionId 指向它
-            // （恢复的云端数据里 sessionList 应该已经包含目标 session，但以防万一）
+            // 4) 强制设置 lastSessionId 和 sessionList，确保 app 用正确的 session 启动
             try {
-                var sl = await localforage.getItem(APP_PREFIX_STR + 'sessionList');
-                if (!sl) sl = [];
-                var hasTarget = sl.some(function(s) { return s && s.id === targetSessionId; });
-                if (!hasTarget) {
-                    sl.push({ id: targetSessionId, name: '已恢复的梦角', createdAt: Date.now() });
-                    await localforage.setItem(APP_PREFIX_STR + 'sessionList', sl);
+                // 从 remote 拿到正确的 sessionList（云端存的原始 sessionList）
+                var remoteSessionList = (remote.indexedDB && remote.indexedDB[APP_PREFIX_STR + 'sessionList']) || null;
+                if (Array.isArray(remoteSessionList) && remoteSessionList.some(function(s) { return s && s.id === targetSessionId; })) {
+                    // 直接用云端的 sessionList，它包含目标 session
+                    await localforage.setItem(APP_PREFIX_STR + 'sessionList', remoteSessionList);
+                } else {
+                    // 兜底：确保目标 session 在列表里
+                    var sl = await localforage.getItem(APP_PREFIX_STR + 'sessionList');
+                    if (!Array.isArray(sl)) sl = [];
+                    if (!sl.some(function(s) { return s && s.id === targetSessionId; })) {
+                        sl.push({ id: targetSessionId, name: _extractPartnerName(remote) || '已恢复的梦角', createdAt: Date.now() });
+                        await localforage.setItem(APP_PREFIX_STR + 'sessionList', sl);
+                    }
                 }
+                // lastSessionId 强制指向目标
                 await localforage.setItem(APP_PREFIX_STR + 'lastSessionId', targetSessionId);
             } catch (e) {}
 

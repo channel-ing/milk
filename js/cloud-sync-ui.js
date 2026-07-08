@@ -194,7 +194,7 @@
                         '<div class="cs-hint">密钥仅保存在你的浏览器本地，不会上传到任何服务器（除了阿里云本身）。</div>' +
                     '</div>' +
                     '<button class="cs-btn cs-btn-danger" id="cs-disconnect" style="display:none;width:100%;margin-top:6px;">断开连接</button>' +
-                    '<button class="cs-btn cs-btn-secondary" id="cs-restore" style="display:none;width:100%;margin-top:8px;">从云端恢复数据到本设备</button>' +
+                    '<button class="cs-btn cs-btn-secondary" id="cs-restore" style="display:none;width:100%;margin-top:8px;">从云端恢复梦角到本浏览器</button>' +
                 '</div>' +
                 '<div class="cs-actions">' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-cancel">取消</button>' +
@@ -245,7 +245,7 @@
         m.querySelector('#cs-disconnect').style.display =
             (window.CloudSync && window.CloudSync.isConnected()) ? '' : 'none';
         m.querySelector('#cs-restore').style.display =
-            (window.CloudSync && window.CloudSync.isConnected() && window.CloudSyncEngine) ? '' : 'none';
+            (window.CloudSync && window.CloudSync.isConnected() && window.CloudSyncEngine && window.CloudSyncEngine.listCloudSessions) ? '' : 'none';
         m.style.display = 'flex';
     }
 
@@ -365,24 +365,110 @@
     }
 
     async function onManualRestore() {
-        if (!window.CloudSyncEngine || !window.CloudSyncEngine.manualRestore) {
+        if (!window.CloudSyncEngine || !window.CloudSyncEngine.listCloudSessions) {
             _showResult('err', '同步引擎未就绪，请刷新页面后重试');
             return;
         }
-        if (!confirm('将从云端下载最新数据并覆盖本设备的对应数据。\n\n确定继续吗？')) return;
-        _showResult('loading', '正在从云端下载数据…');
+        _showResult('loading', '正在读取云端梦角列表…');
         var btn = document.querySelector('#' + MODAL_ID + ' #cs-restore');
         if (btn) btn.disabled = true;
         try {
-            var result = await window.CloudSyncEngine.manualRestore();
-            var savedAt = result.savedAt ? new Date(result.savedAt).toLocaleString('zh-CN') : '未知';
-            _showResult('ok', '✓ 已恢复 ' + result.count + ' 项数据（云端保存于 ' + savedAt + '）\n请刷新页面以生效。');
+            var list = await window.CloudSyncEngine.listCloudSessions();
+            if (!list || list.length === 0) {
+                _showResult('err', '云端没有可恢复的梦角');
+                return;
+            }
+            _showResult('', '');
+            closeConfigModal();
+            showRestorePicker(list, { autoTriggered: false });
         } catch (e) {
-            _showResult('err', '✗ 恢复失败：' + (e && e.message || e));
+            _showResult('err', '✗ ' + (e && e.message || e));
         } finally {
             if (btn) btn.disabled = false;
         }
     }
+
+    // ==== 梦角选择弹窗 ====
+    function showRestorePicker(list, opts) {
+        opts = opts || {};
+        injectStyles();
+        var existing = document.getElementById('cs-restore-picker');
+        if (existing) existing.remove();
+
+        var m = document.createElement('div');
+        m.id = 'cs-restore-picker';
+        m.style.cssText = 'display:flex;position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+        var itemsHtml = list.map(function (s, idx) {
+            var name = s.name || '未命名梦角';
+            var timeStr = s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '未知';
+            return '<div class="cs-session-item" data-idx="' + idx + '" style="' +
+                'padding:14px 16px;border:1px solid var(--border-color,#e6e6e6);border-radius:12px;' +
+                'margin-bottom:10px;cursor:pointer;background:var(--input-bg,#fafafa);' +
+                'transition:transform .12s ease, border-color .12s ease;">' +
+                '<div style="font-size:15px;font-weight:600;color:var(--text-color,#333);margin-bottom:4px;">' + _escape(name) + '</div>' +
+                '<div style="font-size:12px;color:var(--text-secondary,#888);">上次同步：' + timeStr + '</div>' +
+            '</div>';
+        }).join('');
+
+        var titleText = opts.autoTriggered
+            ? '选择要在本浏览器使用的梦角'
+            : '从云端恢复梦角';
+        var descText = opts.autoTriggered
+            ? '云端有以下梦角，请选择一个恢复到本浏览器：'
+            : '⚠️ 选中后，本浏览器当前的所有数据将被替换，不可撤销。';
+
+        m.innerHTML =
+            '<div style="max-width:460px;width:100%;max-height:82vh;display:flex;flex-direction:column;' +
+                'background:var(--secondary-bg,#fff);border-radius:16px;overflow:hidden;opacity:1;transform:none;">' +
+                '<div style="padding:16px 20px;font-size:16px;font-weight:600;color:var(--text-color,#333);flex-shrink:0;">' +
+                    '<i class="fas fa-cloud-download-alt"></i>&nbsp;' + titleText +
+                '</div>' +
+                '<div style="padding:0 20px 8px;font-size:12px;color:var(--text-secondary,#888);flex-shrink:0;">' + descText + '</div>' +
+                '<div style="flex:1;overflow-y:auto;padding:8px 20px 4px;" id="cs-session-list">' + itemsHtml + '</div>' +
+                '<div style="padding:12px 20px;border-top:1px solid var(--border-color,#eee);background:var(--secondary-bg,#fafafa);display:flex;gap:10px;flex-shrink:0;">' +
+                    '<button class="cs-btn cs-btn-secondary" id="cs-picker-cancel" style="flex:1;padding:11px;border-radius:10px;border:none;font-size:14px;background:var(--input-bg,#f0f0f0);color:var(--text-color,#333);cursor:pointer;">取消</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(m);
+
+        m.addEventListener('click', function (e) {
+            if (e.target === m) m.remove();
+        });
+        m.querySelector('#cs-picker-cancel').addEventListener('click', function () { m.remove(); });
+
+        var items = m.querySelectorAll('.cs-session-item');
+        for (var i = 0; i < items.length; i++) {
+            (function (item) {
+                item.addEventListener('click', async function () {
+                    var idx = parseInt(item.getAttribute('data-idx'), 10);
+                    var s = list[idx];
+                    if (!confirm('将本浏览器切换为「' + (s.name || '未命名梦角') + '」，当前所有数据会被替换，不可撤销。\n\n确定继续？')) return;
+
+                    item.style.opacity = '0.5';
+                    item.textContent = '正在恢复…';
+                    try {
+                        var result = await window.CloudSyncEngine.restoreSession(s.sessionId);
+                        alert('已恢复「' + (s.name || '未命名梦角') + '」，共 ' + result.count + ' 项数据。\n\n即将刷新页面以生效。');
+                        m.remove();
+                        location.reload();
+                    } catch (e) {
+                        alert('恢复失败：' + (e && e.message || e));
+                        item.style.opacity = '1';
+                    }
+                });
+            })(items[i]);
+        }
+    }
+
+    function _escape(s) {
+        return String(s || '').replace(/[&<>"']/g, function (c) {
+            return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c];
+        });
+    }
+
+    // 暴露给引擎调用（启动自动检测触发时用）
+    window.__cloudSyncShowRestorePicker = showRestorePicker;
 
     // ==== 帮助弹窗 ====
     function ensureHelpModal() {

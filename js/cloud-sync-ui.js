@@ -23,6 +23,8 @@
         var s = document.createElement('style');
         s.id = 'cloud-sync-style';
         s.textContent = [
+            // 强制我们的弹窗内容始终可见，覆盖 data.js 里的全局动画重置
+            '#' + MODAL_ID + ' .modal-content, #' + HELP_MODAL_ID + ' .modal-content { opacity: 1 !important; transform: none !important; }',
             '#' + SECTION_ID + ' .cs-tile { background: var(--secondary-bg, #fff); border: 1px solid var(--border-color, #eee); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform .15s ease; }',
             '#' + SECTION_ID + ' .cs-tile:active { transform: scale(0.98); }',
             '#' + SECTION_ID + ' .cs-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #6EC7E8, #4AA3D4); flex-shrink: 0; font-size: 18px; }',

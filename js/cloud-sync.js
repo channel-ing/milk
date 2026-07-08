@@ -133,15 +133,138 @@
         return 'OSS ' + accessKeyId + ':' + signature;
     }
 
+    // ==== 阿里云 OSS V4 签名工具 ====
+    // 参考: https://help.aliyun.com/zh/oss/developer-reference/include-signatures-in-the-query-string
+
+    async function _hmacSha256(key, message) {
+        var enc = new TextEncoder();
+        var keyBuf = key instanceof Uint8Array ? key : enc.encode(key);
+        var cryptoKey = await crypto.subtle.importKey(
+            'raw', keyBuf,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false, ['sign']
+        );
+        var sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message));
+        return new Uint8Array(sig);
+    }
+
+    async function _sha256Hex(message) {
+        var enc = new TextEncoder();
+        var buf = await crypto.subtle.digest('SHA-256', enc.encode(message));
+        return _bytesToHex(new Uint8Array(buf));
+    }
+
+    function _bytesToHex(bytes) {
+        var hex = '';
+        for (var i = 0; i < bytes.length; i++) {
+            var h = bytes[i].toString(16);
+            hex += (h.length === 1 ? '0' : '') + h;
+        }
+        return hex;
+    }
+
+    function _iso8601(date) {
+        // YYYYMMDDTHHmmssZ
+        function p(n) { return n < 10 ? '0' + n : '' + n; }
+        return date.getUTCFullYear()
+            + p(date.getUTCMonth() + 1)
+            + p(date.getUTCDate())
+            + 'T'
+            + p(date.getUTCHours())
+            + p(date.getUTCMinutes())
+            + p(date.getUTCSeconds())
+            + 'Z';
+    }
+
+    function _dateStamp(date) {
+        // YYYYMMDD
+        function p(n) { return n < 10 ? '0' + n : '' + n; }
+        return date.getUTCFullYear()
+            + p(date.getUTCMonth() + 1)
+            + p(date.getUTCDate());
+    }
+
+    // OSS 需要的百分号编码（保留 - _ . ~，其它全编码）
+    function _ossEncode(s, encodeSlash) {
+        s = encodeURIComponent(s).replace(/[!'()*]/g, function (c) {
+            return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+        });
+        if (!encodeSlash) s = s.replace(/%2F/g, '/');
+        return s;
+    }
+
     /**
-     * 测试连接：向 Bucket 发送一个 GET (?prefix=&max-keys=1) 请求，验证凭据可用
-     *
-     * 说明：浏览器出于安全考虑禁止 JavaScript 设置 Date 请求头，因此改用阿里云的
-     * URL 签名方式（把签名信息放到查询参数里），避免 "OSS authentication requires
-     * a valid Date." 错误。
-     *
-     * 参考：https://help.aliyun.com/document_detail/31952.html
-     *
+     * 生成阿里云 OSS V4 预签名 URL
+     * @param {object} cfg
+     * @param {string} method  HTTP 方法
+     * @param {string} objectKey  对象 key，可为空
+     * @param {object} extraQuery  额外查询参数（如 {'max-keys': '1'}）
+     */
+    async function _buildV4SignedUrl(cfg, method, objectKey, extraQuery) {
+        var now = new Date();
+        var dateTime = _iso8601(now);
+        var dateStamp = _dateStamp(now);
+        var region = cfg.region.replace(/^oss-/, ''); // "cn-shenzhen"
+        var host = cfg.bucket + '.' + cfg.region + '.aliyuncs.com';
+        var credentialScope = dateStamp + '/' + region + '/oss/aliyun_v4_request';
+        var credential = cfg.accessKeyId + '/' + credentialScope;
+
+        // 查询参数（未签名前的、按字典序）
+        var query = {};
+        if (extraQuery) {
+            for (var k in extraQuery) {
+                if (Object.prototype.hasOwnProperty.call(extraQuery, k)) {
+                    query[k] = String(extraQuery[k]);
+                }
+            }
+        }
+        query['x-oss-signature-version'] = 'OSS4-HMAC-SHA256';
+        query['x-oss-credential'] = credential;
+        query['x-oss-date'] = dateTime;
+        query['x-oss-expires'] = '120';
+        query['x-oss-signed-headers'] = 'host';
+
+        // 排序后拼接 canonical query string
+        var keys = Object.keys(query).sort();
+        var canonicalQuery = keys.map(function (k) {
+            return _ossEncode(k, true) + '=' + _ossEncode(query[k], true);
+        }).join('&');
+
+        var canonicalUri = '/' + (objectKey ? _ossEncode(objectKey, false) : '');
+        var canonicalHeaders = 'host:' + host + '\n';
+        var signedHeaders = 'host';
+
+        var canonicalRequest = [
+            method,
+            canonicalUri,
+            canonicalQuery,
+            canonicalHeaders,
+            signedHeaders,
+            'UNSIGNED-PAYLOAD'
+        ].join('\n');
+
+        var stringToSign = [
+            'OSS4-HMAC-SHA256',
+            dateTime,
+            credentialScope,
+            await _sha256Hex(canonicalRequest)
+        ].join('\n');
+
+        // 派生签名密钥
+        var kDate    = await _hmacSha256('aliyun_v4' + cfg.accessKeySecret, dateStamp);
+        var kRegion  = await _hmacSha256(kDate, region);
+        var kService = await _hmacSha256(kRegion, 'oss');
+        var kSigning = await _hmacSha256(kService, 'aliyun_v4_request');
+        var sigBytes = await _hmacSha256(kSigning, stringToSign);
+        var signature = _bytesToHex(sigBytes);
+
+        var finalQuery = canonicalQuery + '&x-oss-signature=' + _ossEncode(signature, true);
+        return 'https://' + host + canonicalUri + '?' + finalQuery;
+    }
+
+    /**
+     * 测试连接：向 Bucket 发送一个 GET (?max-keys=1) 请求，验证凭据可用
+     * 使用阿里云 OSS V4 签名（当前唯一支持的签名版本）。
      * @returns {Promise<{ok:boolean, code?:string, message?:string}>}
      */
     async function testConnection(cfg) {
@@ -149,18 +272,8 @@
         if (!cfg || !cfg.bucket || !cfg.region || !cfg.accessKeyId || !cfg.accessKeySecret) {
             return { ok: false, code: 'MISSING_CONFIG', message: '请填写完整的密钥信息' };
         }
-        var host = cfg.bucket + '.' + cfg.region + '.aliyuncs.com';
-        // URL 签名：Expires 用秒级时间戳（120 秒有效期）
-        var expires = Math.floor(Date.now() / 1000) + 120;
-        var canonicalResource = '/' + cfg.bucket + '/';
-        var stringToSign = 'GET\n\n\n' + expires + '\n' + canonicalResource;
         try {
-            var signature = await _hmacSha1Base64(cfg.accessKeySecret, stringToSign);
-            var params = '?max-keys=1'
-                + '&OSSAccessKeyId=' + encodeURIComponent(cfg.accessKeyId)
-                + '&Expires=' + expires
-                + '&Signature=' + encodeURIComponent(signature);
-            var url = 'https://' + host + '/' + params;
+            var url = await _buildV4SignedUrl(cfg, 'GET', '', { 'max-keys': '1' });
             var res = await fetch(url, { method: 'GET' });
             if (res.ok) {
                 return { ok: true };

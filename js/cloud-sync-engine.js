@@ -290,10 +290,20 @@
             var index = null;
             try {
                 index = await _downloadFromOSS(_indexObjectKey());
-            } catch (e) {
-                // 静默：首次运行 index 不存在
-            }
+            } catch (e) {}
             if (!index || !index.sessions) index = { version: 1, sessions: {} };
+
+            // 按名字去重：如果已有同名梦角（但 SESSION_ID 不同），
+            // 把旧的那条删掉，只保留最新的 SESSION_ID。
+            // 这样换设备/恢复操作不会在列表里累积重复条目。
+            for (var existingSid in index.sessions) {
+                if (!Object.prototype.hasOwnProperty.call(index.sessions, existingSid)) continue;
+                if (existingSid === sid) continue; // 自己不删
+                if (index.sessions[existingSid].name === name) {
+                    delete index.sessions[existingSid];
+                }
+            }
+
             index.sessions[sid] = {
                 name: name,
                 lastSyncAt: payload.savedAt
@@ -301,7 +311,6 @@
             index.updatedAt = new Date().toISOString();
             await _uploadToOSS(JSON.stringify(index), _indexObjectKey());
         } catch (e) {
-            // index 更新失败不影响主同步，静默
             console.debug && console.debug('[cloud-sync-engine] 更新 index 失败', e);
         }
     }

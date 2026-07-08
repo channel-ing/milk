@@ -70,7 +70,9 @@
         listeners: [],
         // ready 标记：只有 SESSION_ID 就绪 + 启动检测完成后才允许触发同步。
         // 避免 app 启动加载数据时被误认为"数据变化"，把 pending 表覆盖到云端。
-        ready: false
+        ready: false,
+        // 本次会话是否已经弹过失败告警 toast（避免连续刷屏）
+        failAlertShown: false
     };
 
     // 防抖延迟（数据变化后）
@@ -185,8 +187,8 @@
         }
         var objectKey = _syncObjectKey();
         // 阿里云 V4 签名要求：如果请求头有 Content-Type，就必须签入 CanonicalHeaders。
-        // 用 Blob 明确指定 MIME，让签名内容和实际请求一致。
-        var contentType = 'application/json;charset=UTF-8';
+        // 注意：Safari 会把 charset 值改成小写 utf-8，我们签名时必须用完全一致的字符串。
+        var contentType = 'application/json;charset=utf-8';
         var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {}, contentType);
         var blob = new Blob([jsonString], { type: contentType });
         var res = await fetch(url, {
@@ -271,11 +273,19 @@
             _state.lastSyncOk = true;
             _state.lastError = null;
             _state.consecutiveFailures = 0;
+            _state.failAlertShown = false; // 成功后重置，下次失败可以再提示
         } catch (e) {
             _state.lastSyncOk = false;
             _state.lastError = String(e && e.message || e);
             _state.consecutiveFailures++;
             console.warn('[cloud-sync-engine] 同步失败（第 ' + _state.consecutiveFailures + ' 次）:', e);
+            // 达到阈值时告知用户（本次会话只提示一次）
+            if (_state.consecutiveFailures >= FAIL_ALERT_THRESHOLD && !_state.failAlertShown) {
+                _state.failAlertShown = true;
+                if (typeof showNotification === 'function') {
+                    showNotification('云端同步失败，请检查网络或密钥（数据管理 → 云端同步）', 'error', 5000);
+                }
+            }
         } finally {
             _state.syncing = false;
             _notify();

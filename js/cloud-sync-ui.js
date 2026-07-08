@@ -471,6 +471,11 @@
                         var result = await window.CloudSyncEngine.restoreSession(s.sessionId);
                         alert('已恢复「' + name + '」，共 ' + result.count + ' 项数据。\n\n即将刷新页面以生效。');
                         m.remove();
+                        // 最后一刻再清一次紧急备份（防止 alert 期间 app 重写）
+                        try {
+                            localStorage.removeItem('BACKUP_V1_critical');
+                            localStorage.removeItem('BACKUP_V1_timestamp');
+                        } catch (e) {}
                         location.reload();
                     } catch (e) {
                         alert('恢复失败：' + (e && e.message || e));

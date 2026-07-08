@@ -417,9 +417,26 @@
                 }
             }
 
-            // 4) 切换 SESSION_ID
+            // 4) 确保 sessionList 里有目标 session，且 lastSessionId 指向它
+            // （恢复的云端数据里 sessionList 应该已经包含目标 session，但以防万一）
             try {
+                var sl = await localforage.getItem(APP_PREFIX_STR + 'sessionList');
+                if (!sl) sl = [];
+                var hasTarget = sl.some(function(s) { return s && s.id === targetSessionId; });
+                if (!hasTarget) {
+                    sl.push({ id: targetSessionId, name: '已恢复的梦角', createdAt: Date.now() });
+                    await localforage.setItem(APP_PREFIX_STR + 'sessionList', sl);
+                }
                 await localforage.setItem(APP_PREFIX_STR + 'lastSessionId', targetSessionId);
+            } catch (e) {}
+
+            // 5) 在 reload 之前最后一刻清掉紧急备份
+            // 注意：visibilitychange/pagehide 可能在 reload 触发时重新写入备份，
+            // 所以这里清完之后要尽快 reload，不给 app 重写的机会
+            try {
+                localStorage.removeItem('BACKUP_V1_critical');
+                localStorage.removeItem('BACKUP_V1_timestamp');
+                localStorage.removeItem('_cdRecLogs');
             } catch (e) {}
 
             // 恢复完成后不清除 restoreInProgress 标记，让即将到来的 reload 处理一切

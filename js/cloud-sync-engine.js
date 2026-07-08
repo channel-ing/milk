@@ -19,10 +19,28 @@
     // ==== 常量 ====
     var APP_PREFIX_STR = (typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_');
 
-    // 云端对象命名：按 SESSION_ID 隔离两个梦角
+    // 云端对象命名
     function _syncObjectKey() {
         var sid = (typeof SESSION_ID !== 'undefined' && SESSION_ID) ? SESSION_ID : 'default';
         return 'sync/' + sid + '/text-data.json';
+    }
+    // 云端所有梦角的索引文件
+    function _indexObjectKey() {
+        return 'sync/index.json';
+    }
+
+    // 从 payload 中提取梦角名字（partnerName）用于展示
+    function _extractPartnerName(payload) {
+        try {
+            if (!payload || !payload.indexedDB) return null;
+            for (var k in payload.indexedDB) {
+                if (k.indexOf('chatSettings') !== -1) {
+                    var s = payload.indexedDB[k];
+                    if (s && typeof s === 'object' && s.partnerName) return s.partnerName;
+                }
+            }
+        } catch (e) {}
+        return null;
     }
 
     // "文字类"数据的键名匹配规则（按 SESSION_ID 前缀过滤后再匹配）
@@ -180,12 +198,12 @@
     }
 
     // ==== 上传到 OSS ====
-    async function _uploadToOSS(jsonString) {
+    async function _uploadToOSS(jsonString, objectKey) {
         var cfg = window.CloudSync && window.CloudSync.getConfig();
         if (!cfg || !window.CloudSync.isConnected()) {
             throw new Error('未连接云端');
         }
-        var objectKey = _syncObjectKey();
+        if (!objectKey) objectKey = _syncObjectKey();
         // 阿里云 V4 签名要求：如果请求头有 Content-Type，就必须签入 CanonicalHeaders。
         // 注意：Safari 会把 charset 值改成小写 utf-8，我们签名时必须用完全一致的字符串。
         var contentType = 'application/json;charset=utf-8';
@@ -204,12 +222,12 @@
     }
 
     // ==== 从 OSS 下载 ====
-    async function _downloadFromOSS() {
+    async function _downloadFromOSS(objectKey) {
         var cfg = window.CloudSync && window.CloudSync.getConfig();
         if (!cfg || !window.CloudSync.isConnected()) {
             throw new Error('未连接云端');
         }
-        var objectKey = _syncObjectKey();
+        if (!objectKey) objectKey = _syncObjectKey();
         var url = await window.CloudSync.buildSignedUrl(cfg, 'GET', objectKey, {});
         var res = await fetch(url, { method: 'GET' });
         if (res.status === 404) return null; // 云端没有数据
@@ -224,35 +242,118 @@
         }
     }
 
-    // ==== 应用从云端拉回的数据 ====
-    async function _applyRemoteData(payload) {
-        if (!payload || typeof payload !== 'object') return 0;
-        var count = 0;
-        // indexedDB
-        if (payload.indexedDB) {
-            for (var k in payload.indexedDB) {
-                if (!Object.prototype.hasOwnProperty.call(payload.indexedDB, k)) continue;
-                try {
-                    await localforage.setItem(k, payload.indexedDB[k]);
-                    count++;
-                } catch (e) {
-                    console.warn('[cloud-sync-engine] 写入失败', k, e);
-                }
+    // ==== 更新云端 index（登记当前梦角） ====
+    async function _updateIndex(payload) {
+        try {
+            var sid = payload.sessionId;
+            if (!sid) return;
+            var name = _extractPartnerName(payload) || '未命名梦角';
+            // 拉旧 index
+            var index = null;
+            try { index = await _downloadFromOSS(_indexObjectKey()); } catch (e) {}
+            if (!index || !index.sessions) index = { version: 1, sessions: {} };
+            index.sessions[sid] = {
+                name: name,
+                lastSyncAt: payload.savedAt
+            };
+            index.updatedAt = new Date().toISOString();
+            await _uploadToOSS(JSON.stringify(index), _indexObjectKey());
+        } catch (e) {
+            // index 更新失败不影响主同步，静默
+            console.warn('[cloud-sync-engine] 更新 index 失败', e);
+        }
+    }
+
+    // ==== 列出云端所有梦角 ====
+    async function listCloudSessions() {
+        var index = await _downloadFromOSS(_indexObjectKey());
+        if (!index || !index.sessions) return [];
+        var list = [];
+        for (var sid in index.sessions) {
+            if (!Object.prototype.hasOwnProperty.call(index.sessions, sid)) continue;
+            var entry = index.sessions[sid];
+            list.push({
+                sessionId: sid,
+                name: entry.name || '未命名梦角',
+                lastSyncAt: entry.lastSyncAt || null
+            });
+        }
+        // 按最后同步时间倒序
+        list.sort(function (a, b) {
+            var ta = a.lastSyncAt ? new Date(a.lastSyncAt).getTime() : 0;
+            var tb = b.lastSyncAt ? new Date(b.lastSyncAt).getTime() : 0;
+            return tb - ta;
+        });
+        return list;
+    }
+
+    // ==== 恢复指定 sessionId 的数据到本地 ====
+    // 会先清掉本地所有当前 session 的相关数据，再写入云端数据，最后切换 SESSION_ID
+    async function restoreSession(targetSessionId) {
+        if (!targetSessionId) throw new Error('未指定要恢复的梦角');
+        var objectKey = 'sync/' + targetSessionId + '/text-data.json';
+        var remote = await _downloadFromOSS(objectKey);
+        if (!remote) throw new Error('云端找不到该梦角的数据');
+
+        // 1) 清掉本地所有 CHAT_APP 相关 key（IndexedDB）
+        //    注意：只清带 APP_PREFIX 的键，避免误删其他站点数据
+        var keys = await localforage.keys();
+        for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf(APP_PREFIX_STR) === 0) {
+                try { await localforage.removeItem(keys[i]); } catch (e) {}
             }
         }
-        // localStorage
-        if (payload.localStorage) {
-            for (var lk in payload.localStorage) {
-                if (!Object.prototype.hasOwnProperty.call(payload.localStorage, lk)) continue;
+        // 2) 清 localStorage 里 app 相关的
+        try {
+            var lsKeys = [];
+            for (var j = 0; j < localStorage.length; j++) {
+                var lk = localStorage.key(j);
+                if (lk) lsKeys.push(lk);
+            }
+            for (var m = 0; m < lsKeys.length; m++) {
+                // 只清我们知道的键（不误删其他）
+                if (TEXT_LS_KEYS.indexOf(lsKeys[m]) !== -1) {
+                    localStorage.removeItem(lsKeys[m]);
+                    continue;
+                }
+                for (var p = 0; p < TEXT_LS_PREFIXES.length; p++) {
+                    if (lsKeys[m].indexOf(TEXT_LS_PREFIXES[p]) === 0) {
+                        localStorage.removeItem(lsKeys[m]);
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
+
+        // 3) 写入云端数据（键名已经带了目标 SESSION_ID 的前缀，直接写入即可）
+        var count = 0;
+        if (remote.indexedDB) {
+            for (var k in remote.indexedDB) {
+                if (!Object.prototype.hasOwnProperty.call(remote.indexedDB, k)) continue;
                 try {
-                    var v = payload.localStorage[lk];
-                    if (v == null) localStorage.removeItem(lk);
-                    else localStorage.setItem(lk, v);
+                    await localforage.setItem(k, remote.indexedDB[k]);
                     count++;
                 } catch (e) {}
             }
         }
-        return count;
+        if (remote.localStorage) {
+            for (var lk2 in remote.localStorage) {
+                if (!Object.prototype.hasOwnProperty.call(remote.localStorage, lk2)) continue;
+                try {
+                    var v = remote.localStorage[lk2];
+                    if (v == null) localStorage.removeItem(lk2);
+                    else localStorage.setItem(lk2, v);
+                    count++;
+                } catch (e) {}
+            }
+        }
+
+        // 4) 切换 SESSION_ID：写到 app 存储位置（localforage 里的 lastSessionId）
+        try {
+            await localforage.setItem(APP_PREFIX_STR + 'lastSessionId', targetSessionId);
+        } catch (e) {}
+
+        return { count: count, savedAt: remote.savedAt, sessionId: targetSessionId };
     }
 
     // ==== 主同步动作（异步，不抛错） ====
@@ -268,6 +369,8 @@
             var payload = await _collectTextData();
             var jsonString = JSON.stringify(payload);
             await _uploadToOSS(jsonString);
+            // 顺便更新云端 index（登记当前梦角）— 失败不影响主同步
+            _updateIndex(payload);
 
             _state.lastSyncAt = new Date();
             _state.lastSyncOk = true;
@@ -400,7 +503,7 @@
         });
     }
 
-    // ==== 启动检测：本地空但云端有 → 询问恢复 ====
+    // ==== 启动检测：本地空但云端有 → 询问选择哪个梦角恢复 ====
     async function _checkRestoreOnStart() {
         if (_state.restoreOffered) return;
         if (!window.CloudSync || !window.CloudSync.isConnected()) {
@@ -415,52 +518,34 @@
         }
 
         // 判断本地是否为"空"：只要有 chatMessages 或 sessionList 就算非空
+        // 注意：新设备第一次打开会默认初始化 sessionList / chatMessages 为空数据。
+        // 因此这里要额外判断 sessionList 里是否真的有内容。
         try {
-            var keys = await localforage.keys();
-            var hasLocalData = false;
-            for (var i = 0; i < keys.length; i++) {
-                if (!_isTextKey(keys[i])) continue;
-                if (keys[i].indexOf('chatMessages') !== -1 || keys[i].indexOf('sessionList') !== -1) {
-                    hasLocalData = true;
-                    break;
-                }
-            }
+            var sessionList = await localforage.getItem(APP_PREFIX_STR + 'sessionList');
+            var hasLocalData = sessionList && sessionList.length > 0;
+
             if (hasLocalData) {
                 _state.ready = true;
                 return;
             }
 
-            // 本地空，检查云端
-            var remote = await _downloadFromOSS();
-            if (!remote) {
+            // 本地实质为空，检查云端是否有梦角
+            var list = await listCloudSessions();
+            if (!list || list.length === 0) {
                 _state.ready = true;
                 return;
             }
             _state.restoreOffered = true;
 
-            var savedAt = remote.savedAt ? new Date(remote.savedAt).toLocaleString('zh-CN') : '未知';
-            var msg = '检测到云端有数据，是否恢复到本设备？\n\n云端最后同步时间：' + savedAt +
-                      '\n\n（恢复后请刷新页面以生效）';
-            if (confirm(msg)) {
-                var count = await _applyRemoteData(remote);
-                alert('已恢复 ' + count + ' 项数据。\n请刷新页面以生效。');
+            // 交给 UI 层展示选择器
+            if (typeof window.__cloudSyncShowRestorePicker === 'function') {
+                window.__cloudSyncShowRestorePicker(list, { autoTriggered: true });
             }
             _state.ready = true;
         } catch (e) {
             console.warn('[cloud-sync-engine] 启动检测失败', e);
-            _state.ready = true; // 出错也标记就绪，不然永远不同步
+            _state.ready = true;
         }
-    }
-
-    // ==== 手动恢复（数据管理入口） ====
-    async function manualRestore() {
-        if (!window.CloudSync || !window.CloudSync.isConnected()) {
-            throw new Error('未连接云端');
-        }
-        var remote = await _downloadFromOSS();
-        if (!remote) throw new Error('云端没有可恢复的数据');
-        var count = await _applyRemoteData(remote);
-        return { count: count, savedAt: remote.savedAt };
     }
 
     // ==== 启动 ====
@@ -495,7 +580,8 @@
     global.CloudSyncEngine = {
         requestSync: requestSync,
         requestSyncNow: requestSyncNow,
-        manualRestore: manualRestore,
+        listCloudSessions: listCloudSessions,
+        restoreSession: restoreSession,
         getSyncStatus: getSyncStatus,
         onSyncStatusChange: onSyncStatusChange
     };

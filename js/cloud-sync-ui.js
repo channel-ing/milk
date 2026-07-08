@@ -113,12 +113,25 @@
         if (!badge || !desc) return;
         var connected = window.CloudSync && window.CloudSync.isConnected();
         var cfg = window.CloudSync && window.CloudSync.getConfig();
+        var syncStatus = (window.CloudSyncEngine && window.CloudSyncEngine.getSyncStatus)
+            ? window.CloudSyncEngine.getSyncStatus() : null;
+
         if (connected && cfg) {
+            // 有连续同步失败告警时，用错误样式提示
+            if (syncStatus && syncStatus.hasFailAlert) {
+                badge.className = 'cs-status-badge cs-status-error';
+                badge.textContent = '同步异常';
+                desc.textContent = '云端同步连续失败，点击查看';
+                return;
+            }
             badge.className = 'cs-status-badge cs-status-connected';
-            badge.textContent = '已连接';
-            desc.textContent = cfg.bucket + '（' + _regionLabel(cfg.region) + '）';
+            badge.textContent = syncStatus && syncStatus.syncing ? '同步中…' : '已连接';
+            var subLine = cfg.bucket + '（' + _regionLabel(cfg.region) + '）';
+            if (syncStatus && syncStatus.lastSyncAt) {
+                subLine += ' · 上次同步：' + _timeAgo(syncStatus.lastSyncAt);
+            }
+            desc.textContent = subLine;
         } else if (cfg && cfg.bucket) {
-            // 密钥已保存但未验证
             badge.className = 'cs-status-badge cs-status-error';
             badge.textContent = '未验证';
             desc.textContent = cfg.bucket + '（连接未验证，点击重试）';
@@ -127,6 +140,16 @@
             badge.textContent = '未连接';
             desc.textContent = '未连接，点击设置密钥';
         }
+    }
+
+    function _timeAgo(date) {
+        if (!(date instanceof Date)) date = new Date(date);
+        var diff = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (diff < 10) return '刚刚';
+        if (diff < 60) return diff + ' 秒前';
+        if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+        return Math.floor(diff / 86400) + ' 天前';
     }
 
     function _regionLabel(id) {
@@ -171,6 +194,7 @@
                         '<div class="cs-hint">密钥仅保存在你的浏览器本地，不会上传到任何服务器（除了阿里云本身）。</div>' +
                     '</div>' +
                     '<button class="cs-btn cs-btn-danger" id="cs-disconnect" style="display:none;width:100%;margin-top:6px;">断开连接</button>' +
+                    '<button class="cs-btn cs-btn-secondary" id="cs-restore" style="display:none;width:100%;margin-top:8px;">从云端恢复数据到本设备</button>' +
                 '</div>' +
                 '<div class="cs-actions">' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-cancel">取消</button>' +
@@ -192,6 +216,7 @@
         m.querySelector('#cs-test').addEventListener('click', onTestConnection);
         m.querySelector('#cs-save').addEventListener('click', onSaveAndConnect);
         m.querySelector('#cs-disconnect').addEventListener('click', onDisconnect);
+        m.querySelector('#cs-restore').addEventListener('click', onManualRestore);
         m.querySelector('#cs-open-help').addEventListener('click', openHelpModal);
 
         // 点击背景关闭
@@ -219,6 +244,8 @@
         m.querySelector('#cs-test-result').textContent = '';
         m.querySelector('#cs-disconnect').style.display =
             (window.CloudSync && window.CloudSync.isConnected()) ? '' : 'none';
+        m.querySelector('#cs-restore').style.display =
+            (window.CloudSync && window.CloudSync.isConnected() && window.CloudSyncEngine) ? '' : 'none';
         m.style.display = 'flex';
     }
 
@@ -337,6 +364,26 @@
         }
     }
 
+    async function onManualRestore() {
+        if (!window.CloudSyncEngine || !window.CloudSyncEngine.manualRestore) {
+            _showResult('err', '同步引擎未就绪，请刷新页面后重试');
+            return;
+        }
+        if (!confirm('将从云端下载最新数据并覆盖本设备的对应数据。\n\n确定继续吗？')) return;
+        _showResult('loading', '正在从云端下载数据…');
+        var btn = document.querySelector('#' + MODAL_ID + ' #cs-restore');
+        if (btn) btn.disabled = true;
+        try {
+            var result = await window.CloudSyncEngine.manualRestore();
+            var savedAt = result.savedAt ? new Date(result.savedAt).toLocaleString('zh-CN') : '未知';
+            _showResult('ok', '✓ 已恢复 ' + result.count + ' 项数据（云端保存于 ' + savedAt + '）\n请刷新页面以生效。');
+        } catch (e) {
+            _showResult('err', '✗ 恢复失败：' + (e && e.message || e));
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
     // ==== 帮助弹窗 ====
     function ensureHelpModal() {
         var m = document.getElementById(HELP_MODAL_ID);
@@ -403,11 +450,15 @@
     // ==== 与数据管理页的挂接 ====
     // 数据管理弹窗每次打开时（点击设置里的入口）会触发 rebuild；用 MutationObserver 监听插入时机
     // 静默重测（用于面板打开时，如果处于"已保存但未验证"状态，后台尝试再连一次）
+    // 为避免刷屏，本次会话只尝试一次
+    var _silentRetestDone = false;
     async function _silentRetest() {
+        if (_silentRetestDone) return;
         if (!window.CloudSync) return;
         var cfg = window.CloudSync.getConfig();
         if (!cfg || !cfg.bucket) return;
         if (window.CloudSync.isConnected()) return; // 已连接，不用重测
+        _silentRetestDone = true;
         try {
             var result = await window.CloudSync.testConnection(cfg);
             if (result.ok) {
@@ -419,7 +470,7 @@
                 }
             }
         } catch (e) {
-            // 静默失败，保持"未验证"状态
+            // 静默失败
         }
     }
 
@@ -453,6 +504,17 @@
             return;
         }
         window.CloudSync.onStatusChange(function () { updateStatusBadge(); });
+
+        // 同步引擎的状态变化（同步中 / 完成 / 失败）也刷新 UI
+        function _hookEngine() {
+            if (window.CloudSyncEngine && window.CloudSyncEngine.onSyncStatusChange) {
+                window.CloudSyncEngine.onSyncStatusChange(function () { updateStatusBadge(); });
+            } else {
+                setTimeout(_hookEngine, 300);
+            }
+        }
+        _hookEngine();
+
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', watchDataModal);
         } else {

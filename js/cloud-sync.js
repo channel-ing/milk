@@ -335,7 +335,9 @@
         getRegions: getRegions,
         onStatusChange: onStatusChange,
         // 连接
-        testConnection: testConnection
+        testConnection: testConnection,
+        // 供阶段二/三使用：生成任意 OSS 请求的 V4 预签名 URL
+        buildSignedUrl: _buildV4SignedUrl
     };
 
     // 页面加载时读取一次

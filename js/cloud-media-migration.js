@@ -13,6 +13,7 @@
  *   - 我的表情库（myStickerLibrary）→ 云端引用
  *   - 陪伴媒体（companionData.backgrounds/voices/noises）→ 云端引用
  *   - 收藏语音（favAudio_*）→ 云端引用（旧键名 + 旧格式 base64 全覆盖）
+ *   - 聊天图片（chatMessages[].image）→ 云端引用（base64 替换，消息内容不变）
  */
 (function (global) {
     'use strict';
@@ -313,6 +314,56 @@
         }
     }
 
+    // ==== 聊天图片迁移（chatMessages[].image base64 → oss://）====
+    async function _migrateChatImages(sid) {
+        var key = APP_PREFIX_STR + sid + '_chatMessages';
+        var msgs = await localforage.getItem(key);
+        if (!Array.isArray(msgs) || msgs.length === 0) return;
+
+        // 先数出需要迁移的条数，更新进度分母（已在 _countTasks 算过，这里只走上传）
+        var changed = false;
+        for (var i = 0; i < msgs.length; i++) {
+            var msg = msgs[i];
+            if (!msg || !msg.image) continue;
+            // 已经是云端引用或 pending：跳过
+            if (typeof msg.image !== 'string') continue;
+            if (msg.image.indexOf('oss://') === 0) continue;
+            if (msg.image.indexOf('pending://') === 0) continue;
+            // 不是 base64 图片：跳过
+            if (!_isBase64Image(msg.image)) continue;
+
+            _state.currentTask = '聊天图片 ' + (i + 1) + '/' + msgs.length;
+            _notify();
+
+            try {
+                var r = await window.CloudMedia.upload(msg.image, 'chat-images');
+                msgs[i] = Object.assign({}, msg, { image: r.url });
+                changed = true;
+                _state.completed++;
+            } catch (e) {
+                console.warn('[migration] 聊天图片上传失败 msgId=' + (msg.id || i), e);
+                _state.failed++;
+            }
+            _state.progress++;
+            _notify();
+
+            // 每 20 条批量写一次，避免一条失败丢掉全部进度
+            if (changed && i % 20 === 19) {
+                try {
+                    await localforage.setItem(key, msgs);
+                    changed = false;
+                } catch (saveErr) {
+                    console.warn('[migration] 中途保存失败', saveErr);
+                }
+            }
+        }
+
+        // 最终写入
+        if (changed) {
+            await localforage.setItem(key, msgs);
+        }
+    }
+
     // ==== 扫描：计算总项数 ====
     async function _countTasks(sid) {
         var count = 0;
@@ -372,6 +423,14 @@
             if (_isRawBase64Audio(val)) count++;
         }
 
+        // 聊天图片
+        var cm = await localforage.getItem(APP_PREFIX_STR + sid + '_chatMessages');
+        if (Array.isArray(cm)) {
+            cm.forEach(function (msg) {
+                if (msg && msg.image && _isBase64Image(msg.image)) count++;
+            });
+        }
+
         return count;
     }
 
@@ -419,6 +478,9 @@
 
             // 收藏语音（新增）
             await _migrateFavAudio(sid);
+
+            // 聊天图片（新增）
+            await _migrateChatImages(sid);
 
             _state.currentTask = '完成';
             _notify();

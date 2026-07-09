@@ -127,23 +127,43 @@ function initChatActionListeners() {
                         showNotification(message.favorited ? '已收藏': '已取消收藏', 'success', 1500);
                         playSound('favorite');
 
-                        // 收藏语音消息时，把已播放过的音频持久化到 IndexedDB（存Base64）
+                        // 收藏语音消息时，把已播放过的音频持久化（优先存云端）
                         if (message.favorited && message.voice && message.voice.fakeText) {
                             const cachedUrl = window.voiceTTS?._getAudioCache?.(String(messageId));
                             if (cachedUrl) {
-                                fetch(cachedUrl).then(r => r.arrayBuffer()).then(buf => {
-                                    // 转成 Base64 字符串存储，更稳定
+                                fetch(cachedUrl).then(r => r.arrayBuffer()).then(async buf => {
                                     const uint8 = new Uint8Array(buf);
                                     let binary = '';
                                     uint8.forEach(b => binary += String.fromCharCode(b));
                                     const base64 = btoa(binary);
-                                    localforage.setItem(`favAudio_${messageId}`, base64);
+
+                                    // 阶段四：优先上传云端，失败降级本地
+                                    const key = window.favAudioKey ? window.favAudioKey(messageId) : `favAudio_${messageId}`;
+                                    if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                                        try {
+                                            const blob = new Blob([buf], { type: 'audio/mpeg' });
+                                            const result = await window.CloudMedia.upload(blob, 'fav-audio', String(messageId));
+                                            // 存云端引用
+                                            await localforage.setItem(key, result.url);
+                                        } catch (e) {
+                                            console.warn('[fav-audio] 云端上传失败，降级本地', e);
+                                            await localforage.setItem(key, base64);
+                                        }
+                                    } else {
+                                        await localforage.setItem(key, base64);
+                                    }
                                 }).catch(() => {});
                             }
                         }
-                        // 取消收藏时删除缓存
+                        // 取消收藏时删除缓存（本地 + 云端）
                         if (!message.favorited) {
-                            localforage.removeItem(`favAudio_${messageId}`).catch(() => {});
+                            const key = window.favAudioKey ? window.favAudioKey(messageId) : `favAudio_${messageId}`;
+                            localforage.getItem(key).then(async val => {
+                                if (typeof val === 'string' && val.startsWith('oss://') && window.CloudMedia) {
+                                    try { await window.CloudMedia.delete(val); } catch (e) {}
+                                }
+                                localforage.removeItem(key).catch(() => {});
+                            }).catch(() => {});
                         }
                         
                         throttledSaveData();

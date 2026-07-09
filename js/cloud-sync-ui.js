@@ -195,6 +195,7 @@
                     '</div>' +
                     '<button class="cs-btn cs-btn-danger" id="cs-disconnect" style="display:none;width:100%;margin-top:6px;">断开连接</button>' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-restore" style="display:none;width:100%;margin-top:8px;">从云端恢复梦角到本浏览器</button>' +
+                    '<button class="cs-btn cs-btn-secondary" id="cs-migrate" style="display:none;width:100%;margin-top:8px;">迁移本地图片到云端（省空间）</button>' +
                 '</div>' +
                 '<div class="cs-actions">' +
                     '<button class="cs-btn cs-btn-secondary" id="cs-cancel">取消</button>' +
@@ -217,6 +218,7 @@
         m.querySelector('#cs-save').addEventListener('click', onSaveAndConnect);
         m.querySelector('#cs-disconnect').addEventListener('click', onDisconnect);
         m.querySelector('#cs-restore').addEventListener('click', onManualRestore);
+        m.querySelector('#cs-migrate').addEventListener('click', onMigrate);
         m.querySelector('#cs-open-help').addEventListener('click', openHelpModal);
 
         // 点击背景关闭
@@ -246,6 +248,8 @@
             (window.CloudSync && window.CloudSync.isConnected()) ? '' : 'none';
         m.querySelector('#cs-restore').style.display =
             (window.CloudSync && window.CloudSync.isConnected() && window.CloudSyncEngine && window.CloudSyncEngine.listCloudSessions) ? '' : 'none';
+        m.querySelector('#cs-migrate').style.display =
+            (window.CloudSync && window.CloudSync.isConnected() && window.CloudMediaMigration) ? '' : 'none';
         m.style.display = 'flex';
     }
 
@@ -361,6 +365,72 @@
             closeConfigModal();
         } catch (e) {
             _showResult('err', '断开失败：' + (e && e.message || e));
+        }
+    }
+
+    async function onMigrate() {
+        if (!window.CloudMediaMigration) {
+            _showResult('err', '迁移模块未就绪，请刷新页面后重试');
+            return;
+        }
+        if (window.CloudMediaMigration.getStatus().running) {
+            _showResult('err', '迁移正在进行中');
+            return;
+        }
+
+        if (!confirm('将扫描本地所有 base64 图片并上传到云端，之后本地只保留缩略图，可节省大量空间。\n\n迁移过程中请不要关闭页面。\n\n继续吗？')) return;
+
+        closeConfigModal();
+
+        // 创建进度弹窗
+        var overlay = document.createElement('div');
+        overlay.id = 'cs-migrate-progress';
+        overlay.style.cssText = 'display:flex;position:fixed;inset:0;z-index:10003;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+        overlay.innerHTML =
+            '<div style="max-width:420px;width:100%;background:var(--secondary-bg,#fff);border-radius:16px;padding:24px;">' +
+                '<div style="font-size:16px;font-weight:600;color:var(--text-color,#333);margin-bottom:16px;">' +
+                    '<i class="fas fa-cloud-upload-alt"></i>&nbsp;正在迁移本地图片到云端' +
+                '</div>' +
+                '<div id="cs-mig-task" style="font-size:13px;color:var(--text-secondary,#888);margin-bottom:12px;min-height:18px;">准备中…</div>' +
+                '<div style="height:8px;background:var(--input-bg,#f0f0f0);border-radius:4px;overflow:hidden;margin-bottom:12px;">' +
+                    '<div id="cs-mig-bar" style="height:100%;width:0%;background:var(--accent-color,#c5a47e);transition:width .2s ease;"></div>' +
+                '</div>' +
+                '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary,#888);">' +
+                    '<span id="cs-mig-count">0 / 0</span>' +
+                    '<span id="cs-mig-stats">成功 0 · 失败 0</span>' +
+                '</div>' +
+                '<button id="cs-mig-close" class="cs-btn cs-btn-primary" style="display:none;width:100%;margin-top:16px;padding:11px;border-radius:10px;border:none;font-size:14px;background:var(--accent-color,#c5a47e);color:#fff;cursor:pointer;">完成</button>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        var taskEl = overlay.querySelector('#cs-mig-task');
+        var barEl = overlay.querySelector('#cs-mig-bar');
+        var countEl = overlay.querySelector('#cs-mig-count');
+        var statsEl = overlay.querySelector('#cs-mig-stats');
+        var closeBtn = overlay.querySelector('#cs-mig-close');
+        closeBtn.addEventListener('click', function () { overlay.remove(); });
+
+        window.CloudMediaMigration.onStatusChange(function (s) {
+            if (!document.body.contains(overlay)) return;
+            taskEl.textContent = s.currentTask || '';
+            var pct = s.total > 0 ? Math.round(s.progress / s.total * 100) : 0;
+            barEl.style.width = pct + '%';
+            countEl.textContent = s.progress + ' / ' + s.total;
+            statsEl.textContent = '成功 ' + s.completed + ' · 失败 ' + s.failed;
+        });
+
+        try {
+            var result = await window.CloudMediaMigration.run();
+            taskEl.textContent = '✓ 完成：共 ' + result.total + ' 项，成功 ' + result.migrated + '，失败 ' + result.failed;
+            barEl.style.width = '100%';
+            closeBtn.style.display = '';
+            if (typeof showNotification === 'function') {
+                showNotification('图片迁移完成', 'success', 3000);
+            }
+        } catch (e) {
+            taskEl.textContent = '✗ 迁移失败：' + (e && e.message || e);
+            closeBtn.style.display = '';
+            closeBtn.textContent = '关闭';
         }
     }
 

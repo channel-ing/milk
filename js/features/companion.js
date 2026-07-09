@@ -47,8 +47,9 @@
         backgrounds: { study: [], work: [], exercise: [], sleep: [] },
         voices:      { study: [], work: [], exercise: [], sleep: [] },
         noises:      { study: [], work: [], exercise: [], sleep: [] },
-        lastNoiseChoice: { study: null, work: null, exercise: null, sleep: null }, // null=无声, 'rain'/'fire'=内置, 字符串id=用户上传
-        lastPlayMode:    { study: 'single', work: 'single', exercise: 'single', sleep: 'single' }, // 'single'/'list'/'random'
+        selectedBg:  { study: null, work: null, exercise: null, sleep: null }, // 选中的背景 id
+        lastNoiseChoice: { study: null, work: null, exercise: null, sleep: null },
+        lastPlayMode:    { study: 'single', work: 'single', exercise: 'single', sleep: 'single' },
         history: []
     };
 
@@ -68,6 +69,7 @@
             backgrounds: { study: [], work: [], exercise: [], sleep: [] },
             voices:      { study: [], work: [], exercise: [], sleep: [] },
             noises:      { study: [], work: [], exercise: [], sleep: [] },
+            selectedBg:  { study: null, work: null, exercise: null, sleep: null },
             lastNoiseChoice: { study: null, work: null, exercise: null, sleep: null },
             lastPlayMode:    { study: 'single', work: 'single', exercise: 'single', sleep: 'single' },
             history: []
@@ -168,15 +170,15 @@
 
     /**
      * 上传媒体到云端（8 处上传点共用）
-     * @param {string} base64
-     * @param {string} category  'companion-backgrounds' | 'companion-voices' | 'companion-noises'
-     * @returns {Promise<{data: string, cloudKey: string}>}  成功返回 oss:// 引用；失败抛出
+     * @param {string|File} source  base64 字符串或 File 对象（File 优先，避免大文件内存爆炸）
+     * @param {string} category
+     * @returns {Promise<{data: string, cloudKey: string}>}
      */
-    async function _uploadCompanionMedia(base64, category) {
+    async function _uploadCompanionMedia(source, category) {
         if (!window.CloudMedia || !window.CloudSync || !window.CloudSync.isConnected()) {
             throw new Error('未连接云端');
         }
-        const result = await window.CloudMedia.upload(base64, category);
+        const result = await window.CloudMedia.upload(source, category);
         return { data: result.url, cloudKey: result.key };
     }
 
@@ -1539,9 +1541,13 @@
         // 防御：清理可能残留的白噪音（避免上次未完全关闭时新陪伴叠加播放）
         stopNoise();
 
-        // 设置背景
+        // 设置背景：优先用用户选定的背景，没有选定时用第一个
         const bgs = companionData.backgrounds[currentMode];
-        const bg = bgs[Math.floor(Math.random() * bgs.length)];
+        let bg = null;
+        if (bgs && bgs.length > 0) {
+            const selectedId = companionData.selectedBg && companionData.selectedBg[currentMode];
+            bg = (selectedId && bgs.find(b => b.id === selectedId)) || bgs[0];
+        }
         renderCompanionBackground(bg);
 
         // 设置提示文字
@@ -1617,7 +1623,6 @@
         if (bg.type === 'video') {
             const v = document.createElement('video');
             v.src = mediaSrc;
-            v.muted = true;
             v.autoplay = true;
             v.loop = true;
             v.playsInline = true;
@@ -3340,6 +3345,9 @@
         if (!list) return;
         const mode = _mgrState.bg;
         const items = (companionData.backgrounds[mode] || []);
+        const selectedId = companionData.selectedBg && companionData.selectedBg[mode];
+        // 没有 selectedId 时默认第一个为选中
+        const activeId = selectedId || (items.length > 0 ? items[0].id : null);
 
         let html = '';
         if (items.length === 0) {
@@ -3350,6 +3358,8 @@
         } else {
             html += items.map(bg => {
                 const isCloud = typeof bg.data === 'string' && bg.data.indexOf('oss://') === 0;
+                const isUploading = bg._uploading === true;
+                const isActive = bg.id === activeId;
                 const thumbHtml = bg.type === 'video'
                     ? (isCloud
                         ? `<div class="companion-bg-thumb-placeholder"><i class="fas fa-video"></i></div><span class="type-badge">视频</span>`
@@ -3358,18 +3368,18 @@
                         ? `<img data-lazy-cloud-ref="${bg.data}" alt="">`
                         : `<img src="${bg.data}" alt="">`);
                 return `
-                <div class="companion-bg-card" data-id="${bg.id}">
+                <div class="companion-bg-card${isActive ? ' companion-bg-card--active' : ''}" data-id="${bg.id}" data-action="select-bg">
                     <div class="companion-bg-card-thumb">
                         ${thumbHtml}
+                        ${isActive ? `<div class="companion-bg-card-check"><i class="fas fa-check"></i></div>` : ''}
+                        ${isUploading ? `<div class="companion-bg-upload-progress"><div class="companion-bg-upload-bar" style="width:${bg._progress || 0}%"></div><span class="companion-bg-upload-label">上传中…</span></div>` : ''}
                     </div>
                     <div class="companion-bg-card-info">
                         <div class="companion-bg-card-name">${escapeHtml(bg.name || '未命名')}</div>
-                        <div class="companion-bg-card-meta">${bg.type === 'video' ? '视频' : '图片'}</div>
+                        <div class="companion-bg-card-meta">${bg.type === 'video' ? '视频' : '图片'}${isActive ? ' · 使用中' : ''}</div>
                     </div>
                     <div class="companion-bg-card-actions">
-                        <button class="companion-mgr-iconbtn danger" data-action="delete-bg" data-id="${bg.id}" title="删除">
-                            <i class="fas fa-trash-can"></i>
-                        </button>
+                        ${!isUploading ? `<button class="companion-mgr-iconbtn danger" data-action="delete-bg" data-id="${bg.id}" title="删除"><i class="fas fa-trash-can"></i></button>` : ''}
                     </div>
                 </div>
             `; }).join('');
@@ -3384,6 +3394,20 @@
                 window.CloudMedia.bindLazyImage(imgEl, imgEl.getAttribute('data-lazy-cloud-ref'));
             });
         }
+        // 绑定点击选中
+        list.querySelectorAll('.companion-bg-card[data-action="select-bg"]').forEach(function (card) {
+            card.addEventListener('click', function (e) {
+                if (e.target.closest('[data-action="delete-bg"]')) return; // 点删除不触发选中
+                const id = card.dataset.id;
+                const bg = (companionData.backgrounds[mode] || []).find(b => b.id === id);
+                if (!bg || bg._uploading) return; // 上传中不可选
+                if (!companionData.selectedBg) companionData.selectedBg = {};
+                companionData.selectedBg[mode] = id;
+                saveCompanionData();
+                renderCompanionBgManager();
+                notify('已选定为当前背景', 'success');
+            });
+        });
     }
 
     // ── 渲染：陪伴语音列表 ──
@@ -3490,38 +3514,75 @@
             notify('请选择图片或视频文件', 'error');
             return;
         }
-        if (file.size > 100 * 1024 * 1024) notify('文件超过 100MB，加载可能较慢', 'warning');
+        if (file.size > 500 * 1024 * 1024) {
+            notify('文件超过 500MB，无法上传', 'error');
+            return;
+        }
+        if (file.size > 100 * 1024 * 1024) notify('文件较大，上传可能需要一些时间', 'info', 3000);
 
         await ensureDataLoaded();
+        const mode = _mgrState.bg;
+        const id = generateId();
+
+        // 1. 立刻读出可显示的本地预览（图片用 ObjectURL；视频用 ObjectURL）
+        const localUrl = URL.createObjectURL(file);
+
+        // 2. 创建占位条目，立刻插入列表（带进度条）
+        const placeholder = {
+            id,
+            type: isVideo ? 'video' : 'image',
+            data: localUrl,   // 先用本地 URL 显示
+            name: file.name,
+            addedAt: Date.now(),
+            _uploading: true,
+            _progress: 0
+        };
+        if (!companionData.backgrounds[mode]) companionData.backgrounds[mode] = [];
+        companionData.backgrounds[mode].push(placeholder);
+        renderCompanionBgManager();
+
+        // 3. 后台上传（直接传 File 对象，不走 base64 转换）
         try {
-            notify('正在处理文件...', 'info');
-            const base64 = await readFileAsBase64(file);
-            let mediaData = base64;
+            const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
+            let mediaData = localUrl; // 降级：本地 URL（不可跨设备）
             let cloudKey = null;
-            try {
-                notify('正在上传到云端...', 'info', 2000);
-                const r = await _uploadCompanionMedia(base64, 'companion-backgrounds');
-                mediaData = r.data;
-                cloudKey = r.cloudKey;
-            } catch (e) {
-                console.warn('[companion] 背景云端上传失败，降级本地', e);
+
+            if (cloudReady) {
+                // 模拟进度（OSS 不支持上传进度，用假进度给用户感知）
+                let fakeProgress = 0;
+                const fakeTimer = setInterval(() => {
+                    fakeProgress = Math.min(fakeProgress + Math.random() * 15, 85);
+                    placeholder._progress = Math.round(fakeProgress);
+                    renderCompanionBgManager();
+                }, 600);
+
+                try {
+                    const r = await _uploadCompanionMedia(file, 'companion-backgrounds');
+                    mediaData = r.data;
+                    cloudKey = r.cloudKey;
+                } finally {
+                    clearInterval(fakeTimer);
+                }
             }
-            const bg = {
-                id: generateId(),
-                type: isVideo ? 'video' : 'image',
-                data: mediaData,
-                cloudKey,
-                name: file.name,
-                addedAt: Date.now()
-            };
-            companionData.backgrounds[_mgrState.bg].push(bg);
+
+            // 4. 上传完成，更新条目
+            placeholder.data = mediaData;
+            placeholder.cloudKey = cloudKey;
+            placeholder._uploading = false;
+            placeholder._progress = 100;
+            delete placeholder._progress;
+            // 本地 URL 已不需要（已替换为 oss://），释放内存
+            if (mediaData !== localUrl) URL.revokeObjectURL(localUrl);
             await saveCompanionData();
-            renderCompanionBgManager();
             notify('背景已添加', 'success');
         } catch (err) {
+            // 上传失败：条目保留本地 URL，用户可以用，但换设备后不可用
             console.error('[companion] 背景上传失败', err);
-            notify('文件读取失败', 'error');
+            placeholder._uploading = false;
+            notify('上传失败，暂存本地（换设备后不可用）', 'error', 3000);
+            await saveCompanionData();
         }
+        renderCompanionBgManager();
         e.target.value = '';
     }
 
@@ -3538,15 +3599,17 @@
                 /\.(mp3|m4a|aac|wav|ogg|flac|amr|opus)$/i.test(file.name);
             if (!isAudio) { skippedCount++; continue; }
             try {
-                const base64 = await readFileAsBase64(file);
-                let mediaData = base64;
+                let mediaData = null;
                 let cloudKey = null;
-                try {
-                    const r = await _uploadCompanionMedia(base64, 'companion-voices');
+                const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
+                if (cloudReady) {
+                    const r = await _uploadCompanionMedia(file, 'companion-voices');
                     mediaData = r.data;
                     cloudKey = r.cloudKey;
-                } catch (e) {
-                    console.warn('[companion] 语音云端上传失败，降级本地', e);
+                } else {
+                    // 没连云端降级为 base64（兼容老逻辑）
+                    const base64 = await readFileAsBase64(file);
+                    mediaData = base64;
                 }
                 companionData.voices[_mgrState.voice].push({
                     id: generateId(),
@@ -3653,15 +3716,16 @@
                 /\.(mp3|m4a|aac|wav|ogg|flac|amr|opus)$/i.test(file.name);
             if (!isAudio) { skippedCount++; continue; }
             try {
-                const base64 = await readFileAsBase64(file);
-                let mediaData = base64;
+                let mediaData = null;
                 let cloudKey = null;
-                try {
-                    const r = await _uploadCompanionMedia(base64, 'companion-noises');
+                const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
+                if (cloudReady) {
+                    const r = await _uploadCompanionMedia(file, 'companion-noises');
                     mediaData = r.data;
                     cloudKey = r.cloudKey;
-                } catch (e) {
-                    console.warn('[companion] 白噪音云端上传失败，降级本地', e);
+                } else {
+                    const base64 = await readFileAsBase64(file);
+                    mediaData = base64;
                 }
                 companionData.noises[_mgrState.noise].push({
                     id: generateId(),

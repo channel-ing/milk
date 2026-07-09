@@ -3524,14 +3524,14 @@
         const mode = _mgrState.bg;
         const id = generateId();
 
-        // 1. 立刻读出可显示的本地预览（图片用 ObjectURL；视频用 ObjectURL）
+        // 1. 立刻用 ObjectURL 生成本地预览
         const localUrl = URL.createObjectURL(file);
 
-        // 2. 创建占位条目，立刻插入列表（带进度条）
+        // 2. 创建占位条目，立刻插入列表
         const placeholder = {
             id,
             type: isVideo ? 'video' : 'image',
-            data: localUrl,   // 先用本地 URL 显示
+            data: localUrl,
             name: file.name,
             addedAt: Date.now(),
             _uploading: true,
@@ -3539,22 +3539,31 @@
         };
         if (!companionData.backgrounds[mode]) companionData.backgrounds[mode] = [];
         companionData.backgrounds[mode].push(placeholder);
-        renderCompanionBgManager();
+        renderCompanionBgManager(); // 只在插入时全量渲染一次
 
-        // 3. 后台上传（直接传 File 对象，不走 base64 转换）
+        // 只操作单个卡片进度条，不重建整个列表
+        function _updateCardProgress(pct) {
+            const list = document.getElementById('companion-bg-list');
+            if (!list) return;
+            const card = list.querySelector(`.companion-bg-card[data-id="${id}"]`);
+            if (!card) return;
+            const bar = card.querySelector('.companion-bg-upload-bar');
+            if (bar) bar.style.width = pct + '%';
+        }
+
+        // 3. 后台上传
         try {
             const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
-            let mediaData = localUrl; // 降级：本地 URL（不可跨设备）
+            let mediaData = localUrl;
             let cloudKey = null;
 
             if (cloudReady) {
-                // 模拟进度（OSS 不支持上传进度，用假进度给用户感知）
                 let fakeProgress = 0;
                 const fakeTimer = setInterval(() => {
-                    fakeProgress = Math.min(fakeProgress + Math.random() * 15, 85);
+                    fakeProgress = Math.min(fakeProgress + Math.random() * 12, 85);
                     placeholder._progress = Math.round(fakeProgress);
-                    renderCompanionBgManager();
-                }, 600);
+                    _updateCardProgress(placeholder._progress); // 只更新进度条，不重建列表
+                }, 800);
 
                 try {
                     const r = await _uploadCompanionMedia(file, 'companion-backgrounds');
@@ -3565,24 +3574,26 @@
                 }
             }
 
-            // 4. 上传完成，更新条目
+            // 4. 上传完成
             placeholder.data = mediaData;
             placeholder.cloudKey = cloudKey;
             placeholder._uploading = false;
-            placeholder._progress = 100;
             delete placeholder._progress;
-            // 本地 URL 已不需要（已替换为 oss://），释放内存
             if (mediaData !== localUrl) URL.revokeObjectURL(localUrl);
             await saveCompanionData();
+            renderCompanionBgManager(); // 上传完成后全量刷一次（去掉进度条，显示勾选）
             notify('背景已添加', 'success');
         } catch (err) {
-            // 上传失败：条目保留本地 URL，用户可以用，但换设备后不可用
             console.error('[companion] 背景上传失败', err);
             placeholder._uploading = false;
+            delete placeholder._progress;
+            // 失败时保留 localUrl，但 localUrl 在页面刷新后会失效
+            // 给用户提示，并标记为"本地临时"
+            placeholder._localOnly = true;
             notify('上传失败，暂存本地（换设备后不可用）', 'error', 3000);
             await saveCompanionData();
+            renderCompanionBgManager();
         }
-        renderCompanionBgManager();
         e.target.value = '';
     }
 

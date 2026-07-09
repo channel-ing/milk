@@ -1427,7 +1427,15 @@ function initComboMenu() {
                 picker.classList.remove('active');
                 const delayRange = settings.replyDelayMax - settings.replyDelayMin;
                 setTimeout(simulateReply, settings.replyDelayMin + Math.random() * delayRange);
-            }, () => {
+            }, async () => {
+                // 阶段三B：如果是云端引用，先删云端（失败不阻塞）
+                if (window.CloudMedia && typeof src === 'string' && src.indexOf('oss://') === 0) {
+                    try {
+                        await window.CloudMedia.delete(src);
+                    } catch (err) {
+                        console.warn('[cloud-media] 云端删除失败', err);
+                    }
+                }
                 myStickerLibrary.splice(idx, 1);
                 localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary);
                 showNotification('✓ 已删除', 'success');

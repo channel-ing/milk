@@ -211,7 +211,15 @@ autoSendInterval: 5,
                 const item = document.createElement('div');
                 let isActive = false;
 
-                if (currentBg && currentBg === bg.value) isActive = true;
+                if (currentBg) {
+                    if (currentBg === bg.value) {
+                        // 本地 base64 完全匹配
+                        isActive = true;
+                    } else if (typeof currentBg === 'string' && currentBg.indexOf('oss://') === 0) {
+                        // 换设备恢复后 currentBg 是 oss:// 引用，跟 cloudUrl 比较
+                        isActive = bg.cloudUrl === currentBg;
+                    }
+                }
 
                 item.className = `bg-item ${isActive ? 'active': ''}`;
 
@@ -451,6 +459,41 @@ const loadData = async () => {
             updateAvatar(DOMElements.partner.avatar, partnerAvatarSrc);
             updateAvatar(DOMElements.me.avatar, myAvatarSrc);
             // updateAvatar 已经把值写进 _avatarCache 了，这里不用再写一遍
+
+            // 阶段四：本地没有头像时，从云端下载（换设备恢复场景）
+            if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                const _tryRestoreAvatar = async (isPartner) => {
+                    const localSrc = isPartner ? partnerAvatarSrc : myAvatarSrc;
+                    if (localSrc) return; // 本地有就不拉
+                    const category = isPartner ? 'avatars' : 'my-avatars';
+                    const avatarId = isPartner ? 'partner' : 'me';
+                    // 云端路径 media/<SID>/<category>/<avatarId>.jpg（尝试几种后缀）
+                    const sid = SESSION_ID;
+                    for (const ext of ['jpg', 'png', 'jpeg', 'webp']) {
+                        const ossRef = `oss://media/${sid}/${category}/${avatarId}.${ext}`;
+                        try {
+                            const blobUrl = await window.CloudMedia.fetchUrl(ossRef);
+                            // 把 blob URL 转成 base64 存本地
+                            const resp = await fetch(blobUrl);
+                            const buf = await resp.arrayBuffer();
+                            const b64arr = new Uint8Array(buf);
+                            let binary = '';
+                            b64arr.forEach(b => binary += String.fromCharCode(b));
+                            const base64 = `data:image/${ext};base64,` + btoa(binary);
+                            // 写本地 + 更新 UI
+                            const storageKey = getStorageKey(isPartner ? 'partnerAvatar' : 'myAvatar');
+                            await localforage.setItem(storageKey, base64);
+                            const el = isPartner ? DOMElements.partner.avatar : DOMElements.me.avatar;
+                            updateAvatar(el, base64);
+                            break; // 成功就不再试其他后缀
+                        } catch (e) {
+                            // 这个后缀没有，继续试下一个
+                        }
+                    }
+                };
+                _tryRestoreAvatar(true).catch(() => {});
+                _tryRestoreAvatar(false).catch(() => {});
+            }
         }
 
         if (savedChatBg) {

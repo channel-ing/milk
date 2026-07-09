@@ -232,9 +232,9 @@ autoSendInterval: 5,
                     item.innerHTML = `<div class="bg-color-block" style="background: ${bg.value}"></div>`;
                 }
 
-                item.onclick = (e) => {
+                item.onclick = async (e) => {
                     if (e.target.closest('.bg-delete-btn')) return;
-                    applyBackground(bg.value);
+                    await applyBackground(bg.value);
                     safeSetItem(getStorageKey('chatBackground'), bg.value);
                     localforage.setItem(getStorageKey('chatBackground'), bg.value);
                     renderBackgroundGallery();

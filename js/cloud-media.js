@@ -90,10 +90,23 @@
             'image/jpeg': 'jpg', 'image/jpg': 'jpg',
             'image/png': 'png', 'image/gif': 'gif',
             'image/webp': 'webp', 'image/svg+xml': 'svg',
-            'video/mp4': 'mp4', 'video/webm': 'webm',
-            'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/webm': 'webm'
+            // 视频
+            'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
+            'video/x-m4v': 'm4v', 'video/avi': 'avi', 'video/x-matroska': 'mkv',
+            // 音频
+            'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+            'audio/wav': 'wav', 'audio/x-wav': 'wav',
+            'audio/webm': 'webm', 'audio/ogg': 'ogg',
+            'audio/aac': 'aac', 'audio/x-aac': 'aac',
+            'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a',
+            'audio/flac': 'flac', 'audio/x-flac': 'flac',
+            'audio/amr': 'amr',
         };
-        return map[mime] || 'bin';
+        if (map[mime]) return map[mime];
+        // 兜底：从 mime 子类型里提取（如 audio/x-foo → foo）
+        var sub = mime.split('/')[1];
+        if (sub) return sub.replace(/^x-/, '').split(';')[0].trim() || 'bin';
+        return 'bin';
     }
 
     function _generateId() {

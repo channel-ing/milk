@@ -462,6 +462,28 @@ if (myStickerQuickUpload) {
 })();
 
 window.addEventListener('load', function() {
+    // 阶段三B：恢复未完成的图片上传队列（页面刷新后继续传）
+    setTimeout(function () {
+        if (!window.CloudMedia || typeof window.CloudMedia.restorePendingQueue !== 'function') return;
+        window.CloudMedia.restorePendingQueue(function (taskId, record) {
+            // 返回 onSuccess 回调：上传成功后更新对应消息的 image
+            var msgId = record && record.messageId;
+            if (msgId == null) return null;
+            return async function (result) {
+                try {
+                    if (typeof messages === 'undefined' || !Array.isArray(messages)) return;
+                    var target = messages.find(function (m) { return String(m.id) === String(msgId); });
+                    if (target) {
+                        target.image = result.url;
+                        delete target.uploadStatus;
+                        try { if (typeof throttledSaveData === 'function') throttledSaveData(); } catch (e) {}
+                        try { if (typeof renderMessages === 'function') renderMessages(true); } catch (e) {}
+                    }
+                } catch (e) { console.warn(e); }
+            };
+        });
+    }, 3000);
+
     setTimeout(function() {
         try {
             if (localStorage.getItem('dailyGreetingShown') === new Date().toDateString()) return;

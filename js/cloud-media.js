@@ -1,0 +1,361 @@
+/**
+ * cloud-media.js — 阶段三：图片/媒体云端存储模块
+ *
+ * 职责：
+ *   - 图片上传到 OSS（自动生成缩略图存本地）
+ *   - 按需从 OSS 下载图片
+ *   - 图片元素懒加载（滚动到才加载）
+ *   - 缓存管理（避免重复下载）
+ *   - 旧数据迁移（base64 → OSS URL）
+ *
+ * 数据分层：
+ *   1) 头像（partnerAvatar / myAvatar）：本地全尺寸 + 云端全尺寸（双保存）
+ *   2) 背景图库：本地缩略图 + 云端全尺寸
+ *   3) 聊天图片、贴纸库、陪伴背景、日记背景：仅云端 URL，按需加载
+ *
+ * 云端路径：
+ *   - media/<SESSION_ID>/<category>/<id>.<ext>
+ *   - 例如：media/mqjndirn8xxx/chat-images/img_001.png
+ */
+(function (global) {
+    'use strict';
+
+    var APP_PREFIX_STR = (typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_');
+
+    // ==== 缩略图生成 ====
+    /**
+     * 从 base64 或 File 生成缩略图（宽度 200px）
+     * @param {string|File|Blob} source
+     * @param {number} maxWidth
+     * @returns {Promise<string>} base64 缩略图
+     */
+    async function makeThumbnail(source, maxWidth) {
+        maxWidth = maxWidth || 200;
+        var dataUrl;
+        if (typeof source === 'string') {
+            dataUrl = source;
+        } else if (source instanceof Blob) {
+            dataUrl = await _blobToBase64(source);
+        } else {
+            throw new Error('缩略图源类型不支持');
+        }
+        return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.onload = function () {
+                var ratio = maxWidth / img.width;
+                if (ratio >= 1) {
+                    // 图片本来就小，直接返回原图
+                    resolve(dataUrl);
+                    return;
+                }
+                var canvas = document.createElement('canvas');
+                canvas.width = maxWidth;
+                canvas.height = Math.round(img.height * ratio);
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                try {
+                    // 用 jpeg 压缩到 0.75 质量，一般 10-30KB
+                    resolve(canvas.toDataURL('image/jpeg', 0.75));
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            img.onerror = function () { reject(new Error('图片加载失败')); };
+            img.src = dataUrl;
+        });
+    }
+
+    function _blobToBase64(blob) {
+        return new Promise(function (resolve, reject) {
+            var r = new FileReader();
+            r.onload = function () { resolve(r.result); };
+            r.onerror = function () { reject(new Error('读取文件失败')); };
+            r.readAsDataURL(blob);
+        });
+    }
+
+    function _base64ToBlob(base64) {
+        var match = /^data:([^;]+);base64,(.+)$/.exec(base64);
+        if (!match) return null;
+        var mime = match[1];
+        var b64 = match[2];
+        var binary = atob(b64);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+    }
+
+    function _extFromMime(mime) {
+        var map = {
+            'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+            'image/png': 'png', 'image/gif': 'gif',
+            'image/webp': 'webp', 'image/svg+xml': 'svg',
+            'video/mp4': 'mp4', 'video/webm': 'webm',
+            'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/webm': 'webm'
+        };
+        return map[mime] || 'bin';
+    }
+
+    function _generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    // ==== 云端上传 ====
+    /**
+     * 上传媒体到云端
+     * @param {string|Blob} source  base64 字符串或 Blob
+     * @param {string} category  分类（如 'chat-images', 'backgrounds', 'stickers'）
+     * @param {string} [id]  可选：指定 ID，否则自动生成
+     * @returns {Promise<{url: string, key: string, id: string, size: number}>}
+     */
+    async function uploadMedia(source, category, id) {
+        if (!window.CloudSync || !window.CloudSync.isConnected()) {
+            throw new Error('未连接云端');
+        }
+        var cfg = window.CloudSync.getConfig();
+        var sid = (typeof SESSION_ID !== 'undefined' && SESSION_ID) ? SESSION_ID : 'default';
+
+        var blob;
+        if (typeof source === 'string') {
+            blob = _base64ToBlob(source);
+            if (!blob) throw new Error('base64 格式错误');
+        } else if (source instanceof Blob) {
+            blob = source;
+        } else {
+            throw new Error('上传源类型不支持');
+        }
+
+        var ext = _extFromMime(blob.type);
+        id = id || _generateId();
+        var objectKey = 'media/' + sid + '/' + category + '/' + id + '.' + ext;
+
+        var contentType = blob.type || 'application/octet-stream';
+        var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {}, contentType);
+
+        // 用 Blob 上传，Content-Type 会被浏览器自动带上，与我们签名的一致
+        var res = await fetch(url, { method: 'PUT', body: blob });
+        if (!res.ok) {
+            var text = '';
+            try { text = await res.text(); } catch (e) {}
+            throw new Error('上传失败 HTTP ' + res.status + (text ? ' - ' + text.slice(0, 200) : ''));
+        }
+
+        // 生成永久访问 URL（后续下载时会重新签名）
+        return {
+            url: 'oss://' + objectKey,   // 内部标识，实际访问时会解析成签名 URL
+            key: objectKey,
+            id: id,
+            size: blob.size
+        };
+    }
+
+    // ==== 云端下载 ====
+    // 内存缓存：objectKey -> objectURL（blob:）
+    var _mediaCache = new Map();
+    var _pendingFetches = new Map();
+
+    /**
+     * 从云端下载媒体，返回可直接用于 <img src> 的 blob URL
+     * @param {string} ref  内部引用（"oss://media/xxx" 或 objectKey）
+     * @returns {Promise<string>} blob URL
+     */
+    async function fetchMediaUrl(ref) {
+        if (!ref) throw new Error('无媒体引用');
+        var objectKey = ref.indexOf('oss://') === 0 ? ref.slice(6) : ref;
+
+        // 缓存命中
+        if (_mediaCache.has(objectKey)) return _mediaCache.get(objectKey);
+        // 正在下载中
+        if (_pendingFetches.has(objectKey)) return _pendingFetches.get(objectKey);
+
+        var promise = (async function () {
+            if (!window.CloudSync || !window.CloudSync.isConnected()) {
+                throw new Error('未连接云端');
+            }
+            var cfg = window.CloudSync.getConfig();
+            var url = await window.CloudSync.buildSignedUrl(cfg, 'GET', objectKey, {});
+            var res = await fetch(url);
+            if (!res.ok) throw new Error('下载失败 HTTP ' + res.status);
+            var blob = await res.blob();
+            var blobUrl = URL.createObjectURL(blob);
+            _mediaCache.set(objectKey, blobUrl);
+            return blobUrl;
+        })();
+
+        _pendingFetches.set(objectKey, promise);
+        try {
+            return await promise;
+        } finally {
+            _pendingFetches.delete(objectKey);
+        }
+    }
+
+    /**
+     * 判断一个值是否是我们的云端引用格式
+     */
+    function isCloudRef(value) {
+        return typeof value === 'string' && value.indexOf('oss://') === 0;
+    }
+
+    /**
+     * 判断是否是 base64
+     */
+    function isBase64(value) {
+        return typeof value === 'string' && value.indexOf('data:') === 0;
+    }
+
+    // ==== 懒加载图片元素 ====
+    var _lazyObserver = null;
+
+    function _ensureObserver() {
+        if (_lazyObserver) return _lazyObserver;
+        if (!('IntersectionObserver' in window)) return null;
+        _lazyObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                var img = entry.target;
+                _lazyObserver.unobserve(img);
+                var ref = img.getAttribute('data-cloud-ref');
+                if (!ref) return;
+                _loadImageElement(img, ref);
+            });
+        }, { rootMargin: '200px' });
+        return _lazyObserver;
+    }
+
+    async function _loadImageElement(img, ref) {
+        img.classList.add('cloud-media-loading');
+        try {
+            var blobUrl = await fetchMediaUrl(ref);
+            img.src = blobUrl;
+            img.classList.remove('cloud-media-loading');
+            img.classList.add('cloud-media-loaded');
+        } catch (e) {
+            img.classList.remove('cloud-media-loading');
+            img.classList.add('cloud-media-error');
+            console.warn('[cloud-media] 加载失败', ref, e);
+        }
+    }
+
+    /**
+     * 绑定一个 <img> 元素做懒加载
+     * @param {HTMLImageElement} imgEl
+     * @param {string} ref  云端引用（oss://xxx）
+     * @param {string} [placeholder]  占位图 base64/URL
+     */
+    function bindLazyImage(imgEl, ref, placeholder) {
+        if (!imgEl || !ref) return;
+        imgEl.setAttribute('data-cloud-ref', ref);
+        // 占位图
+        if (placeholder) {
+            imgEl.src = placeholder;
+        } else {
+            // 1x1 透明 gif 兜底
+            imgEl.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        }
+        imgEl.classList.add('cloud-media-pending');
+        var obs = _ensureObserver();
+        if (obs) {
+            obs.observe(imgEl);
+        } else {
+            // 不支持 IO 则立即加载
+            _loadImageElement(imgEl, ref);
+        }
+    }
+
+    /**
+     * 立即加载（不懒加载）
+     */
+    async function loadNow(imgEl, ref) {
+        if (!imgEl || !ref) return;
+        imgEl.setAttribute('data-cloud-ref', ref);
+        await _loadImageElement(imgEl, ref);
+    }
+
+    // ==== 迁移辅助 ====
+    /**
+     * 检查一个字符串是否是 base64 图片，如果是则上传到云端，返回新引用
+     * 如果本来就是 oss://，直接返回
+     */
+    async function migrateIfBase64(value, category) {
+        if (!value) return value;
+        if (isCloudRef(value)) return value;
+        if (!isBase64(value)) return value;
+        try {
+            var r = await uploadMedia(value, category);
+            return r.url;
+        } catch (e) {
+            console.warn('[cloud-media] 迁移失败', category, e);
+            return value; // 失败保持原样
+        }
+    }
+
+    // ==== 缓存清理 ====
+    function clearMemoryCache() {
+        _mediaCache.forEach(function (blobUrl) {
+            try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+        });
+        _mediaCache.clear();
+    }
+
+    // ==== 样式（占位加载效果） ====
+    function _injectStyles() {
+        if (document.getElementById('cloud-media-styles')) return;
+        var s = document.createElement('style');
+        s.id = 'cloud-media-styles';
+        s.textContent = [
+            '.cloud-media-pending, .cloud-media-loading {',
+            '  background: linear-gradient(90deg, #eaeaea 0%, #f5f5f5 50%, #eaeaea 100%);',
+            '  background-size: 200% 100%;',
+            '  animation: cloudMediaShimmer 1.4s ease-in-out infinite;',
+            '  min-height: 60px;',
+            '}',
+            '@keyframes cloudMediaShimmer {',
+            '  0% { background-position: 200% 0; }',
+            '  100% { background-position: -200% 0; }',
+            '}',
+            '.cloud-media-error {',
+            '  background: #f8d7da;',
+            '  color: #721c24;',
+            '  padding: 8px;',
+            '  font-size: 12px;',
+            '  min-height: 40px;',
+            '  display: flex;',
+            '  align-items: center;',
+            '  justify-content: center;',
+            '}',
+            '.cloud-media-error::after {',
+            '  content: "图片加载失败";',
+            '}'
+        ].join('\n');
+        document.head.appendChild(s);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _injectStyles);
+    } else {
+        _injectStyles();
+    }
+
+    // ==== 暴露 ====
+    global.CloudMedia = {
+        // 上传下载
+        upload: uploadMedia,
+        fetchUrl: fetchMediaUrl,
+        // 缩略图
+        makeThumbnail: makeThumbnail,
+        // 判断
+        isCloudRef: isCloudRef,
+        isBase64: isBase64,
+        // 懒加载
+        bindLazyImage: bindLazyImage,
+        loadNow: loadNow,
+        // 迁移
+        migrateIfBase64: migrateIfBase64,
+        // 缓存
+        clearMemoryCache: clearMemoryCache,
+        // 工具
+        _blobToBase64: _blobToBase64,
+        _base64ToBlob: _base64ToBlob
+    };
+})(typeof window !== 'undefined' ? window : this);

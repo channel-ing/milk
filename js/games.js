@@ -926,13 +926,28 @@ function renderFavorites() {
 
                 // 先查 IndexedDB 持久化缓存（有缓存则直接播，不依赖 TTS 配置）
                 try {
-                    const base64 = await localforage.getItem(`favAudio_${msgId}`);
-                    if (base64 && typeof base64 === 'string') {
-                        const binary = atob(base64);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                        const blob = new Blob([bytes], { type: 'audio/mpeg' });
-                        audioUrl = URL.createObjectURL(blob);
+                    // 阶段四：键名带 SESSION_ID 前缀；值可以是 base64 或 oss:// 引用
+                    const key = window.favAudioKey ? window.favAudioKey(msgId) : `favAudio_${msgId}`;
+                    let stored = await localforage.getItem(key);
+                    // 兼容旧键名（无 SESSION_ID 前缀）
+                    if (!stored) {
+                        stored = await localforage.getItem(`favAudio_${msgId}`);
+                    }
+                    if (stored && typeof stored === 'string') {
+                        if (stored.startsWith('oss://')) {
+                            // 云端引用：fetch blob URL
+                            if (window.CloudMedia) {
+                                const blobUrl = await window.CloudMedia.fetchUrl(stored);
+                                audioUrl = blobUrl;
+                            }
+                        } else {
+                            // 老格式：裸 base64
+                            const binary = atob(stored);
+                            const bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                            const blob = new Blob([bytes], { type: 'audio/mpeg' });
+                            audioUrl = URL.createObjectURL(blob);
+                        }
                     }
                 } catch (e) {}
 

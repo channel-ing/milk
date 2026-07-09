@@ -953,6 +953,20 @@
             delBtn.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm('确定删除这张日记背景吗？')) {
+                    // 阶段三B：如果有云端引用，先删云端对象（失败不阻塞本地删除）
+                    if (window.CloudMedia && bg && bg.cloudKey) {
+                        try {
+                            await window.CloudMedia.delete(bg.cloudKey);
+                        } catch (err) {
+                            console.warn('[cloud-media] 云端删除失败', err);
+                        }
+                    } else if (window.CloudMedia && bg && typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0) {
+                        try {
+                            await window.CloudMedia.delete(bg.value);
+                        } catch (err) {
+                            console.warn('[cloud-media] 云端删除失败', err);
+                        }
+                    }
                     _diaryBgGallery.splice(index, 1);
                     await saveDiaryBgGallery();
                     if (isActive) await clearDiaryBg();

@@ -207,36 +207,47 @@
                 try {
                     var v = await localforage.getItem(k);
                     if (v === undefined) continue;
-                    // 阶段三A 保护：如果 backgroundGallery / chatBackground 仍然是 base64 大图，
-                    // 不同步（避免 payload 爆炸），提示用户先迁移
+                    // 阶段三B 修：backgroundGallery 本地 value 现在是全尺寸 base64
+                    // 同步时把 value 换成 cloudUrl（oss:// 引用），让换设备恢复时能从云端下载
+                    // 没有 cloudUrl 的（未上云）：如果有 thumbnail 用 thumbnail 兜底，否则跳过
                     if (k.indexOf('backgroundGallery') !== -1 && Array.isArray(v)) {
-                        var sanitized = v.filter(function (bg) {
-                            if (!bg || typeof bg !== 'object') return true;
-                            // 保留：不是图片（颜色/渐变）、云端引用、有 thumbnail 的
-                            if (typeof bg.value !== 'string') return true;
-                            if (bg.value.indexOf('oss://') === 0) return true;
-                            if (!bg.value.startsWith('data:image')) return true;
-                            // 是 base64 大图：跳过（等用户迁移后再同步）
-                            return false;
-                        });
-                        // 对于保留的项，也确保没有大 base64
-                        sanitized = sanitized.map(function (bg) {
-                            if (!bg || typeof bg !== 'object') return bg;
-                            if (typeof bg.value === 'string' && bg.value.indexOf('data:image') === 0) {
-                                // 兜底：把 base64 value 换成 thumbnail（如果有），否则删掉
-                                var copy = Object.assign({}, bg);
-                                if (bg.thumbnail) copy.value = bg.thumbnail;
-                                else return null;
-                                return copy;
+                        var sanitized = [];
+                        v.forEach(function (bg) {
+                            if (!bg || typeof bg !== 'object') { sanitized.push(bg); return; }
+                            // 颜色/渐变：直接同步
+                            if (typeof bg.value !== 'string' || (!bg.value.startsWith('data:image') && bg.value.indexOf('oss://') !== 0)) {
+                                sanitized.push(bg);
+                                return;
                             }
-                            return bg;
-                        }).filter(Boolean);
+                            // 有云端备份引用：把 value 换成 cloudUrl
+                            if (bg.cloudUrl && bg.cloudUrl.indexOf('oss://') === 0) {
+                                var copy = Object.assign({}, bg);
+                                copy.value = bg.cloudUrl; // 换成云端引用
+                                // 本地 base64 不上传到云端 payload
+                                delete copy.cloudUrl;
+                                sanitized.push(copy);
+                                return;
+                            }
+                            // 旧格式：value 已经是 oss://（历史数据）
+                            if (bg.value.indexOf('oss://') === 0) {
+                                sanitized.push(bg);
+                                return;
+                            }
+                            // 纯本地 base64，没有云端备份：thumbnail 兜底，否则跳过
+                            if (bg.thumbnail) {
+                                var copy2 = Object.assign({}, bg);
+                                copy2.value = bg.thumbnail;
+                                sanitized.push(copy2);
+                            }
+                            // 没 thumbnail 也没云端：跳过，不上传大 base64
+                        });
                         payload.indexedDB[k] = sanitized;
                         continue;
                     }
                     if (k.indexOf('chatBackground') !== -1) {
-                        // 只同步云端引用或非图片；base64 大图跳过
+                        // chatBackground 本地存 base64，不同步到云端（体积大，换设备从 gallery 恢复）
                         if (typeof v === 'string' && v.indexOf('data:image') === 0) continue;
+                        // 颜色/渐变等非图片类型：正常同步
                         payload.indexedDB[k] = v;
                         continue;
                     }

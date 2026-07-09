@@ -1402,17 +1402,43 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                         showNotification('文件较大，正在处理中...', 'info', 2000);
                     }
                     const reader = new FileReader();
-                    reader.onload = (event) => {
+                    reader.onload = async (event) => {
                         const base64 = event.target.result;
-                        savedBackgrounds.push({
-                            id: `user-${Date.now()}`,
-                            type: file.type === 'image/gif' ? 'gif' : 'image',
-                            value: base64
-                        });
+                        const bgType = file.type === 'image/gif' ? 'gif' : 'image';
+                        const bgId = `user-${Date.now()}`;
+
+                        // 阶段三：如果已连云端，上传全尺寸到云端，本地只存缩略图
+                        let stored = { id: bgId, type: bgType, value: base64 };
+                        if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                            showNotification('正在上传到云端...', 'info', 2000);
+                            try {
+                                const uploadResult = await window.CloudMedia.upload(base64, 'backgrounds', bgId);
+                                let thumb = null;
+                                try {
+                                    thumb = await window.CloudMedia.makeThumbnail(base64, 200);
+                                } catch (thumbErr) {
+                                    console.warn('[cloud-media] 缩略图生成失败', thumbErr);
+                                }
+                                stored = {
+                                    id: bgId,
+                                    type: bgType,
+                                    value: uploadResult.url,      // 云端引用 oss://
+                                    thumbnail: thumb,              // 本地缩略图（预览用），可能为 null
+                                    cloudKey: uploadResult.key
+                                };
+                            } catch (err) {
+                                console.warn('[cloud-media] 背景上传失败，降级为本地存储', err);
+                                showNotification('云端上传失败，暂存本地', 'error', 2500);
+                                // stored 保持默认（本地 base64）
+                            }
+                        }
+
+                        savedBackgrounds.push(stored);
                         saveBackgroundGallery();
                         renderBackgroundGallery();
-                        applyBackground(base64);
-                        localforage.setItem(getStorageKey('chatBackground'), base64);
+                        // 应用背景：优先用云端 URL，其次用 base64
+                        applyBackground(stored.value);
+                        localforage.setItem(getStorageKey('chatBackground'), stored.value);
                         showNotification('新背景已添加并应用', 'success');
                     };
                     reader.readAsDataURL(file);

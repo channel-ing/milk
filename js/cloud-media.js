@@ -296,9 +296,11 @@
             var blobUrl = await fetchMediaUrl(ref);
             img.src = blobUrl;
             img.classList.remove('cloud-media-loading');
+            img.classList.remove('cloud-media-pending');
             img.classList.add('cloud-media-loaded');
         } catch (e) {
             img.classList.remove('cloud-media-loading');
+            img.classList.remove('cloud-media-pending');
             img.classList.add('cloud-media-error');
             console.warn('[cloud-media] 加载失败', ref, e);
         }

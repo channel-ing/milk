@@ -194,11 +194,23 @@ const stickerInput = document.getElementById('sticker-file-input');
 
                     let successCount = 0;
                     let failCount = 0;
+                    const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
 
                     for (const file of validFiles) {
                         try {
                             const base64 = await optimizeImage(file, 300, 0.8);
-                            stickerLibrary.push(base64);
+                            let toStore = base64;
+                            // 阶段三B：连了云端就上传，本地只存 oss:// 引用
+                            if (cloudReady) {
+                                try {
+                                    const r = await window.CloudMedia.upload(base64, 'stickers');
+                                    toStore = r.url;
+                                } catch (upErr) {
+                                    console.warn('[cloud-media] 贴纸上传失败，降级本地', upErr);
+                                    // toStore 保持 base64
+                                }
+                            }
+                            stickerLibrary.push(toStore);
                             successCount++;
                         } catch (err) {
                             console.error(err);
@@ -230,10 +242,20 @@ if (myStickerQuickUpload) {
         showNotification('正在处理 ' + validFiles.length + ' 张...', 'info');
         let ok = 0, fail = 0;
         const newStickers = [];
+        const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
         for (const file of validFiles) {
             try {
                 const base64 = await optimizeImage(file, 300, 0.8);
-                newStickers.push(base64);
+                let toStore = base64;
+                if (cloudReady) {
+                    try {
+                        const r = await window.CloudMedia.upload(base64, 'my-stickers');
+                        toStore = r.url;
+                    } catch (upErr) {
+                        console.warn('[cloud-media] 我的贴纸上传失败，降级本地', upErr);
+                    }
+                }
+                newStickers.push(toStore);
                 ok++;
             } catch(err) { fail++; }
         }

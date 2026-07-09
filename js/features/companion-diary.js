@@ -132,13 +132,28 @@
     };
 
     // ─── 日记背景：应用到 modal 的 .cd-pages 上 ────────
-    window.applyCompanionDiaryBg = function(bgValue) {
+    window.applyCompanionDiaryBg = async function(bgValue) {
         const pages = document.getElementById('cd-pages');
         if (!pages) return;
         if (!bgValue) {
             pages.style.backgroundImage = '';
             pages.style.backgroundColor = '';
             pages.classList.remove('cd-has-bg');
+            return;
+        }
+        // 阶段三B：云端引用先下载
+        if (typeof bgValue === 'string' && bgValue.indexOf('oss://') === 0) {
+            if (!window.CloudMedia) return;
+            try {
+                const blobUrl = await window.CloudMedia.fetchUrl(bgValue);
+                pages.style.backgroundImage = 'url(' + JSON.stringify(blobUrl) + ')';
+                pages.style.backgroundSize = 'cover';
+                pages.style.backgroundPosition = 'center';
+                pages.style.backgroundRepeat = 'no-repeat';
+                pages.classList.add('cd-has-bg');
+            } catch (e) {
+                console.warn('[companion-diary] 云端背景加载失败', e);
+            }
             return;
         }
         if (bgValue.startsWith('linear-gradient') || bgValue.startsWith('#') || bgValue.startsWith('rgb')) {
@@ -874,13 +889,13 @@
     async function applyDiaryBg(value) {
         try { await localforage.setItem(diaryBgKey(), value || ''); } catch (e) {}
         if (typeof window.applyCompanionDiaryBg === 'function') {
-            window.applyCompanionDiaryBg(value || '');
+            await window.applyCompanionDiaryBg(value || '');
         }
     }
     async function clearDiaryBg() {
         try { await localforage.removeItem(diaryBgKey()); } catch (e) {}
         if (typeof window.applyCompanionDiaryBg === 'function') {
-            window.applyCompanionDiaryBg('');
+            await window.applyCompanionDiaryBg('');
         }
     }
 
@@ -906,7 +921,23 @@
             const item = document.createElement('div');
             const isActive = currentBg && currentBg === bg.value;
             item.className = 'bg-item ' + (isActive ? 'active' : '');
-            item.innerHTML = '<img src="' + bg.value + '" loading="lazy" alt="bg">';
+
+            // 阶段三B：云端引用走懒加载 + 缩略图兜底
+            const isCloud = typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0;
+            if (isCloud) {
+                const displaySrc = bg.thumbnail || '';
+                if (displaySrc) {
+                    item.innerHTML = '<img src="' + displaySrc + '" loading="lazy" alt="bg">';
+                } else {
+                    item.innerHTML = '<img loading="lazy" alt="bg">';
+                    const imgEl = item.querySelector('img');
+                    if (window.CloudMedia && imgEl) {
+                        window.CloudMedia.bindLazyImage(imgEl, bg.value);
+                    }
+                }
+            } else {
+                item.innerHTML = '<img src="' + bg.value + '" loading="lazy" alt="bg">';
+            }
 
             item.onclick = (e) => {
                 if (e.target.closest('.bg-delete-btn')) return;
@@ -948,13 +979,39 @@
                 const reader = new FileReader();
                 reader.onload = async (ev) => {
                     const base64 = ev.target.result;
-                    _diaryBgGallery.push({
-                        id: 'user-' + Date.now(),
-                        type: 'image',
-                        value: base64
-                    });
+                    const bgId = 'user-' + Date.now();
+
+                    // 阶段三B：如果已连云端，上传全尺寸到云端，本地只存缩略图
+                    let stored = { id: bgId, type: 'image', value: base64 };
+                    let valueToApply = base64;
+                    if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                        if (typeof showNotification === 'function') showNotification('正在上传到云端...', 'info', 2000);
+                        try {
+                            const uploadResult = await window.CloudMedia.upload(base64, 'diary-backgrounds', bgId);
+                            let thumb = null;
+                            try {
+                                thumb = await window.CloudMedia.makeThumbnail(base64, 200);
+                            } catch (thumbErr) {
+                                console.warn('[cloud-media] 日记背景缩略图生成失败', thumbErr);
+                            }
+                            stored = {
+                                id: bgId,
+                                type: 'image',
+                                value: uploadResult.url,
+                                thumbnail: thumb,
+                                cloudKey: uploadResult.key
+                            };
+                            valueToApply = uploadResult.url;
+                        } catch (err) {
+                            console.warn('[cloud-media] 日记背景上传失败，降级为本地存储', err);
+                            if (typeof showNotification === 'function') showNotification('云端上传失败，暂存本地', 'error', 2500);
+                            // stored 保持默认（本地 base64）
+                        }
+                    }
+
+                    _diaryBgGallery.push(stored);
                     await saveDiaryBgGallery();
-                    await applyDiaryBg(base64);
+                    await applyDiaryBg(valueToApply);
                     renderDiaryBgGallery();
                     if (typeof showNotification === 'function') showNotification('日记背景已添加并应用', 'success');
                 };

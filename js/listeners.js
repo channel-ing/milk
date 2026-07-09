@@ -3243,7 +3243,7 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
 
 
                 sendBtn.addEventListener('click',
-                    async () => {
+                    () => {
                         if (currentImageData) {
                             const messageId = Date.now();
                             let imageField = currentImageData;
@@ -3254,27 +3254,41 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
                             const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
                             if (isBase64Img && cloudReady) {
                                 const taskId = 'up_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-                                try {
-                                    // await 确保 pendingUpload_ 键写完，随后消息渲染能立即读到 base64
-                                    await window.CloudMedia.queueUpload(currentImageData, 'chat-images', {
-                                        taskId: taskId,
-                                        messageId: messageId,
-                                        onSuccess: async (result) => {
-                                            const target = messages.find(m => String(m.id) === String(messageId));
-                                            if (target) {
-                                                target.image = result.url;
-                                                delete target.uploadStatus;
-                                                try { throttledSaveData(); } catch (e) {}
-                                                try { renderMessages(true); } catch (e) {}
+                                imageField = 'pending://' + taskId;
+                                uploadStatus = 'uploading';
+                                // 同步入队：内部同步写内存缓存 + 队列，随后消息渲染能立刻读到 base64
+                                window.CloudMedia.queueUpload(currentImageData, 'chat-images', {
+                                    taskId: taskId,
+                                    messageId: messageId,
+                                    onSuccess: async (result) => {
+                                        const target = messages.find(m => String(m.id) === String(messageId));
+                                        if (!target) return;
+                                        target.image = result.url;
+                                        delete target.uploadStatus;
+                                        try { throttledSaveData(); } catch (e) {}
+                                        // 局部更新 DOM，不重刷全部消息（避免影响滚动位置）
+                                        try {
+                                            const wrapper = document.querySelector('.message-wrapper[data-id="' + messageId + '"]');
+                                            if (wrapper) {
+                                                const wrap = wrapper.querySelector('.message-image-pending-wrap');
+                                                if (wrap) {
+                                                    const img = wrap.querySelector('img');
+                                                    const parent = wrap.parentNode;
+                                                    if (img && parent) {
+                                                        // 换成云端引用的懒加载 img
+                                                        img.removeAttribute('data-pending-ref');
+                                                        img.setAttribute('data-lazy-cloud-ref', result.url);
+                                                        img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                                        img.src = '';
+                                                        // 把 img 从 wrap 里拎出来，替换 wrap
+                                                        parent.replaceChild(img, wrap);
+                                                        if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                                    }
+                                                }
                                             }
-                                        }
-                                    });
-                                    imageField = 'pending://' + taskId;
-                                    uploadStatus = 'uploading';
-                                } catch (err) {
-                                    console.warn('[cloud-media] 队列入队失败，降级为 base64 存储', err);
-                                    // imageField 保持 base64，走老逻辑
-                                }
+                                        } catch (e) { console.warn('[cloud-media] 局部更新失败', e); }
+                                    }
+                                });
                             }
 
                             addMessage({

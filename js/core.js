@@ -464,30 +464,31 @@ const loadData = async () => {
             if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
                 const _tryRestoreAvatar = async (isPartner) => {
                     const localSrc = isPartner ? partnerAvatarSrc : myAvatarSrc;
-                    if (localSrc) return; // 本地有就不拉
+                    // 本地 localforage 有 或 内存缓存有，都不拉
+                    const cacheVal = window._avatarCache && (isPartner ? window._avatarCache.partner : window._avatarCache.me);
+                    if (localSrc || cacheVal) return;
+
                     const category = isPartner ? 'avatars' : 'my-avatars';
                     const avatarId = isPartner ? 'partner' : 'me';
-                    // 云端路径 media/<SID>/<category>/<avatarId>.jpg（尝试几种后缀）
                     const sid = SESSION_ID;
-                    for (const ext of ['jpg', 'png', 'jpeg', 'webp']) {
+                    // 只试 jpg 和 png（上传时统一用 jpg，png 做兜底）
+                    for (const ext of ['jpg', 'png']) {
                         const ossRef = `oss://media/${sid}/${category}/${avatarId}.${ext}`;
                         try {
                             const blobUrl = await window.CloudMedia.fetchUrl(ossRef);
-                            // 把 blob URL 转成 base64 存本地
                             const resp = await fetch(blobUrl);
                             const buf = await resp.arrayBuffer();
                             const b64arr = new Uint8Array(buf);
                             let binary = '';
                             b64arr.forEach(b => binary += String.fromCharCode(b));
                             const base64 = `data:image/${ext};base64,` + btoa(binary);
-                            // 写本地 + 更新 UI
                             const storageKey = getStorageKey(isPartner ? 'partnerAvatar' : 'myAvatar');
                             await localforage.setItem(storageKey, base64);
                             const el = isPartner ? DOMElements.partner.avatar : DOMElements.me.avatar;
                             updateAvatar(el, base64);
-                            break; // 成功就不再试其他后缀
+                            break;
                         } catch (e) {
-                            // 这个后缀没有，继续试下一个
+                            // 没有这个后缀，继续
                         }
                     }
                 };

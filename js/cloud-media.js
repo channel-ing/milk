@@ -197,6 +197,35 @@
         return typeof value === 'string' && value.indexOf('oss://') === 0;
     }
 
+    // ==== 云端删除 ====
+    /**
+     * 从云端删除对象
+     * @param {string} refOrKey  'oss://media/xxx' 或 objectKey 'media/xxx'
+     * @returns {Promise<boolean>} 成功返回 true
+     */
+    async function deleteMedia(refOrKey) {
+        if (!refOrKey) return false;
+        if (!window.CloudSync || !window.CloudSync.isConnected()) {
+            throw new Error('未连接云端');
+        }
+        var objectKey = refOrKey.indexOf('oss://') === 0 ? refOrKey.slice(6) : refOrKey;
+        var cfg = window.CloudSync.getConfig();
+        var url = await window.CloudSync.buildSignedUrl(cfg, 'DELETE', objectKey, {});
+        var res = await fetch(url, { method: 'DELETE' });
+        // OSS DELETE 成功返回 204，即使对象不存在也返回 204
+        if (!res.ok && res.status !== 204 && res.status !== 404) {
+            var text = '';
+            try { text = await res.text(); } catch (e) {}
+            throw new Error('删除失败 HTTP ' + res.status + (text ? ' - ' + text.slice(0, 200) : ''));
+        }
+        // 清理内存缓存
+        if (_mediaCache.has(objectKey)) {
+            try { URL.revokeObjectURL(_mediaCache.get(objectKey)); } catch (e) {}
+            _mediaCache.delete(objectKey);
+        }
+        return true;
+    }
+
     /**
      * 判断是否是 base64
      */
@@ -342,6 +371,7 @@
         // 上传下载
         upload: uploadMedia,
         fetchUrl: fetchMediaUrl,
+        delete: deleteMedia,
         // 缩略图
         makeThumbnail: makeThumbnail,
         // 判断

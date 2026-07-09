@@ -369,6 +369,8 @@
     // ==== 上传队列（阶段三B：聊天图片"发送即成功"，后台自动重试）====
     // 队列 task 结构：{ base64, category, messageId, onSuccess, attempts, timerId }
     var _uploadQueue = new Map();
+    // 内存 base64 缓存：taskId → base64。让 bindPendingImage 同步读到数据，避免竞态
+    var _pendingBase64Cache = new Map();
     // 加 APP_PREFIX 前缀，让恢复流程能一并清掉（避免残留别的梦角的 pending 数据）
     var _pendingKeyPrefix = APP_PREFIX_STR + 'pendingUpload_';
     var _uploaderStarted = false;
@@ -384,30 +386,18 @@
     }
 
     /**
-     * 加入上传队列（聊天图片专用）
+     * 加入上传队列（聊天图片专用，同步函数，立即返回 taskId）
      * @param {string} base64
-     * @param {string} category  云端子目录（如 'chat-images'）
+     * @param {string} category
      * @param {object} opts  { taskId?, messageId, onSuccess?(result), onFailure?(err) }
-     * @returns {Promise<string>} taskId
+     * @returns {string} taskId
      */
-    async function queueUpload(base64, category, opts) {
+    function queueUpload(base64, category, opts) {
         opts = opts || {};
-        // 允许外部预生成 taskId（用于避免消息首帧闪烁）
         var taskId = opts.taskId || ('up_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
-        var record = {
-            base64: base64,
-            category: category,
-            messageId: opts.messageId,
-            createdAt: Date.now()
-        };
-        // 持久化：即使刷新页面也能恢复
-        try {
-            await localforage.setItem(_pendingKey(taskId), record);
-        } catch (e) {
-            console.error('[cloud-media] 上传队列持久化失败', e);
-            throw e;
-        }
-        // 加入内存队列
+        // 内存缓存立即写入（同步），供随后立刻渲染的消息读取，避免竞态
+        _pendingBase64Cache.set(taskId, base64);
+        // 内存队列同步写入
         _uploadQueue.set(taskId, {
             base64: base64,
             category: category,
@@ -417,7 +407,17 @@
             attempts: 0,
             timerId: null
         });
-        // 触发上传（不 await，异步）
+        // 持久化（异步 fire-and-forget，即使失败也不影响本次发送体验）
+        var record = {
+            base64: base64,
+            category: category,
+            messageId: opts.messageId,
+            createdAt: Date.now()
+        };
+        localforage.setItem(_pendingKey(taskId), record).catch(function (e) {
+            console.error('[cloud-media] pending 键持久化失败（不影响本次上传）', e);
+        });
+        // 触发上传（不 await）
         _tryUpload(taskId);
         return taskId;
     }
@@ -436,8 +436,9 @@
 
         try {
             var result = await uploadMedia(task.base64, task.category);
-            // 成功：清队列 + 清持久化
+            // 成功：清队列 + 清持久化 + 清内存缓存
             _uploadQueue.delete(taskId);
+            _pendingBase64Cache.delete(taskId);
             try { await localforage.removeItem(_pendingKey(taskId)); } catch (e) {}
             if (typeof task.onSuccess === 'function') {
                 try { await task.onSuccess(result); } catch (e) { console.warn('[cloud-media] onSuccess 回调出错', e); }
@@ -451,23 +452,46 @@
 
     /**
      * 从 pendingUpload_ 键读出 base64（供消息渲染显示上传中的图）
+     * 优先查内存缓存（同步命中，无竞态），未命中再读 localforage（页面刷新后的恢复场景）
      */
     async function getPendingBase64(taskIdOrRef) {
         var taskId = taskIdOrRef.indexOf('pending://') === 0 ? taskIdOrRef.slice(10) : taskIdOrRef;
+        // 优先内存
+        if (_pendingBase64Cache.has(taskId)) {
+            return _pendingBase64Cache.get(taskId);
+        }
+        // 回退到 localforage
         try {
             var record = await localforage.getItem(_pendingKey(taskId));
-            return record && record.base64 ? record.base64 : null;
-        } catch (e) {
-            return null;
-        }
+            if (record && record.base64) {
+                // 顺便回填内存缓存
+                _pendingBase64Cache.set(taskId, record.base64);
+                return record.base64;
+            }
+        } catch (e) {}
+        return null;
     }
 
     /**
-     * 绑定"上传中"图片的 src（从 pendingUpload_ 读 base64 显示）
+     * 绑定"上传中"图片的 src
+     * 内存命中：同步设置 src（无闪烁）
+     * 内存未命中：await localforage，异步设置 src
      */
-    async function bindPendingImage(imgEl, pendingRef) {
-        var base64 = await getPendingBase64(pendingRef);
-        if (base64 && imgEl) imgEl.src = base64;
+    function bindPendingImage(imgEl, pendingRef) {
+        if (!imgEl || !pendingRef) return;
+        var taskId = pendingRef.indexOf('pending://') === 0 ? pendingRef.slice(10) : pendingRef;
+        // 同步路径
+        if (_pendingBase64Cache.has(taskId)) {
+            imgEl.src = _pendingBase64Cache.get(taskId);
+            return;
+        }
+        // 异步路径（刷新后恢复的场景）
+        localforage.getItem(_pendingKey(taskId)).then(function (record) {
+            if (record && record.base64) {
+                _pendingBase64Cache.set(taskId, record.base64);
+                imgEl.src = record.base64;
+            }
+        }).catch(function () {});
     }
 
     /**
@@ -501,6 +525,8 @@
                     attempts: 0,
                     timerId: null
                 });
+                // 恢复内存缓存，让重启后消息重新渲染时能同步显示 base64
+                _pendingBase64Cache.set(taskId, record.base64);
                 _tryUpload(taskId);
             }
         } catch (e) {

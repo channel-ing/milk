@@ -449,7 +449,15 @@ function showEmojiTab() {
     stickerLibrary.forEach(src => {
         const item = document.createElement('div');
         item.className = 'picker-item';
-        item.innerHTML = `<img src="${src}" style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
+        // 阶段三B：识别 oss:// 走懒加载
+        const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+        item.innerHTML = `<img style="width:100%; height:100%; object-fit:cover; border-radius:6px;">`;
+        const imgEl = item.querySelector('img');
+        if (isCloud) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(imgEl, src);
+        } else {
+            imgEl.src = src;
+        }
         item.onclick = () => {
             if (isBatchMode) {
                 batchMessages.push({ id: Date.now() + batchMessages.length, text: '', image: src });

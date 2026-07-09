@@ -143,10 +143,22 @@
         var objectKey = 'media/' + sid + '/' + category + '/' + id + '.' + ext;
 
         var contentType = blob.type || 'application/octet-stream';
-        var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {}, contentType);
+        // 大文件需要更长的签名有效期（每 10MB 预留 60 秒，最少 120 秒，最多 600 秒）
+        var fileMB = blob.size / 1024 / 1024;
+        var expiresSeconds = Math.min(Math.max(Math.ceil(fileMB / 10) * 60, 120), 600);
+        var url = await window.CloudSync.buildSignedUrl(cfg, 'PUT', objectKey, {}, contentType, expiresSeconds);
 
-        // 用 Blob 上传，Content-Type 会被浏览器自动带上，与我们签名的一致
-        var res = await fetch(url, { method: 'PUT', body: blob });
+        // 大文件给足超时时间（每 MB 预留 3 秒，最少 30 秒，最多 10 分钟）
+        var timeoutMs = Math.min(Math.max(blob.size / 1024 / 1024 * 3000, 30000), 600000);
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function () { controller.abort(); }, timeoutMs);
+
+        var res;
+        try {
+            res = await fetch(url, { method: 'PUT', body: blob, signal: controller.signal });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         if (!res.ok) {
             var text = '';
             try { text = await res.text(); } catch (e) {}

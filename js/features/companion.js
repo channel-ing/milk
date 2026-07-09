@@ -139,7 +139,26 @@
             const key = typeof getStorageKey === 'function'
                 ? getStorageKey(STORAGE_KEY)
                 : (window.APP_PREFIX || 'CHAT_APP_V3_') + STORAGE_KEY;
-            await localforage.setItem(key, companionData);
+
+            // 保存前深拷贝并过滤掉：blob URL（刷新失效）、临时上传状态字段
+            const toSave = JSON.parse(JSON.stringify(companionData, function (k, v) {
+                // 过滤临时字段
+                if (k === '_uploading' || k === '_progress' || k === '_localOnly') return undefined;
+                // 过滤 blob URL（data 字段只允许 base64 或 oss://）
+                if (k === 'data' && typeof v === 'string' && v.startsWith('blob:')) return undefined;
+                return v;
+            }));
+            // 过滤掉 data 为空（被上面过滤掉 blob URL）的背景条目
+            const modes = ['study', 'work', 'exercise', 'sleep'];
+            modes.forEach(function (m) {
+                if (toSave.backgrounds && Array.isArray(toSave.backgrounds[m])) {
+                    toSave.backgrounds[m] = toSave.backgrounds[m].filter(function (bg) {
+                        return bg && bg.data; // data 为空的条目（blob URL 被过滤）不保存
+                    });
+                }
+            });
+
+            await localforage.setItem(key, toSave);
         } catch (e) {
             console.warn('[companion] 保存数据失败', e);
         }
@@ -1642,6 +1661,19 @@
         stopEarlyLeaveCheck();
         stopPartnerGoodnightCheck();
         recordHistory();
+
+        // 阶段三B：停止并清理背景视频（防止退出后声音继续播放）
+        try {
+            const container = document.getElementById('companion-bg-container');
+            if (container) {
+                container.querySelectorAll('video').forEach(function (v) {
+                    v.pause();
+                    v.src = '';
+                    v.load();
+                });
+                container.innerHTML = '';
+            }
+        } catch (e) {}
 
         // 阶段三B：清理媒体 blob URL 缓存
         try { _clearMediaCache(); } catch (e) {}
@@ -3585,12 +3617,12 @@
             notify('背景已添加', 'success');
         } catch (err) {
             console.error('[companion] 背景上传失败', err);
-            placeholder._uploading = false;
-            delete placeholder._progress;
-            // 失败时保留 localUrl，但 localUrl 在页面刷新后会失效
-            // 给用户提示，并标记为"本地临时"
-            placeholder._localOnly = true;
-            notify('上传失败，暂存本地（换设备后不可用）', 'error', 3000);
+            // 上传失败：不能把 blob URL 存进 localforage（刷新后会失效报错）
+            // 直接从数组里移除这条记录，告知用户重试
+            const idx = companionData.backgrounds[mode].indexOf(placeholder);
+            if (idx !== -1) companionData.backgrounds[mode].splice(idx, 1);
+            URL.revokeObjectURL(localUrl);
+            notify('上传失败，请检查网络后重试', 'error', 3000);
             await saveCompanionData();
             renderCompanionBgManager();
         }

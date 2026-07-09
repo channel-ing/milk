@@ -294,6 +294,39 @@
                         payload.indexedDB[k] = sanitizedStickers;
                         continue;
                     }
+                    // 阶段三B 保护：companionData（嵌套对象，递归过滤 base64 大数据）
+                    // backgrounds/voices/noises 里的 .data 字段可能是 base64，需要过滤
+                    if (k.indexOf('companionData') !== -1 && v && typeof v === 'object') {
+                        var sanitizeCompanionItems = function (items) {
+                            if (!Array.isArray(items)) return items;
+                            return items.map(function (item) {
+                                if (!item || typeof item !== 'object') return item;
+                                if (typeof item.data !== 'string') return item;
+                                // 是 oss:// 引用：保留
+                                if (item.data.indexOf('oss://') === 0) return item;
+                                // 是 base64：过滤掉 data 字段，保留元数据
+                                if (item.data.indexOf('data:') === 0) {
+                                    var copy = Object.assign({}, item);
+                                    delete copy.data; // 不上传 base64，换设备后需要迁移
+                                    return copy;
+                                }
+                                return item;
+                            });
+                        };
+                        var sanitizedCompanion = Object.assign({}, v);
+                        var modes = ['study', 'work', 'exercise', 'sleep'];
+                        ['backgrounds', 'voices', 'noises'].forEach(function (field) {
+                            if (sanitizedCompanion[field] && typeof sanitizedCompanion[field] === 'object') {
+                                var sanitizedField = {};
+                                modes.forEach(function (mode) {
+                                    sanitizedField[mode] = sanitizeCompanionItems(sanitizedCompanion[field][mode] || []);
+                                });
+                                sanitizedCompanion[field] = sanitizedField;
+                            }
+                        });
+                        payload.indexedDB[k] = sanitizedCompanion;
+                        continue;
+                    }
                     payload.indexedDB[k] = v;
                 } catch (e) {
                     console.warn('[cloud-sync-engine] 读取失败', k, e);

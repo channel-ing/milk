@@ -67,13 +67,14 @@
         // 信件
         'partnerLetterNextTime',
         // 阶段三A：背景图库（现在存的是 oss:// 引用 + 缩略图，可以同步）
-        'backgroundGallery', 'chatBackground'
+        'backgroundGallery', 'chatBackground',
+        // 阶段三B：日记背景（同上，云端引用后可同步；有 payload 保护过滤 base64）
+        'companionDiaryBg', 'companionDiaryBgGallery'
     ];
 
-    // 媒体类键（大 base64，不同步；阶段三A之后 backgroundGallery/chatBackground 移出此列表）
+    // 媒体类键（大 base64，不同步）
     var SESSION_MEDIA_NEEDLES = [
-        'partnerAvatar', 'myAvatar',
-        'companionDiaryBg', 'companionDiaryBgGallery'
+        'partnerAvatar', 'myAvatar'
     ];
 
     // 2) 全局键（无 SESSION_ID 前缀）- 文字类，需要同步
@@ -237,6 +238,49 @@
                         // 只同步云端引用或非图片；base64 大图跳过
                         if (typeof v === 'string' && v.indexOf('data:image') === 0) continue;
                         payload.indexedDB[k] = v;
+                        continue;
+                    }
+                    // 阶段三B 保护：日记背景图库（对象数组，同 backgroundGallery 逻辑）
+                    // 注意：必须先判断 companionDiaryBgGallery（更长），再判断 companionDiaryBg，
+                    // 否则 companionDiaryBg 的 indexOf 会先命中 companionDiaryBgGallery 的键
+                    if (k.indexOf('companionDiaryBgGallery') !== -1 && Array.isArray(v)) {
+                        var sanitizedDiary = v.filter(function (bg) {
+                            if (!bg || typeof bg !== 'object') return true;
+                            if (typeof bg.value !== 'string') return true;
+                            if (bg.value.indexOf('oss://') === 0) return true;
+                            if (!bg.value.startsWith('data:image')) return true;
+                            return false;
+                        });
+                        sanitizedDiary = sanitizedDiary.map(function (bg) {
+                            if (!bg || typeof bg !== 'object') return bg;
+                            if (typeof bg.value === 'string' && bg.value.indexOf('data:image') === 0) {
+                                var copy = Object.assign({}, bg);
+                                if (bg.thumbnail) copy.value = bg.thumbnail;
+                                else return null;
+                                return copy;
+                            }
+                            return bg;
+                        }).filter(Boolean);
+                        payload.indexedDB[k] = sanitizedDiary;
+                        continue;
+                    }
+                    // 阶段三B 保护：日记单张背景（同 chatBackground 逻辑）
+                    if (k.indexOf('companionDiaryBg') !== -1 && !Array.isArray(v)) {
+                        if (typeof v === 'string' && v.indexOf('data:image') === 0) continue;
+                        payload.indexedDB[k] = v;
+                        continue;
+                    }
+                    // 阶段三B 保护：贴纸库（字符串数组，元素可以是 base64 或 oss://）
+                    // 过滤掉 base64 大图（避免 payload 爆炸），等迁移工具处理
+                    if (k.indexOf('stickerLibrary') !== -1 && Array.isArray(v)) {
+                        var sanitizedStickers = v.filter(function (item) {
+                            if (typeof item !== 'string') return true;
+                            if (item.indexOf('oss://') === 0) return true;
+                            // base64 图片：跳过
+                            if (item.indexOf('data:image') === 0) return false;
+                            return true;
+                        });
+                        payload.indexedDB[k] = sanitizedStickers;
                         continue;
                     }
                     payload.indexedDB[k] = v;

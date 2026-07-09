@@ -1435,6 +1435,11 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
 
                         savedBackgrounds.push(stored);
                         saveBackgroundGallery();
+                        // 阶段三B 修：先写 localStorage，让 renderBackgroundGallery 里的
+                        // safeGetItem 能读到最新的激活值，UI 才会正确高亮新上传的这张
+                        if (typeof safeSetItem === 'function') {
+                            try { safeSetItem(getStorageKey('chatBackground'), stored.value); } catch (e) {}
+                        }
                         renderBackgroundGallery();
                         // 应用背景：优先用云端 URL，其次用 base64
                         applyBackground(stored.value);

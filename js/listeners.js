@@ -129,31 +129,51 @@ function initChatActionListeners() {
 
                         // 收藏语音消息时，把已播放过的音频持久化（优先存云端）
                         if (message.favorited && message.voice && message.voice.fakeText) {
-                            const cachedUrl = window.voiceTTS?._getAudioCache?.(String(messageId));
-                            if (cachedUrl) {
-                                fetch(cachedUrl).then(r => r.arrayBuffer()).then(async buf => {
-                                    const uint8 = new Uint8Array(buf);
-                                    let binary = '';
-                                    uint8.forEach(b => binary += String.fromCharCode(b));
-                                    const base64 = btoa(binary);
-
-                                    // 阶段四：优先上传云端，失败降级本地
+                            (async () => {
+                                try {
                                     const key = window.favAudioKey ? window.favAudioKey(messageId) : `favAudio_${messageId}`;
+                                    // 先检查本地是否已有缓存（之前存过的）
+                                    const existing = await localforage.getItem(key);
+                                    if (existing) return; // 已有，不重复存
+
+                                    // 尝试从 TTS 运行时缓存拿（用户播放过才有）
+                                    let audioUrl = window.voiceTTS?._getAudioCache?.(String(messageId));
+
+                                    // 没有缓存：主动调 TTS 生成（需要 TTS 已配置）
+                                    if (!audioUrl && window.voiceTTS?.isTtsReady() && message.voice.fakeText) {
+                                        try {
+                                            audioUrl = await window.voiceTTS.getAudioForMessage(String(messageId), message.voice.fakeText);
+                                        } catch (e) {
+                                            console.warn('[fav-audio] TTS 生成失败', e);
+                                        }
+                                    }
+
+                                    if (!audioUrl) return; // 实在没有，放弃
+
+                                    const buf = await fetch(audioUrl).then(r => r.arrayBuffer());
+                                    const blob = new Blob([buf], { type: 'audio/mpeg' });
+
                                     if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
                                         try {
-                                            const blob = new Blob([buf], { type: 'audio/mpeg' });
                                             const result = await window.CloudMedia.upload(blob, 'fav-audio', String(messageId));
-                                            // 存云端引用
                                             await localforage.setItem(key, result.url);
                                         } catch (e) {
                                             console.warn('[fav-audio] 云端上传失败，降级本地', e);
-                                            await localforage.setItem(key, base64);
+                                            const uint8 = new Uint8Array(buf);
+                                            let binary = '';
+                                            uint8.forEach(b => binary += String.fromCharCode(b));
+                                            await localforage.setItem(key, btoa(binary));
                                         }
                                     } else {
-                                        await localforage.setItem(key, base64);
+                                        const uint8 = new Uint8Array(buf);
+                                        let binary = '';
+                                        uint8.forEach(b => binary += String.fromCharCode(b));
+                                        await localforage.setItem(key, btoa(binary));
                                     }
-                                }).catch(() => {});
-                            }
+                                } catch (e) {
+                                    console.warn('[fav-audio] 收藏存储失败', e);
+                                }
+                            })();
                         }
                         // 取消收藏时删除缓存（本地 + 云端）
                         if (!message.favorited) {
@@ -468,12 +488,22 @@ fileInput.addEventListener('change', function(e) {
 
 
                 saveBtn.addEventListener('click',
-                    () => {
+                    async () => {
                         if (currentAvatarData) {
                             updateAvatar(isPartner ? DOMElements.partner.avatar: DOMElements.me.avatar, currentAvatarData);
                             throttledSaveData();
                             showNotification('头像已更新', 'success');
                             hideModal(modal.modal);
+                            // 阶段四：头像上传云端备份（失败不影响本地使用）
+                            if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                                try {
+                                    const category = isPartner ? 'avatars' : 'my-avatars';
+                                    const avatarId = isPartner ? 'partner' : 'me';
+                                    await window.CloudMedia.upload(currentAvatarData, category, avatarId);
+                                } catch (e) {
+                                    console.warn('[avatar] 云端备份失败', e);
+                                }
+                            }
                         }
                     });
 

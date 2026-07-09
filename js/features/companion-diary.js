@@ -35,12 +35,31 @@
 
     // ─── 存储 ───────────────────────────────────────
     function getKey() {
-        const prefix = window.APP_PREFIX || '';
-        return prefix + 'companionDiary';
+        // 带 SESSION_ID 前缀，与同步引擎一致
+        if (typeof getStorageKey === 'function' && typeof SESSION_ID !== 'undefined' && SESSION_ID) {
+            try { return getStorageKey('companionDiary'); } catch (e) {}
+        }
+        return (window.APP_PREFIX || '') + 'companionDiary';
+    }
+    // 旧键名（无 SESSION_ID），用于一次性迁移
+    function _getOldKey() {
+        return (window.APP_PREFIX || '') + 'companionDiary';
     }
     async function loadDiary() {
         try {
-            const data = await localforage.getItem(getKey());
+            const newKey = getKey();
+            const oldKey = _getOldKey();
+            let data = await localforage.getItem(newKey);
+            // 一次性迁移：旧键有数据而新键没有，迁移过来
+            if ((!data || !Array.isArray(data) || data.length === 0) && newKey !== oldKey) {
+                const oldData = await localforage.getItem(oldKey);
+                if (Array.isArray(oldData) && oldData.length > 0) {
+                    data = oldData;
+                    await localforage.setItem(newKey, data);
+                    await localforage.removeItem(oldKey);
+                    console.log('[companion-diary] 日记数据已迁移到新键名');
+                }
+            }
             _diaryEntries = Array.isArray(data) ? data : [];
         } catch (e) {
             console.warn('[companion-diary] load failed:', e);
@@ -48,7 +67,7 @@
         }
         // 确保按时间倒序
         _diaryEntries.sort((a, b) => b.ts - a.ts);
-        window._companionDiaryEntries = _diaryEntries; // 暴露给外部（companion.js 写入用）
+        window._companionDiaryEntries = _diaryEntries;
     }
     async function saveDiary() {
         try {
@@ -722,8 +741,7 @@
 
         // 应用日记背景（如果用户在外观设置里选择了）
         try {
-            const prefix = window.APP_PREFIX || '';
-            const bg = await localforage.getItem(prefix + 'companionDiaryBg');
+            const bg = await localforage.getItem(diaryBgKey());
             window.applyCompanionDiaryBg(bg || '');
         } catch (e) {
             window.applyCompanionDiaryBg('');
@@ -887,7 +905,19 @@
 
     async function loadDiaryBgGallery() {
         try {
-            const data = await localforage.getItem(diaryBgGalKey());
+            const newKey = diaryBgGalKey();
+            const oldKey = (window.APP_PREFIX || '') + 'companionDiaryBgGallery';
+            let data = await localforage.getItem(newKey);
+            // 一次性迁移旧键
+            if ((!data || !Array.isArray(data) || data.length === 0) && newKey !== oldKey) {
+                const oldData = await localforage.getItem(oldKey);
+                if (Array.isArray(oldData) && oldData.length > 0) {
+                    data = oldData;
+                    await localforage.setItem(newKey, data);
+                    await localforage.removeItem(oldKey);
+                    console.log('[companion-diary] 日记背景图库已迁移到新键名');
+                }
+            }
             _diaryBgGallery = Array.isArray(data) ? data : [];
         } catch (e) {
             _diaryBgGallery = [];
@@ -898,6 +928,11 @@
     }
     async function applyDiaryBg(value) {
         try { await localforage.setItem(diaryBgKey(), value || ''); } catch (e) {}
+        // 同时清旧键（如果存在）
+        try {
+            const oldKey = (window.APP_PREFIX || '') + 'companionDiaryBg';
+            if (oldKey !== diaryBgKey()) await localforage.removeItem(oldKey);
+        } catch (e) {}
         if (typeof window.applyCompanionDiaryBg === 'function') {
             await window.applyCompanionDiaryBg(value || '');
         }

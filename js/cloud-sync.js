@@ -200,8 +200,9 @@
      * @param {string} objectKey  对象 key，可为空
      * @param {object} extraQuery  额外查询参数（如 {'max-keys': '1'}）
      * @param {string} [contentType]  可选的 Content-Type（PUT 请求需要，会被签入 CanonicalHeaders）
+     * @param {number} [expiresSeconds]  签名过期秒数，默认 120，大文件上传时应传更大值
      */
-    async function _buildV4SignedUrl(cfg, method, objectKey, extraQuery, contentType) {
+    async function _buildV4SignedUrl(cfg, method, objectKey, extraQuery, contentType, expiresSeconds) {
         var now = new Date();
         var dateTime = _iso8601(now);
         var dateStamp = _dateStamp(now);
@@ -222,7 +223,7 @@
         query['x-oss-signature-version'] = 'OSS4-HMAC-SHA256';
         query['x-oss-credential'] = credential;
         query['x-oss-date'] = dateTime;
-        query['x-oss-expires'] = '120';
+        query['x-oss-expires'] = String(expiresSeconds || 120);
         // 注意：query 参数名是 x-oss-additional-headers，不是 x-oss-signed-headers
         // 且当只签名 host（默认）时可以不添加此参数；此处按官方 Java example 加上
         query['x-oss-additional-headers'] = 'host';

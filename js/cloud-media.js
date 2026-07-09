@@ -82,6 +82,19 @@
         var binary = atob(b64);
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        // 用 magic bytes 修正 mime，防止浏览器把 GIF/PNG 文件误报为 image/jpeg
+        if (bytes.length >= 6 &&
+            bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+            mime = 'image/gif'; // GIF87a / GIF89a
+        } else if (bytes.length >= 4 &&
+            bytes[0] === 0x89 && bytes[1] === 0x50 &&
+            bytes[2] === 0x4E && bytes[3] === 0x47) {
+            mime = 'image/png'; // PNG
+        } else if (bytes.length >= 4 &&
+            bytes[0] === 0x52 && bytes[1] === 0x49 &&
+            bytes[2] === 0x46 && bytes[3] === 0x46) {
+            mime = 'image/webp'; // WEBP (RIFF header)
+        }
         return new Blob([bytes], { type: mime });
     }
 

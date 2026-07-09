@@ -72,9 +72,10 @@
         'companionDiaryBg', 'companionDiaryBgGallery'
     ];
 
-    // 媒体类键（大 base64，不同步）
+    // 媒体类键（大 base64 或 oss:// 引用，不走文字同步 payload）
     var SESSION_MEDIA_NEEDLES = [
-        'partnerAvatar', 'myAvatar'
+        'partnerAvatar', 'myAvatar',
+        'favAudio_'   // 阶段四：收藏语音（存 oss:// 引用或 base64，不放进 payload）
     ];
 
     // 2) 全局键（无 SESSION_ID 前缀）- 文字类，需要同步

@@ -366,6 +366,165 @@
         _injectStyles();
     }
 
+    // ==== 上传队列（阶段三B：聊天图片"发送即成功"，后台自动重试）====
+    // 队列 task 结构：{ base64, category, messageId, onSuccess, attempts, timerId }
+    var _uploadQueue = new Map();
+    // 加 APP_PREFIX 前缀，让恢复流程能一并清掉（避免残留别的梦角的 pending 数据）
+    var _pendingKeyPrefix = APP_PREFIX_STR + 'pendingUpload_';
+    var _uploaderStarted = false;
+
+    // 指数退避（毫秒）：2s → 5s → 15s → 60s → 之后每 60s
+    function _retryDelay(attempt) {
+        var table = [2000, 5000, 15000, 60000];
+        return attempt < table.length ? table[attempt] : 60000;
+    }
+
+    function _pendingKey(taskId) {
+        return _pendingKeyPrefix + taskId;
+    }
+
+    /**
+     * 加入上传队列（聊天图片专用）
+     * @param {string} base64
+     * @param {string} category  云端子目录（如 'chat-images'）
+     * @param {object} opts  { taskId?, messageId, onSuccess?(result), onFailure?(err) }
+     * @returns {Promise<string>} taskId
+     */
+    async function queueUpload(base64, category, opts) {
+        opts = opts || {};
+        // 允许外部预生成 taskId（用于避免消息首帧闪烁）
+        var taskId = opts.taskId || ('up_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+        var record = {
+            base64: base64,
+            category: category,
+            messageId: opts.messageId,
+            createdAt: Date.now()
+        };
+        // 持久化：即使刷新页面也能恢复
+        try {
+            await localforage.setItem(_pendingKey(taskId), record);
+        } catch (e) {
+            console.error('[cloud-media] 上传队列持久化失败', e);
+            throw e;
+        }
+        // 加入内存队列
+        _uploadQueue.set(taskId, {
+            base64: base64,
+            category: category,
+            messageId: opts.messageId,
+            onSuccess: opts.onSuccess,
+            onFailure: opts.onFailure,
+            attempts: 0,
+            timerId: null
+        });
+        // 触发上传（不 await，异步）
+        _tryUpload(taskId);
+        return taskId;
+    }
+
+    async function _tryUpload(taskId) {
+        var task = _uploadQueue.get(taskId);
+        if (!task) return;
+        // 清理已排的定时器
+        if (task.timerId) { clearTimeout(task.timerId); task.timerId = null; }
+
+        if (!window.CloudSync || !window.CloudSync.isConnected()) {
+            // 没连云端，等 online 或 CloudSync 就绪
+            task.timerId = setTimeout(function () { _tryUpload(taskId); }, _retryDelay(task.attempts));
+            return;
+        }
+
+        try {
+            var result = await uploadMedia(task.base64, task.category);
+            // 成功：清队列 + 清持久化
+            _uploadQueue.delete(taskId);
+            try { await localforage.removeItem(_pendingKey(taskId)); } catch (e) {}
+            if (typeof task.onSuccess === 'function') {
+                try { await task.onSuccess(result); } catch (e) { console.warn('[cloud-media] onSuccess 回调出错', e); }
+            }
+        } catch (err) {
+            task.attempts++;
+            console.warn('[cloud-media] 上传失败，第 ' + task.attempts + ' 次，将重试', err);
+            task.timerId = setTimeout(function () { _tryUpload(taskId); }, _retryDelay(task.attempts - 1));
+        }
+    }
+
+    /**
+     * 从 pendingUpload_ 键读出 base64（供消息渲染显示上传中的图）
+     */
+    async function getPendingBase64(taskIdOrRef) {
+        var taskId = taskIdOrRef.indexOf('pending://') === 0 ? taskIdOrRef.slice(10) : taskIdOrRef;
+        try {
+            var record = await localforage.getItem(_pendingKey(taskId));
+            return record && record.base64 ? record.base64 : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * 绑定"上传中"图片的 src（从 pendingUpload_ 读 base64 显示）
+     */
+    async function bindPendingImage(imgEl, pendingRef) {
+        var base64 = await getPendingBase64(pendingRef);
+        if (base64 && imgEl) imgEl.src = base64;
+    }
+
+    /**
+     * 启动时扫描 pendingUpload_ 键恢复队列（页面刷新后继续未完成的上传）
+     * 需要外部提供 onRestore(taskId, record) 回调，用来在消息层面重建 onSuccess 回调
+     */
+    async function restorePendingQueue(onRestore) {
+        if (_uploaderStarted) return;
+        _uploaderStarted = true;
+        try {
+            var allKeys = await localforage.keys();
+            for (var i = 0; i < allKeys.length; i++) {
+                var k = allKeys[i];
+                if (k.indexOf(_pendingKeyPrefix) !== 0) continue;
+                var taskId = k.slice(_pendingKeyPrefix.length);
+                var record = await localforage.getItem(k);
+                if (!record || !record.base64) {
+                    try { await localforage.removeItem(k); } catch (e) {}
+                    continue;
+                }
+                // 交给外部（core.js）重建 onSuccess 回调
+                var onSuccess = null;
+                if (typeof onRestore === 'function') {
+                    try { onSuccess = onRestore(taskId, record); } catch (e) { console.warn(e); }
+                }
+                _uploadQueue.set(taskId, {
+                    base64: record.base64,
+                    category: record.category,
+                    messageId: record.messageId,
+                    onSuccess: onSuccess,
+                    attempts: 0,
+                    timerId: null
+                });
+                _tryUpload(taskId);
+            }
+        } catch (e) {
+            console.warn('[cloud-media] 恢复上传队列失败', e);
+        }
+    }
+
+    // 网络恢复：把所有 task 立即再试一次（重置 timer）
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', function () {
+            _uploadQueue.forEach(function (task, taskId) {
+                if (task.timerId) { clearTimeout(task.timerId); task.timerId = null; }
+                _tryUpload(taskId);
+            });
+        });
+    }
+
+    /**
+     * 判断字符串是否是 pending 引用
+     */
+    function isPendingRef(v) {
+        return typeof v === 'string' && v.indexOf('pending://') === 0;
+    }
+
     // ==== 暴露 ====
     global.CloudMedia = {
         // 上传下载
@@ -377,6 +536,7 @@
         // 判断
         isCloudRef: isCloudRef,
         isBase64: isBase64,
+        isPendingRef: isPendingRef,
         // 懒加载
         bindLazyImage: bindLazyImage,
         loadNow: loadNow,
@@ -384,6 +544,11 @@
         migrateIfBase64: migrateIfBase64,
         // 缓存
         clearMemoryCache: clearMemoryCache,
+        // 上传队列（阶段三B）
+        queueUpload: queueUpload,
+        getPendingBase64: getPendingBase64,
+        bindPendingImage: bindPendingImage,
+        restorePendingQueue: restorePendingQueue,
         // 工具
         _blobToBase64: _blobToBase64,
         _base64ToBlob: _base64ToBlob

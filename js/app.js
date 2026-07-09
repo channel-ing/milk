@@ -476,7 +476,6 @@ window.addEventListener('load', function() {
                     target.image = result.url;
                     delete target.uploadStatus;
                     try { if (typeof throttledSaveData === 'function') throttledSaveData(); } catch (e) {}
-                    // 局部更新 DOM
                     try {
                         var wrapper = document.querySelector('.message-wrapper[data-id="' + msgId + '"]');
                         if (wrapper) {
@@ -485,12 +484,22 @@ window.addEventListener('load', function() {
                                 var img = wrap.querySelector('img');
                                 var parent = wrap.parentNode;
                                 if (img && parent) {
+                                    var blobUrl = null;
+                                    try {
+                                        blobUrl = window.CloudMedia ? await window.CloudMedia.fetchUrl(result.url) : null;
+                                    } catch (fetchErr) {
+                                        console.warn('[cloud-media] restore 拉图失败', fetchErr);
+                                    }
                                     img.removeAttribute('data-pending-ref');
-                                    img.setAttribute('data-lazy-cloud-ref', result.url);
                                     img.setAttribute('onclick', "viewImage('" + result.url + "')");
-                                    img.src = '';
+                                    if (blobUrl) {
+                                        img.src = blobUrl;
+                                    } else {
+                                        img.src = '';
+                                        img.setAttribute('data-lazy-cloud-ref', result.url);
+                                        if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                    }
                                     parent.replaceChild(img, wrap);
-                                    if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
                                 }
                             }
                         }

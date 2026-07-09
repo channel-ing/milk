@@ -1376,7 +1376,15 @@ function initComboMenu() {
     function makeStickerItem(src, onClick) {
         const item = document.createElement('div');
         item.className = 'sticker-grid-item';
-        item.innerHTML = `<img src="${src}" loading="lazy">`;
+        // 阶段三B：识别 oss:// 走懒加载
+        const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+        item.innerHTML = `<img loading="lazy">`;
+        const imgEl = item.querySelector('img');
+        if (isCloud) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(imgEl, src);
+        } else {
+            imgEl.src = src;
+        }
         item.onclick = (e) => { e.stopPropagation(); onClick(); };
         return item;
     }
@@ -1385,8 +1393,15 @@ function initComboMenu() {
         const item = document.createElement('div');
         item.className = 'sticker-grid-item';
         item.style.position = 'relative';
-        item.innerHTML = `<img src="${src}" loading="lazy"><div class="sticker-delete-btn" title="删除"><i class="fas fa-times"></i></div>`;
-        item.querySelector('img').onclick = (e) => { e.stopPropagation(); onClick(); };
+        const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+        item.innerHTML = `<img loading="lazy"><div class="sticker-delete-btn" title="删除"><i class="fas fa-times"></i></div>`;
+        const imgEl = item.querySelector('img');
+        if (isCloud) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(imgEl, src);
+        } else {
+            imgEl.src = src;
+        }
+        imgEl.onclick = (e) => { e.stopPropagation(); onClick(); };
         item.querySelector('.sticker-delete-btn').onclick = (e) => { e.stopPropagation(); onDelete(); };
         return item;
     }

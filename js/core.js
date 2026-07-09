@@ -216,19 +216,10 @@ autoSendInterval: 5,
                 item.className = `bg-item ${isActive ? 'active': ''}`;
 
                 if (bg.type === 'image' || bg.type === 'gif') {
-                    // 优先用缩略图（云端存储的图片），否则用 value（本地存储的完整 base64）
+                    // 图库预览：优先用缩略图（省内存），没有缩略图才用本地 base64
+                    // cloudUrl 存云端备份引用，但图库预览不走云端
                     const displaySrc = bg.thumbnail || bg.value;
-                    // 如果 value 是云端引用，需要检查缩略图是否存在
-                    if (typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0 && !bg.thumbnail) {
-                        // 云端引用但没缩略图：占位 + 后台加载
-                        item.innerHTML = `<img loading="lazy" alt="bg">`;
-                        const imgEl = item.querySelector('img');
-                        if (window.CloudMedia) {
-                            window.CloudMedia.bindLazyImage(imgEl, bg.value);
-                        }
-                    } else {
-                        item.innerHTML = `<img src="${displaySrc}" loading="lazy" alt="bg">`;
-                    }
+                    item.innerHTML = `<img src="${displaySrc}" loading="lazy" alt="bg">`;
                 } else {
                     item.innerHTML = `<div class="bg-color-block" style="background: ${bg.value}"></div>`;
                 }
@@ -289,15 +280,32 @@ autoSendInterval: 5,
         const applyBackground = async (value) => {
             if (!value || typeof value !== 'string') return;
             try {
-                // 阶段三：云端引用要先下载
+                // 聊天页背景本地存全尺寸 base64，直接应用，零延迟
+                // oss:// 引用只会在换设备恢复时临时出现（旧数据迁移过渡期），兜底处理
                 if (value.indexOf('oss://') === 0) {
-                    if (!window.CloudMedia) return;
-                    try {
-                        const blobUrl = await window.CloudMedia.fetchUrl(value);
-                        document.documentElement.style.setProperty('--chat-bg-image', `url(${blobUrl})`);
+                    // 兜底：找本地 gallery 里有没有对应的 cloudUrl，有就用本地 base64
+                    const localItem = Array.isArray(savedBackgrounds)
+                        ? savedBackgrounds.find(function (bg) { return bg && (bg.cloudUrl === value || bg.value === value); })
+                        : null;
+                    if (localItem && localItem.value && localItem.value.indexOf('data:image') === 0) {
+                        // 本地有，直接用
+                        const cssValue = `url(${localItem.value})`;
+                        document.documentElement.style.setProperty('--chat-bg-image', cssValue);
                         document.body.classList.add('with-background');
-                    } catch (e) {
-                        console.warn('[cloud-media] 加载云端背景失败', e);
+                        return;
+                    }
+                    // 本地没有（换设备恢复后的旧数据）：才走云端下载，缩略图先垫底
+                    if (window.CloudMedia) {
+                        if (localItem && localItem.thumbnail) {
+                            document.documentElement.style.setProperty('--chat-bg-image', `url(${localItem.thumbnail})`);
+                            document.body.classList.add('with-background');
+                        }
+                        window.CloudMedia.fetchUrl(value).then(function (blobUrl) {
+                            document.documentElement.style.setProperty('--chat-bg-image', `url(${blobUrl})`);
+                            document.body.classList.add('with-background');
+                        }).catch(function (e) {
+                            console.warn('[cloud-media] 加载云端背景失败', e);
+                        });
                     }
                     return;
                 }
@@ -442,6 +450,7 @@ const loadData = async () => {
         if (DOMElements && DOMElements.partner && DOMElements.me) {
             updateAvatar(DOMElements.partner.avatar, partnerAvatarSrc);
             updateAvatar(DOMElements.me.avatar, myAvatarSrc);
+            // updateAvatar 已经把值写进 _avatarCache 了，这里不用再写一遍
         }
 
         if (savedChatBg) {
@@ -617,29 +626,17 @@ const saveData = async () => {
         { key: 'chatMessages',           val: () => localforage.setItem(getStorageKey('chatMessages'), messages) },
     ];
 
-    const partnerAvatarSrc = (() => {
-        try {
-            const img = DOMElements.partner.avatar.querySelector('img');
-            return img ? img.src : null;
-        } catch(e) { return null; }
-    })();
-    const myAvatarSrc = (() => {
-        try {
-            const img = DOMElements.me.avatar.querySelector('img');
-            return img ? img.src : null;
-        } catch(e) { return null; }
-    })();
+    // 头像从内存缓存读（不从 DOM 读，DOM 的 img.src 不可靠：可能是 blob URL、绝对路径或空字符串）
+    const partnerAvatarSrc = window._avatarCache && window._avatarCache.partner || null;
+    const myAvatarSrc = window._avatarCache && window._avatarCache.me || null;
 
     if (partnerAvatarSrc) {
         promises.push({ key: 'partnerAvatar', val: () => localforage.setItem(getStorageKey('partnerAvatar'), partnerAvatarSrc) });
-    } else {
-        promises.push({ key: 'partnerAvatar', val: () => localforage.removeItem(getStorageKey('partnerAvatar')) });
     }
+    // 注意：头像不做 removeItem —— 用户没改头像时 _avatarCache 可能是 null，不能误删
 
     if (myAvatarSrc) {
         promises.push({ key: 'myAvatar', val: () => localforage.setItem(getStorageKey('myAvatar'), myAvatarSrc) });
-    } else {
-        promises.push({ key: 'myAvatar', val: () => localforage.removeItem(getStorageKey('myAvatar')) });
     }
 
     const results = await Promise.allSettled(promises.map(p => {
@@ -916,7 +913,20 @@ function manageAutoSendTimer() {
         };
 
         const updateAvatar = (element, src) => {
-            if (src) element.innerHTML = `<img src="${src}" alt="avatar">`; else element.innerHTML = `<i class="fas fa-user"></i>`;
+            if (src) {
+                element.innerHTML = `<img src="${src}" alt="avatar">`;
+                // 同时写内存缓存，供 saveData 读取（不从 DOM img.src 读，不可靠）
+                if (!window._avatarCache) window._avatarCache = {};
+                if (element === DOMElements.partner.avatar) window._avatarCache.partner = src;
+                else if (element === DOMElements.me.avatar) window._avatarCache.me = src;
+            } else {
+                element.innerHTML = `<i class="fas fa-user"></i>`;
+                // src 为空时清缓存（用户主动删除头像）
+                if (window._avatarCache) {
+                    if (element === DOMElements.partner.avatar) window._avatarCache.partner = null;
+                    else if (element === DOMElements.me.avatar) window._avatarCache.me = null;
+                }
+            }
         };
 
         const removeBackground = () => {

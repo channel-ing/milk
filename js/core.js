@@ -1084,7 +1084,16 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
 
     const isImageOnly = !msg.text && !!msg.image;
     let content = msg.text ? `<div>${msg.text.replace(/\n/g, '<br>')}</div>` : '';
-    if (msg.image) content += `<img src="${msg.image}" class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')">`;
+    if (msg.image) {
+        // 阶段三B：识别 oss:// 走懒加载
+        const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
+        const imgAttrs = `class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')"`;
+        if (isCloudImg) {
+            content += `<img data-lazy-cloud-ref="${msg.image}" ${imgAttrs}>`;
+        } else {
+            content += `<img src="${msg.image}" ${imgAttrs}>`;
+        }
+    }
     messageHTML += content;
 
     const messageDiv = document.createElement('div');
@@ -1094,6 +1103,13 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} ${settings.bubbleStyle}`;
     }
     messageDiv.innerHTML = messageHTML;
+    // 阶段三B：innerHTML 塞完后，找带 data-lazy-cloud-ref 的图绑定懒加载
+    if (window.CloudMedia) {
+        messageDiv.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
+            const ref = imgEl.getAttribute('data-lazy-cloud-ref');
+            window.CloudMedia.bindLazyImage(imgEl, ref);
+        });
+    }
 
     let actionsHTML = '';
     if (settings.replyEnabled) actionsHTML += `<button class="meta-action-btn reply-btn" title="回复"><i class="fas fa-reply"></i></button>`;
@@ -1504,9 +1520,16 @@ if (!isBatchMode && type === 'normal') {
             let listHTML = '';
             if (batchMessages.length > 0) {
                 listHTML = batchMessages.map((msg, index) => {
-                    const preview = msg.image
-                        ? `<img src="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`
-                        : '';
+                    // 阶段三B：识别 oss:// 走懒加载（预览不设 src，塞完 innerHTML 后绑定）
+                    let preview = '';
+                    if (msg.image) {
+                        const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
+                        if (isCloudImg) {
+                            preview = `<img data-lazy-cloud-ref="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`;
+                        } else {
+                            preview = `<img src="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`;
+                        }
+                    }
                     const label = msg.text
                         ? `<span class="batch-preview-text">${msg.text}</span>`
                         : `<span class="batch-preview-text" style="color:var(--text-secondary);font-style:italic;">图片</span>`;
@@ -1524,6 +1547,14 @@ if (!isBatchMode && type === 'normal') {
         <button class="batch-action-btn batch-cancel-btn">取消</button>
         <button class="batch-action-btn batch-send-btn" ${batchMessages.length === 0 ? 'disabled': ''}>发送全部 (${batchMessages.length})</button>
         </div>`;
+
+            // 阶段三B：innerHTML 塞完后绑定云端图懒加载
+            if (window.CloudMedia) {
+                previewContainer.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
+                    const ref = imgEl.getAttribute('data-lazy-cloud-ref');
+                    window.CloudMedia.bindLazyImage(imgEl, ref);
+                });
+            }
 
             const batchImgInput = document.getElementById('batch-image-input');
             if (batchImgInput) {
@@ -1893,14 +1924,27 @@ function showModal(modalElement, focusElement = null) {
             }, 300);
         }
 
-        function viewImage(src) {
+        async function viewImage(src) {
+            // 阶段三B：云端引用先下载
+            let displaySrc = src;
+            let downloadHref = src;
+            if (typeof src === 'string' && src.indexOf('oss://') === 0) {
+                if (!window.CloudMedia) return;
+                try {
+                    displaySrc = await window.CloudMedia.fetchUrl(src);
+                    downloadHref = displaySrc; // blob URL 也能下载
+                } catch (e) {
+                    if (typeof showNotification === 'function') showNotification('图片加载失败', 'error');
+                    return;
+                }
+            }
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;touch-action:pinch-zoom;';
             modal.innerHTML = `
                 <div style="position:relative;max-width:95vw;max-height:92vh;display:flex;align-items:center;justify-content:center;">
-                    <img src="${src}" style="max-width:95vw;max-height:88vh;object-fit:contain;display:block;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);" draggable="false">
+                    <img src="${displaySrc}" style="max-width:95vw;max-height:88vh;object-fit:contain;display:block;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);" draggable="false">
                     <button onclick="this.closest('[style*=fixed]').remove()" style="position:fixed;top:16px;right:16px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);z-index:10;line-height:1;">×</button>
-                    <a href="${src}" download style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:20px;color:#fff;font-size:13px;text-decoration:none;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;"><i class="fas fa-download"></i> 保存图片</a>
+                    <a href="${downloadHref}" download style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:20px;color:#fff;font-size:13px;text-decoration:none;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;"><i class="fas fa-download"></i> 保存图片</a>
                 </div>`;
             modal.addEventListener('click', (e) => {
                 if (e.target === modal || e.target.tagName === 'IMG') modal.remove();

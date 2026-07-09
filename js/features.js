@@ -758,21 +758,28 @@ function showPokeTab() {
                                         try { throttledSaveData(); } catch (e) {}
                                         try {
                                             const wrapper = document.querySelector('.message-wrapper[data-id="' + messageId + '"]');
-                                            if (wrapper) {
-                                                const wrap = wrapper.querySelector('.message-image-pending-wrap');
-                                                if (wrap) {
-                                                    const img = wrap.querySelector('img');
-                                                    const parent = wrap.parentNode;
-                                                    if (img && parent) {
-                                                        img.removeAttribute('data-pending-ref');
-                                                        img.setAttribute('data-lazy-cloud-ref', result.url);
-                                                        img.setAttribute('onclick', "viewImage('" + result.url + "')");
-                                                        img.src = '';
-                                                        parent.replaceChild(img, wrap);
-                                                        if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
-                                                    }
-                                                }
+                                            if (!wrapper) return;
+                                            const wrap = wrapper.querySelector('.message-image-pending-wrap');
+                                            if (!wrap) return;
+                                            const img = wrap.querySelector('img');
+                                            const parent = wrap.parentNode;
+                                            if (!img || !parent) return;
+                                            let blobUrl = null;
+                                            try {
+                                                blobUrl = window.CloudMedia ? await window.CloudMedia.fetchUrl(result.url) : null;
+                                            } catch (fetchErr) {
+                                                console.warn('[cloud-media] 上传完拉图失败，继续显示本地图', fetchErr);
                                             }
+                                            img.removeAttribute('data-pending-ref');
+                                            img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                            if (blobUrl) {
+                                                img.src = blobUrl;
+                                            } else {
+                                                img.src = '';
+                                                img.setAttribute('data-lazy-cloud-ref', result.url);
+                                                if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                            }
+                                            parent.replaceChild(img, wrap);
                                         } catch (e) { console.warn('[cloud-media] 局部更新失败', e); }
                                     }
                                 });

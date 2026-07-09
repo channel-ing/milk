@@ -1096,11 +1096,18 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     const isImageOnly = !msg.text && !!msg.image;
     let content = msg.text ? `<div>${msg.text.replace(/\n/g, '<br>')}</div>` : '';
     if (msg.image) {
-        // 阶段三B：识别 oss:// 走懒加载
+        // 阶段三B：识别 oss:// 走懒加载；识别 pending:// 走本地 base64 + 上传中角标
         const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
+        const isPendingImg = typeof msg.image === 'string' && msg.image.indexOf('pending://') === 0;
         const imgAttrs = `class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')"`;
         if (isCloudImg) {
             content += `<img data-lazy-cloud-ref="${msg.image}" ${imgAttrs}>`;
+        } else if (isPendingImg) {
+            // 用一个包裹层放"上传中"角标
+            content += `<div class="message-image-pending-wrap" style="position:relative;display:inline-block;">`
+                + `<img data-pending-ref="${msg.image}" ${imgAttrs}>`
+                + `<div class="upload-indicator" style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;"><i class="fas fa-cloud-upload-alt"></i></div>`
+                + `</div>`;
         } else {
             content += `<img src="${msg.image}" ${imgAttrs}>`;
         }
@@ -1119,6 +1126,11 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         messageDiv.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
             const ref = imgEl.getAttribute('data-lazy-cloud-ref');
             window.CloudMedia.bindLazyImage(imgEl, ref);
+        });
+        // 阶段三B：pending 图从本地 base64 显示
+        messageDiv.querySelectorAll('img[data-pending-ref]').forEach(function (imgEl) {
+            const ref = imgEl.getAttribute('data-pending-ref');
+            window.CloudMedia.bindPendingImage(imgEl, ref);
         });
     }
 
@@ -1936,18 +1948,27 @@ function showModal(modalElement, focusElement = null) {
         }
 
         async function viewImage(src) {
-            // 阶段三B：云端引用先下载
+            // 阶段三B：云端引用先下载；pending 引用从本地 base64 读
             let displaySrc = src;
             let downloadHref = src;
             if (typeof src === 'string' && src.indexOf('oss://') === 0) {
                 if (!window.CloudMedia) return;
                 try {
                     displaySrc = await window.CloudMedia.fetchUrl(src);
-                    downloadHref = displaySrc; // blob URL 也能下载
+                    downloadHref = displaySrc;
                 } catch (e) {
                     if (typeof showNotification === 'function') showNotification('图片加载失败', 'error');
                     return;
                 }
+            } else if (typeof src === 'string' && src.indexOf('pending://') === 0) {
+                if (!window.CloudMedia) return;
+                const base64 = await window.CloudMedia.getPendingBase64(src);
+                if (!base64) {
+                    if (typeof showNotification === 'function') showNotification('图片仍在准备中', 'info');
+                    return;
+                }
+                displaySrc = base64;
+                downloadHref = base64;
             }
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;touch-action:pinch-zoom;';

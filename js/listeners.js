@@ -1407,7 +1407,8 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                         const bgType = file.type === 'image/gif' ? 'gif' : 'image';
                         const bgId = `user-${Date.now()}`;
 
-                        // 阶段三：如果已连云端，上传全尺寸到云端，本地只存缩略图
+                        // 本地永远存全尺寸 base64（保证离线/刷新后立刻显示）
+                        // 云端上传一份备份 + 生成缩略图（供图库预览 + 换设备恢复）
                         let stored = { id: bgId, type: bgType, value: base64 };
                         if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
                             showNotification('正在上传到云端...', 'info', 2000);
@@ -1419,31 +1420,30 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                                 } catch (thumbErr) {
                                     console.warn('[cloud-media] 缩略图生成失败', thumbErr);
                                 }
+                                // value 保持本地 base64；cloudKey/cloudUrl/thumbnail 存云端信息
                                 stored = {
                                     id: bgId,
                                     type: bgType,
-                                    value: uploadResult.url,      // 云端引用 oss://
-                                    thumbnail: thumb,              // 本地缩略图（预览用），可能为 null
-                                    cloudKey: uploadResult.key
+                                    value: base64,             // 本地全尺寸（刷新立刻显示）
+                                    thumbnail: thumb,           // 缩略图（图库预览）
+                                    cloudKey: uploadResult.key, // 云端对象 key
+                                    cloudUrl: uploadResult.url  // 云端 oss:// 引用（同步/换设备用）
                                 };
                             } catch (err) {
-                                console.warn('[cloud-media] 背景上传失败，降级为本地存储', err);
+                                console.warn('[cloud-media] 背景上传失败，仅本地存储', err);
                                 showNotification('云端上传失败，暂存本地', 'error', 2500);
-                                // stored 保持默认（本地 base64）
                             }
                         }
 
                         savedBackgrounds.push(stored);
                         saveBackgroundGallery();
-                        // 阶段三B 修：先写 localStorage，让 renderBackgroundGallery 里的
-                        // safeGetItem 能读到最新的激活值，UI 才会正确高亮新上传的这张
+                        // 写 localStorage 让 renderBackgroundGallery 里 safeGetItem 能立刻读到激活值
                         if (typeof safeSetItem === 'function') {
-                            try { safeSetItem(getStorageKey('chatBackground'), stored.value); } catch (e) {}
+                            try { safeSetItem(getStorageKey('chatBackground'), base64); } catch (e) {}
                         }
                         renderBackgroundGallery();
-                        // 应用背景：优先用云端 URL，其次用 base64
-                        applyBackground(stored.value);
-                        localforage.setItem(getStorageKey('chatBackground'), stored.value);
+                        applyBackground(base64);
+                        localforage.setItem(getStorageKey('chatBackground'), base64);
                         showNotification('新背景已添加并应用', 'success');
                     };
                     reader.readAsDataURL(file);
@@ -3266,26 +3266,33 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
                                         target.image = result.url;
                                         delete target.uploadStatus;
                                         try { throttledSaveData(); } catch (e) {}
-                                        // 局部更新 DOM，不重刷全部消息（避免影响滚动位置）
+                                        // 先拉 blob URL，拿到后再替换 DOM，避免 img.src='' 的白屏闪烁
                                         try {
                                             const wrapper = document.querySelector('.message-wrapper[data-id="' + messageId + '"]');
-                                            if (wrapper) {
-                                                const wrap = wrapper.querySelector('.message-image-pending-wrap');
-                                                if (wrap) {
-                                                    const img = wrap.querySelector('img');
-                                                    const parent = wrap.parentNode;
-                                                    if (img && parent) {
-                                                        // 换成云端引用的懒加载 img
-                                                        img.removeAttribute('data-pending-ref');
-                                                        img.setAttribute('data-lazy-cloud-ref', result.url);
-                                                        img.setAttribute('onclick', "viewImage('" + result.url + "')");
-                                                        img.src = '';
-                                                        // 把 img 从 wrap 里拎出来，替换 wrap
-                                                        parent.replaceChild(img, wrap);
-                                                        if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
-                                                    }
-                                                }
+                                            if (!wrapper) return;
+                                            const wrap = wrapper.querySelector('.message-image-pending-wrap');
+                                            if (!wrap) return;
+                                            const img = wrap.querySelector('img');
+                                            const parent = wrap.parentNode;
+                                            if (!img || !parent) return;
+                                            // 先拉全尺寸 blob
+                                            let blobUrl = null;
+                                            try {
+                                                blobUrl = window.CloudMedia ? await window.CloudMedia.fetchUrl(result.url) : null;
+                                            } catch (fetchErr) {
+                                                console.warn('[cloud-media] 上传完拉图失败，继续显示本地图', fetchErr);
                                             }
+                                            // 有 blob 就直接设 src；没有就走懒加载（下次滚动到触发）
+                                            img.removeAttribute('data-pending-ref');
+                                            img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                            if (blobUrl) {
+                                                img.src = blobUrl;
+                                            } else {
+                                                img.src = '';
+                                                img.setAttribute('data-lazy-cloud-ref', result.url);
+                                                if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                            }
+                                            parent.replaceChild(img, wrap);
                                         } catch (e) { console.warn('[cloud-media] 局部更新失败', e); }
                                     }
                                 });

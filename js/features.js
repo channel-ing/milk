@@ -735,20 +735,50 @@ function showPokeTab() {
 
 
                 sendBtn.addEventListener('click',
-                    () => {
+                    async () => {
                         if (currentImageData) {
+                            const messageId = Date.now();
+                            let imageField = currentImageData;
+                            let uploadStatus = null;
+
+                            // 阶段三B：如果是 base64 且连了云端，走上传队列
+                            const isBase64Img = typeof currentImageData === 'string' && currentImageData.indexOf('data:image') === 0;
+                            const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
+                            if (isBase64Img && cloudReady) {
+                                const taskId = 'up_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                                try {
+                                    await window.CloudMedia.queueUpload(currentImageData, 'chat-images', {
+                                        taskId: taskId,
+                                        messageId: messageId,
+                                        onSuccess: async (result) => {
+                                            const target = messages.find(m => String(m.id) === String(messageId));
+                                            if (target) {
+                                                target.image = result.url;
+                                                delete target.uploadStatus;
+                                                try { throttledSaveData(); } catch (e) {}
+                                                try { renderMessages(true); } catch (e) {}
+                                            }
+                                        }
+                                    });
+                                    imageField = 'pending://' + taskId;
+                                    uploadStatus = 'uploading';
+                                } catch (err) {
+                                    console.warn('[cloud-media] 队列入队失败，降级为 base64 存储', err);
+                                }
+                            }
 
                             addMessage({
-                                id: Date.now(),
+                                id: messageId,
                                 sender: 'user',
                                 text: '',
                                 timestamp: new Date(),
-                                image: currentImageData,
+                                image: imageField,
                                 status: 'sent',
                                 favorited: false,
                                 note: null,
                                 replyTo: currentReplyTo,
-                                type: 'normal'
+                                type: 'normal',
+                                uploadStatus: uploadStatus
                             });
                             playSound('send');
                             currentReplyTo = null;

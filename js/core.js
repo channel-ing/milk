@@ -2395,6 +2395,12 @@ function showModal(modalElement, focusElement = null) {
             return `${APP_PREFIX}${SESSION_ID}_${baseKey}`;
         }
 
+        // 阶段四：收藏语音键名（带 SESSION_ID 前缀，按梦角隔离）
+        function favAudioKey(messageId) {
+            return getStorageKey(`favAudio_${messageId}`);
+        }
+        window.favAudioKey = favAudioKey;
+
         async function migrateData() {
             const isMigrated = await localforage.getItem(APP_PREFIX + 'MIGRATION_V2_DONE');
             if (isMigrated) return;

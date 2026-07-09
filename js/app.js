@@ -466,19 +466,35 @@ window.addEventListener('load', function() {
     setTimeout(function () {
         if (!window.CloudMedia || typeof window.CloudMedia.restorePendingQueue !== 'function') return;
         window.CloudMedia.restorePendingQueue(function (taskId, record) {
-            // 返回 onSuccess 回调：上传成功后更新对应消息的 image
             var msgId = record && record.messageId;
             if (msgId == null) return null;
             return async function (result) {
                 try {
                     if (typeof messages === 'undefined' || !Array.isArray(messages)) return;
                     var target = messages.find(function (m) { return String(m.id) === String(msgId); });
-                    if (target) {
-                        target.image = result.url;
-                        delete target.uploadStatus;
-                        try { if (typeof throttledSaveData === 'function') throttledSaveData(); } catch (e) {}
-                        try { if (typeof renderMessages === 'function') renderMessages(true); } catch (e) {}
-                    }
+                    if (!target) return;
+                    target.image = result.url;
+                    delete target.uploadStatus;
+                    try { if (typeof throttledSaveData === 'function') throttledSaveData(); } catch (e) {}
+                    // 局部更新 DOM
+                    try {
+                        var wrapper = document.querySelector('.message-wrapper[data-id="' + msgId + '"]');
+                        if (wrapper) {
+                            var wrap = wrapper.querySelector('.message-image-pending-wrap');
+                            if (wrap) {
+                                var img = wrap.querySelector('img');
+                                var parent = wrap.parentNode;
+                                if (img && parent) {
+                                    img.removeAttribute('data-pending-ref');
+                                    img.setAttribute('data-lazy-cloud-ref', result.url);
+                                    img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                    img.src = '';
+                                    parent.replaceChild(img, wrap);
+                                    if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn('[cloud-media] restore 局部更新失败', e); }
                 } catch (e) { console.warn(e); }
             };
         });

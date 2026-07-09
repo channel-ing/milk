@@ -69,13 +69,14 @@
         // 阶段三A：背景图库（现在存的是 oss:// 引用 + 缩略图，可以同步）
         'backgroundGallery', 'chatBackground',
         // 阶段三B：日记背景（同上，云端引用后可同步；有 payload 保护过滤 base64）
-        'companionDiaryBg', 'companionDiaryBgGallery'
+        'companionDiaryBg', 'companionDiaryBgGallery',
+        // 阶段四：收藏语音（值是 oss:// 引用，体积小可以同步；有 sanitize 过滤 base64）
+        'favAudio_'
     ];
 
-    // 媒体类键（大 base64 或 oss:// 引用，不走文字同步 payload）
+    // 媒体类键（大 base64，不走文字同步 payload）
     var SESSION_MEDIA_NEEDLES = [
-        'partnerAvatar', 'myAvatar',
-        'favAudio_'   // 阶段四：收藏语音（存 oss:// 引用或 base64，不放进 payload）
+        'partnerAvatar', 'myAvatar'
     ];
 
     // 2) 全局键（无 SESSION_ID 前缀）- 文字类，需要同步
@@ -326,6 +327,14 @@
                             }
                         });
                         payload.indexedDB[k] = sanitizedCompanion;
+                        continue;
+                    }
+                    // 阶段四：收藏语音键（favAudio_）只同步 oss:// 引用，base64 跳过（太大）
+                    if (k.indexOf('favAudio_') !== -1) {
+                        if (typeof v === 'string' && v.indexOf('oss://') === 0) {
+                            payload.indexedDB[k] = v; // oss:// 引用：允许同步
+                        }
+                        // base64 或其他格式：跳过（不进 payload）
                         continue;
                     }
                     payload.indexedDB[k] = v;

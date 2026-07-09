@@ -247,9 +247,20 @@ autoSendInterval: 5,
                     delBtn.className = 'bg-delete-btn';
                     delBtn.innerHTML = '<i class="fas fa-trash"></i>';
                     delBtn.title = "删除此背景";
-                    delBtn.onclick = (e) => {
+                    delBtn.onclick = async (e) => {
                         e.stopPropagation();
                         if (confirm('确定删除这张背景图吗？')) {
+                            // 阶段三B：如果有云端引用，先删云端对象（失败不阻塞本地删除）
+                            if (window.CloudMedia && bg) {
+                                const refToDelete = bg.cloudKey || (typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0 ? bg.value : null);
+                                if (refToDelete) {
+                                    try {
+                                        await window.CloudMedia.delete(refToDelete);
+                                    } catch (err) {
+                                        console.warn('[cloud-media] 云端删除失败', err);
+                                    }
+                                }
+                            }
                             savedBackgrounds.splice(index, 1);
                             saveBackgroundGallery();
 

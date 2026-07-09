@@ -1,19 +1,21 @@
 /**
- * cloud-media-migration.js — 阶段三A：旧数据迁移工具
+ * cloud-media-migration.js — 阶段三：旧数据迁移工具
  *
  * 扫描本地所有 base64 图片，上传到云端，替换成 oss:// 引用。
  * 迁移完成后本地空间会大幅减少。
  *
- * 3A 阶段只处理：
+ * 已支持的类别：
  *   - 背景图库（backgroundGallery）→ 云端全尺寸 + 本地缩略图
  *   - 当前聊天背景（chatBackground）→ 云端全尺寸
+ *   - 日记背景图库（companionDiaryBgGallery）→ 云端全尺寸 + 本地缩略图
+ *   - 当前日记背景（companionDiaryBg）→ 云端全尺寸
+ *   - 对方表情库（stickerLibrary）→ 云端引用（无缩略图，直接懒加载）
+ *   - 我的表情库（myStickerLibrary）→ 云端引用
  *
- * 不处理（留给 3B）：
+ * 尚未处理（留给 3B 后续）：
  *   - 头像（保持本地+云端双存）
- *   - 聊天消息里的图片（涉及消息渲染改造）
- *   - 贴纸库（涉及贴纸面板改造）
- *   - 陪伴模式媒体（涉及陪伴模块改造）
- *   - 日记背景（涉及日记模块改造）
+ *   - 聊天消息里的图片
+ *   - 陪伴模式媒体（背景 / 语音 / 噪音）
  */
 (function (global) {
     'use strict';
@@ -55,9 +57,9 @@
         return typeof v === 'string' && v.indexOf('data:image/') === 0 && v.length > 1000;
     }
 
-    // ==== 迁移背景图库 ====
-    async function _migrateBackgroundGallery(sid) {
-        var key = APP_PREFIX_STR + sid + '_backgroundGallery';
+    // ==== 通用：对象数组类型的背景图库迁移（backgroundGallery / companionDiaryBgGallery）====
+    async function _migrateObjectGallery(sid, keySuffix, category, label) {
+        var key = APP_PREFIX_STR + sid + '_' + keySuffix;
         var gallery = await localforage.getItem(key);
         if (!Array.isArray(gallery) || gallery.length === 0) return;
 
@@ -76,10 +78,10 @@
                 continue;
             }
             // 需要迁移
-            _state.currentTask = '背景图库 ' + (i + 1) + '/' + gallery.length;
+            _state.currentTask = label + ' ' + (i + 1) + '/' + gallery.length;
             _notify();
             try {
-                var uploadResult = await window.CloudMedia.upload(bg.value, 'backgrounds', bg.id || undefined);
+                var uploadResult = await window.CloudMedia.upload(bg.value, category, bg.id || undefined);
                 var thumb = null;
                 try {
                     thumb = await window.CloudMedia.makeThumbnail(bg.value, 200);
@@ -95,7 +97,7 @@
                 });
                 _state.completed++;
             } catch (e) {
-                console.warn('[migration] 背景图上传失败', e);
+                console.warn('[migration] ' + label + '上传失败', e);
                 newGallery.push(bg); // 失败保留原状
                 _state.failed++;
             }
@@ -105,34 +107,115 @@
         await localforage.setItem(key, newGallery);
     }
 
-    // ==== 迁移当前聊天背景（单张图）====
-    async function _migrateChatBackground(sid) {
-        var key = APP_PREFIX_STR + sid + '_chatBackground';
+    // ==== 通用：单张图迁移（chatBackground / companionDiaryBg）====
+    async function _migrateSingleImage(sid, keySuffix, category, label) {
+        var key = APP_PREFIX_STR + sid + '_' + keySuffix;
         var bg = await localforage.getItem(key);
         if (!_isBase64Image(bg)) return;
 
-        _state.currentTask = '当前聊天背景';
+        _state.currentTask = label;
         _notify();
         try {
-            var r = await window.CloudMedia.upload(bg, 'backgrounds');
+            var r = await window.CloudMedia.upload(bg, category);
             await localforage.setItem(key, r.url);
             _state.completed++;
         } catch (e) {
+            console.warn('[migration] ' + label + '上传失败', e);
             _state.failed++;
         }
         _state.progress++;
         _notify();
     }
 
+    // ==== 贴纸库迁移（字符串数组）====
+    // 字符串数组元素可以是 base64 或 oss://，只迁移 base64
+    // 同时更新 disabledStickerItems 里的 key（如果匹配）
+    async function _migrateStickerArray(sid, keySuffix, category, label) {
+        var key = APP_PREFIX_STR + sid + '_' + keySuffix;
+        var arr = await localforage.getItem(key);
+        if (!Array.isArray(arr) || arr.length === 0) return;
+
+        // 读取屏蔽集合
+        var disabledSet = null;
+        try {
+            var raw = localStorage.getItem('disabledStickerItems');
+            if (raw) disabledSet = new Set(JSON.parse(raw));
+        } catch (e) {}
+
+        var newArr = [];
+        for (var i = 0; i < arr.length; i++) {
+            var item = arr[i];
+            // 已是云端引用或非字符串：跳过
+            if (typeof item !== 'string' || item.indexOf('oss://') === 0) {
+                newArr.push(item);
+                continue;
+            }
+            // 不是 base64 图片：跳过
+            if (!_isBase64Image(item)) {
+                newArr.push(item);
+                continue;
+            }
+            _state.currentTask = label + ' ' + (i + 1) + '/' + arr.length;
+            _notify();
+            try {
+                var r = await window.CloudMedia.upload(item, category);
+                newArr.push(r.url);
+                // 更新屏蔽集合：如果老 base64 key 在集合里，替换成新 oss:// key
+                if (disabledSet && disabledSet.has(item)) {
+                    disabledSet.delete(item);
+                    disabledSet.add(r.url);
+                }
+                _state.completed++;
+            } catch (e) {
+                console.warn('[migration] ' + label + '上传失败', e);
+                newArr.push(item); // 失败保留原状
+                _state.failed++;
+            }
+            _state.progress++;
+            _notify();
+        }
+        await localforage.setItem(key, newArr);
+
+        // 屏蔽集合有更新才写回
+        if (disabledSet !== null) {
+            try {
+                localStorage.setItem('disabledStickerItems', JSON.stringify(Array.from(disabledSet)));
+            } catch (e) {}
+        }
+    }
+
     // ==== 扫描：计算总项数 ====
     async function _countTasks(sid) {
         var count = 0;
+
+        // 背景图库
         var g = await localforage.getItem(APP_PREFIX_STR + sid + '_backgroundGallery');
         if (Array.isArray(g)) {
             g.forEach(function (bg) { if (bg && _isBase64Image(bg.value)) count++; });
         }
+        // 聊天背景
         var cb = await localforage.getItem(APP_PREFIX_STR + sid + '_chatBackground');
         if (_isBase64Image(cb)) count++;
+
+        // 日记背景图库
+        var dg = await localforage.getItem(APP_PREFIX_STR + sid + '_companionDiaryBgGallery');
+        if (Array.isArray(dg)) {
+            dg.forEach(function (bg) { if (bg && _isBase64Image(bg.value)) count++; });
+        }
+        // 日记当前背景
+        var dcb = await localforage.getItem(APP_PREFIX_STR + sid + '_companionDiaryBg');
+        if (_isBase64Image(dcb)) count++;
+
+        // 贴纸库（对方 + 我的）
+        var sl = await localforage.getItem(APP_PREFIX_STR + sid + '_stickerLibrary');
+        if (Array.isArray(sl)) {
+            sl.forEach(function (item) { if (_isBase64Image(item)) count++; });
+        }
+        var ml = await localforage.getItem(APP_PREFIX_STR + sid + '_myStickerLibrary');
+        if (Array.isArray(ml)) {
+            ml.forEach(function (item) { if (_isBase64Image(item)) count++; });
+        }
+
         return count;
     }
 
@@ -163,8 +246,17 @@
             }
             _notify();
 
-            await _migrateBackgroundGallery(sid);
-            await _migrateChatBackground(sid);
+            // 阶段三A：聊天背景
+            await _migrateObjectGallery(sid, 'backgroundGallery', 'backgrounds', '背景图库');
+            await _migrateSingleImage(sid, 'chatBackground', 'backgrounds', '当前聊天背景');
+
+            // 阶段三B：日记背景
+            await _migrateObjectGallery(sid, 'companionDiaryBgGallery', 'diary-backgrounds', '日记背景图库');
+            await _migrateSingleImage(sid, 'companionDiaryBg', 'diary-backgrounds', '当前日记背景');
+
+            // 阶段三B：贴纸
+            await _migrateStickerArray(sid, 'stickerLibrary', 'stickers', '对方表情库');
+            await _migrateStickerArray(sid, 'myStickerLibrary', 'my-stickers', '我的表情库');
 
             _state.currentTask = '完成';
             _notify();

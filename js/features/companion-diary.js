@@ -872,8 +872,18 @@
     }
 
     // ─── 日记背景管理 ────────────────────────────────
-    function diaryBgKey()   { return (window.APP_PREFIX || '') + 'companionDiaryBg'; }
-    function diaryBgGalKey() { return (window.APP_PREFIX || '') + 'companionDiaryBgGallery'; }
+    function diaryBgKey() {
+        if (typeof getStorageKey === 'function') {
+            try { return getStorageKey('companionDiaryBg'); } catch (e) {}
+        }
+        return (window.APP_PREFIX || '') + 'companionDiaryBg';
+    }
+    function diaryBgGalKey() {
+        if (typeof getStorageKey === 'function') {
+            try { return getStorageKey('companionDiaryBgGallery'); } catch (e) {}
+        }
+        return (window.APP_PREFIX || '') + 'companionDiaryBgGallery';
+    }
 
     async function loadDiaryBgGallery() {
         try {

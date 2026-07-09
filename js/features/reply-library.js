@@ -863,11 +863,19 @@ function _renderStickerTab(list, itemsToRender) {
         const isDisabled = disabledSet.has(item);
         const isSelected = _batchModeActive && _batchSelectedIndices.has(index);
         div.className = `sticker-item${isDisabled ? ' sticker-disabled' : ''}${isSelected ? ' sticker-batch-selected' : ''}`;
+        // 阶段三B：识别 oss:// 走懒加载
+        const isCloud = typeof item === 'string' && item.indexOf('oss://') === 0;
         div.innerHTML = `
-            <img src="${item}" loading="lazy">
+            <img loading="lazy">
             <div class="sticker-batch-check">✓</div>
             <div class="sticker-delete-btn"><i class="fas fa-times"></i></div>
         `;
+        const imgEl = div.querySelector('img');
+        if (isCloud) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(imgEl, item);
+        } else {
+            imgEl.src = item;
+        }
         div.addEventListener('click', () => {
             if (!_batchModeActive) return;
             if (currentMajorTab !== 'reply' || currentSubTab !== 'stickers') return;

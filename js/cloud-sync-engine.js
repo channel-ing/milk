@@ -60,17 +60,18 @@
         'moodCalendar', 'customMoodOptions', 'moodTrash',
         // 主题人设
         'partnerPersonas',
-        // 贴纸库（文字索引，实际图片阶段三处理）
+        // 贴纸库（文字索引，实际图片阶段三B处理）
         'stickerLibrary', 'myStickerLibrary',
         // 陪伴日记文字
         'companionData', 'companionDiary',
         // 信件
-        'partnerLetterNextTime'
+        'partnerLetterNextTime',
+        // 阶段三A：背景图库（现在存的是 oss:// 引用 + 缩略图，可以同步）
+        'backgroundGallery', 'chatBackground'
     ];
 
-    // 媒体类键（带 SESSION_ID 前缀，阶段三才处理，这里只列出以便排除）
+    // 媒体类键（大 base64，不同步；阶段三A之后 backgroundGallery/chatBackground 移出此列表）
     var SESSION_MEDIA_NEEDLES = [
-        'chatBackground', 'backgroundGallery',
         'partnerAvatar', 'myAvatar',
         'companionDiaryBg', 'companionDiaryBgGallery'
     ];
@@ -204,7 +205,41 @@
                 if (!_isTextKey(k)) continue;
                 try {
                     var v = await localforage.getItem(k);
-                    if (v !== undefined) payload.indexedDB[k] = v;
+                    if (v === undefined) continue;
+                    // 阶段三A 保护：如果 backgroundGallery / chatBackground 仍然是 base64 大图，
+                    // 不同步（避免 payload 爆炸），提示用户先迁移
+                    if (k.indexOf('backgroundGallery') !== -1 && Array.isArray(v)) {
+                        var sanitized = v.filter(function (bg) {
+                            if (!bg || typeof bg !== 'object') return true;
+                            // 保留：不是图片（颜色/渐变）、云端引用、有 thumbnail 的
+                            if (typeof bg.value !== 'string') return true;
+                            if (bg.value.indexOf('oss://') === 0) return true;
+                            if (!bg.value.startsWith('data:image')) return true;
+                            // 是 base64 大图：跳过（等用户迁移后再同步）
+                            return false;
+                        });
+                        // 对于保留的项，也确保没有大 base64
+                        sanitized = sanitized.map(function (bg) {
+                            if (!bg || typeof bg !== 'object') return bg;
+                            if (typeof bg.value === 'string' && bg.value.indexOf('data:image') === 0) {
+                                // 兜底：把 base64 value 换成 thumbnail（如果有），否则删掉
+                                var copy = Object.assign({}, bg);
+                                if (bg.thumbnail) copy.value = bg.thumbnail;
+                                else return null;
+                                return copy;
+                            }
+                            return bg;
+                        }).filter(Boolean);
+                        payload.indexedDB[k] = sanitized;
+                        continue;
+                    }
+                    if (k.indexOf('chatBackground') !== -1) {
+                        // 只同步云端引用或非图片；base64 大图跳过
+                        if (typeof v === 'string' && v.indexOf('data:image') === 0) continue;
+                        payload.indexedDB[k] = v;
+                        continue;
+                    }
+                    payload.indexedDB[k] = v;
                 } catch (e) {
                     console.warn('[cloud-sync-engine] 读取失败', k, e);
                 }

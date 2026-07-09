@@ -215,8 +215,20 @@ autoSendInterval: 5,
 
                 item.className = `bg-item ${isActive ? 'active': ''}`;
 
-                if (bg.type === 'image') {
-                    item.innerHTML = `<img src="${bg.value}" loading="lazy" alt="bg">`;
+                if (bg.type === 'image' || bg.type === 'gif') {
+                    // 优先用缩略图（云端存储的图片），否则用 value（本地存储的完整 base64）
+                    const displaySrc = bg.thumbnail || bg.value;
+                    // 如果 value 是云端引用，需要检查缩略图是否存在
+                    if (typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0 && !bg.thumbnail) {
+                        // 云端引用但没缩略图：占位 + 后台加载
+                        item.innerHTML = `<img loading="lazy" alt="bg">`;
+                        const imgEl = item.querySelector('img');
+                        if (window.CloudMedia) {
+                            window.CloudMedia.bindLazyImage(imgEl, bg.value);
+                        }
+                    } else {
+                        item.innerHTML = `<img src="${displaySrc}" loading="lazy" alt="bg">`;
+                    }
                 } else {
                     item.innerHTML = `<div class="bg-color-block" style="background: ${bg.value}"></div>`;
                 }
@@ -263,9 +275,21 @@ autoSendInterval: 5,
 }
 
 
-        const applyBackground = (value) => {
+        const applyBackground = async (value) => {
             if (!value || typeof value !== 'string') return;
             try {
+                // 阶段三：云端引用要先下载
+                if (value.indexOf('oss://') === 0) {
+                    if (!window.CloudMedia) return;
+                    try {
+                        const blobUrl = await window.CloudMedia.fetchUrl(value);
+                        document.documentElement.style.setProperty('--chat-bg-image', `url(${blobUrl})`);
+                        document.body.classList.add('with-background');
+                    } catch (e) {
+                        console.warn('[cloud-media] 加载云端背景失败', e);
+                    }
+                    return;
+                }
                 if (value.startsWith('linear-gradient') || value.startsWith('#') || value.startsWith('rgb')) {
                     document.documentElement.style.setProperty('--chat-bg-image', value);
                 } else {

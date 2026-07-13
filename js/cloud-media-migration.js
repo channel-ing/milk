@@ -320,47 +320,54 @@
         var msgs = await localforage.getItem(key);
         if (!Array.isArray(msgs) || msgs.length === 0) return;
 
-        // 先数出需要迁移的条数，更新进度分母（已在 _countTasks 算过，这里只走上传）
-        var changed = false;
+        // 第一步：找出所有需要迁移的图片索引
+        var toMigrate = [];
         for (var i = 0; i < msgs.length; i++) {
             var msg = msgs[i];
             if (!msg || !msg.image) continue;
-            // 已经是云端引用或 pending：跳过
             if (typeof msg.image !== 'string') continue;
             if (msg.image.indexOf('oss://') === 0) continue;
             if (msg.image.indexOf('pending://') === 0) continue;
-            // 不是 base64 图片：跳过
             if (!_isBase64Image(msg.image)) continue;
+            toMigrate.push(i);
+        }
+        if (toMigrate.length === 0) return;
 
-            _state.currentTask = '聊天图片 ' + (i + 1) + '/' + msgs.length;
+        // 第二步：上传所有图片，收集结果（不修改 msgs，避免中途写入大数组）
+        var results = {};
+        for (var j = 0; j < toMigrate.length; j++) {
+            var idx = toMigrate[j];
+            var m = msgs[idx];
+            _state.currentTask = '聊天图片 ' + (j + 1) + '/' + toMigrate.length;
             _notify();
-
             try {
-                var r = await window.CloudMedia.upload(msg.image, 'chat-images');
-                msgs[i] = Object.assign({}, msg, { image: r.url });
-                changed = true;
+                var r = await window.CloudMedia.upload(m.image, 'chat-images');
+                results[idx] = r.url;
                 _state.completed++;
             } catch (e) {
-                console.warn('[migration] 聊天图片上传失败 msgId=' + (msg.id || i), e);
+                console.warn('[migration] 聊天图片上传失败 msgId=' + (m.id || idx), e);
                 _state.failed++;
             }
             _state.progress++;
             _notify();
-
-            // 每 20 条批量写一次，避免一条失败丢掉全部进度
-            if (changed && i % 20 === 19) {
-                try {
-                    await localforage.setItem(key, msgs);
-                    changed = false;
-                } catch (saveErr) {
-                    console.warn('[migration] 中途保存失败', saveErr);
-                }
-            }
         }
 
-        // 最终写入
+        // 第三步：所有上传完成后，一次性把 oss:// 引用写入 msgs，再保存
+        // 此时 msgs 里的 base64 已被替换为短字符串，体积大幅缩小，写入不会超限
+        var changed = false;
+        var resultKeys = Object.keys(results);
+        for (var ri = 0; ri < resultKeys.length; ri++) {
+            var ki = parseInt(resultKeys[ri]);
+            msgs[ki] = Object.assign({}, msgs[ki], { image: results[ki] });
+            changed = true;
+        }
         if (changed) {
-            await localforage.setItem(key, msgs);
+            try {
+                await localforage.setItem(key, msgs);
+            } catch (saveErr) {
+                console.error('[migration] 聊天图片写回失败', saveErr);
+                throw saveErr;
+            }
         }
     }
 

@@ -426,6 +426,12 @@
             // 原因：迁移把 base64 替换成 oss:// 写回 localforage，但云端同步是 3 秒防抖，
             // 如果用户马上切换到另一个浏览器恢复，云端还是旧快照（表情库可能是空的）。
             // 强制立即同步确保云端在用户看到完成弹窗时已经是最新状态。
+            // 迁移完后先触发陪伴日记的 key 迁移（懒加载，如果用户没打开过日记，
+            // key 还在旧位置，同步快照会丢失日记数据）
+            if (typeof window.reloadCompanionDiary === 'function') {
+                try { await window.reloadCompanionDiary(); } catch (e) {}
+            }
+
             if (window.CloudSyncEngine && window.CloudSyncEngine.requestSyncNow) {
                 taskEl.textContent = '↑ 正在同步到云端，请勿关闭页面…';
                 barEl.style.width = '100%';

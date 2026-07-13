@@ -280,6 +280,22 @@ function saveMoodData() {
         renderMoodCalendar();
     }
 }
+
+// 供导入逻辑调用：按日期 key 合并心情手账（不覆盖已有日期的数据）
+window._setMoodData = function(importedMoodData, importedCustomMoodOptions) {
+    if (importedMoodData && typeof importedMoodData === 'object') {
+        Object.keys(importedMoodData).forEach(function(dateKey) {
+            if (!moodData[dateKey]) {
+                moodData[dateKey] = importedMoodData[dateKey];
+            }
+        });
+        saveMoodData();
+    }
+    if (Array.isArray(importedCustomMoodOptions) && importedCustomMoodOptions.length > 0) {
+        customMoodOptions = importedCustomMoodOptions;
+        saveCustomMoodOptions();
+    }
+};
 function saveCustomMoodOptions() {
     localforage.setItem(getStorageKey('customMoodOptions'), customMoodOptions);
 }

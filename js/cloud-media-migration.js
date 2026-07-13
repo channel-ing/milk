@@ -26,6 +26,10 @@
         { field: 'noises',      category: 'companion-noises' }
     ];
 
+    // 聊天图片每批处理数量：每批上传完立即写回 localforage，
+    // 这样即使中途崩溃也能保留已完成进度，下次迁移会跳过已是 oss:// 的条目
+    var CHAT_IMAGE_BATCH_SIZE = 15;
+
     // 迁移状态
     var _state = {
         running: false,
@@ -315,9 +319,20 @@
     }
 
     // ==== 聊天图片迁移（chatMessages[].image base64 → oss://）====
+    //
+    // 改进：分批处理，每批上传完立即写回 localforage。
+    // 好处一：即使页面中途崩溃，已完成批次的 oss:// 引用不会丢失，下次迁移会跳过。
+    // 好处二：每次 setItem 写回时，已替换为短 oss:// 的消息不再占用内存中的 base64，
+    //         减少低内存设备（Safari）的峰值内存压力。
     async function _migrateChatImages(sid) {
         var key = APP_PREFIX_STR + sid + '_chatMessages';
-        var msgs = await localforage.getItem(key);
+        var msgs;
+        try {
+            msgs = await localforage.getItem(key);
+        } catch (loadErr) {
+            console.warn('[migration] 聊天图片：加载 chatMessages 失败，跳过', loadErr);
+            return;
+        }
         if (!Array.isArray(msgs) || msgs.length === 0) return;
 
         // 第一步：找出所有需要迁移的图片索引
@@ -333,40 +348,39 @@
         }
         if (toMigrate.length === 0) return;
 
-        // 第二步：上传所有图片，收集结果（不修改 msgs，避免中途写入大数组）
-        var results = {};
-        for (var j = 0; j < toMigrate.length; j++) {
-            var idx = toMigrate[j];
-            var m = msgs[idx];
-            _state.currentTask = '聊天图片 ' + (j + 1) + '/' + toMigrate.length;
-            _notify();
-            try {
-                var r = await window.CloudMedia.upload(m.image, 'chat-images');
-                results[idx] = r.url;
-                _state.completed++;
-            } catch (e) {
-                console.warn('[migration] 聊天图片上传失败 msgId=' + (m.id || idx), e);
-                _state.failed++;
-            }
-            _state.progress++;
-            _notify();
-        }
+        // 第二步：分批上传，每批完成后立即写回（保留进度，减少内存峰值）
+        for (var batchStart = 0; batchStart < toMigrate.length; batchStart += CHAT_IMAGE_BATCH_SIZE) {
+            var batchEnd = Math.min(batchStart + CHAT_IMAGE_BATCH_SIZE, toMigrate.length);
+            var batchChanged = false;
 
-        // 第三步：所有上传完成后，一次性把 oss:// 引用写入 msgs，再保存
-        // 此时 msgs 里的 base64 已被替换为短字符串，体积大幅缩小，写入不会超限
-        var changed = false;
-        var resultKeys = Object.keys(results);
-        for (var ri = 0; ri < resultKeys.length; ri++) {
-            var ki = parseInt(resultKeys[ri]);
-            msgs[ki] = Object.assign({}, msgs[ki], { image: results[ki] });
-            changed = true;
-        }
-        if (changed) {
-            try {
-                await localforage.setItem(key, msgs);
-            } catch (saveErr) {
-                console.error('[migration] 聊天图片写回失败', saveErr);
-                throw saveErr;
+            for (var j = batchStart; j < batchEnd; j++) {
+                var idx = toMigrate[j];
+                var m = msgs[idx];
+                _state.currentTask = '聊天图片 ' + (j + 1) + '/' + toMigrate.length;
+                _notify();
+                try {
+                    var r = await window.CloudMedia.upload(m.image, 'chat-images');
+                    // 替换单条消息中的 image 字段，释放 base64 内存
+                    msgs[idx] = Object.assign({}, msgs[idx], { image: r.url });
+                    batchChanged = true;
+                    _state.completed++;
+                } catch (e) {
+                    console.warn('[migration] 聊天图片上传失败 msgId=' + (m.id || idx), e);
+                    _state.failed++;
+                }
+                _state.progress++;
+                _notify();
+            }
+
+            // 每批成功后写回，即使后续崩溃也保留本批成果
+            if (batchChanged) {
+                try {
+                    await localforage.setItem(key, msgs);
+                } catch (saveErr) {
+                    console.error('[migration] 聊天图片写回失败（第 ' + (batchStart / CHAT_IMAGE_BATCH_SIZE + 1) + ' 批）', saveErr);
+                    // 写回失败说明存储已满或其他严重问题，终止后续批次避免数据混乱
+                    throw saveErr;
+                }
             }
         }
     }
@@ -430,12 +444,19 @@
             if (_isRawBase64Audio(val)) count++;
         }
 
-        // 聊天图片
-        var cm = await localforage.getItem(APP_PREFIX_STR + sid + '_chatMessages');
-        if (Array.isArray(cm)) {
-            cm.forEach(function (msg) {
-                if (msg && msg.image && _isBase64Image(msg.image)) count++;
-            });
+        // 聊天图片：用 try/catch 包裹，防止大数组加载失败导致整个 count 流程中断
+        // 注意：这里只统计数量，不做任何修改
+        try {
+            var cm = await localforage.getItem(APP_PREFIX_STR + sid + '_chatMessages');
+            if (Array.isArray(cm)) {
+                cm.forEach(function (msg) {
+                    if (msg && msg.image && _isBase64Image(msg.image)) count++;
+                });
+            }
+        } catch (e) {
+            console.warn('[migration] 无法统计聊天图片数量（数据过大？），将在迁移时尝试处理', e);
+            // 不中断，继续返回其他类别的 count
+            // _migrateChatImages 内部会独立处理，有自己的 try/catch
         }
 
         return count;
@@ -485,13 +506,13 @@
             await _migrateStickerArray(sid, 'stickerLibrary', 'stickers', '对方表情库');
             await _migrateStickerArray(sid, 'myStickerLibrary', 'my-stickers', '我的表情库');
 
-            // 陪伴媒体（新增）
+            // 陪伴媒体
             await _migrateCompanionData(sid);
 
-            // 收藏语音（新增）
+            // 收藏语音
             await _migrateFavAudio(sid);
 
-            // 聊天图片（新增）
+            // 聊天图片（分批处理）
             await _migrateChatImages(sid);
 
             _state.currentTask = '完成';

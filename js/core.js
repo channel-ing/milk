@@ -2041,11 +2041,17 @@ function showModal(modalElement, focusElement = null) {
         async function exportChatHistory() {
             // 直接从 localforage 读取日记（不依赖内存缓存，防止懒加载未就绪时为空）
             let _diaryForExport = [];
+            let _moodForExport = null;
+            let _customMoodOptionsForExport = [];
             try {
                 const _allKeys = await localforage.keys();
                 const _diaryKey = _allKeys.find(k => k.includes('companionDiary') && !k.includes('Bg') && !k.includes('Gallery'));
                 if (_diaryKey) _diaryForExport = (await localforage.getItem(_diaryKey)) || [];
-            } catch(e) { _diaryForExport = []; }
+                const _moodKey = _allKeys.find(k => k.includes('moodCalendar'));
+                if (_moodKey) _moodForExport = (await localforage.getItem(_moodKey)) || {};
+                const _moodOptsKey = _allKeys.find(k => k.includes('customMoodOptions'));
+                if (_moodOptsKey) _customMoodOptionsForExport = (await localforage.getItem(_moodOptsKey)) || [];
+            } catch(e) { _diaryForExport = []; _moodForExport = {}; }
 
             const overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
@@ -2086,6 +2092,11 @@ function showModal(modalElement, focusElement = null) {
                             <i class="fas fa-book-open" style="color:var(--accent-color);width:16px;text-align:center;"></i>
                             <span>陪伴日记 <span style="font-size:11px;color:var(--text-secondary);">(${_diaryForExport.length} 条)</span></span>
                         </label>
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);font-size:13px;color:var(--text-primary);transition:border-color 0.2s;">
+                            <input type="checkbox" id="_exp_mood" style="accent-color:var(--accent-color);width:15px;height:15px;">
+                            <i class="fas fa-face-smile" style="color:var(--accent-color);width:16px;text-align:center;"></i>
+                            <span>心情手账 <span style="font-size:11px;color:var(--text-secondary);">(${Object.keys(_moodForExport || {}).length} 天)</span></span>
+                        </label>
                     </div>
                     <div style="display:flex;gap:10px;">
                         <button id="_exp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2109,8 +2120,9 @@ function showModal(modalElement, focusElement = null) {
                 const inclAnn      = !!document.getElementById('_exp_ann')?.checked;
                 const inclThemes   = !!document.getElementById('_exp_themes')?.checked;
                 const inclDiary    = !!document.getElementById('_exp_diary')?.checked;
+                const inclMood     = !!document.getElementById('_exp_mood')?.checked;
 
-                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes && !inclDiary) {
+                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes && !inclDiary && !inclMood) {
                     showNotification('请至少选择一项导出内容', 'error');
                     return;
                 }
@@ -2154,17 +2166,28 @@ function showModal(modalElement, focusElement = null) {
                     if (inclReplies)  {
                         exportObj.customReplies = customReplies;
                         if (customEmojis && customEmojis.length > 0) exportObj.customEmojis = customEmojis;
+                        if (customPokes && customPokes.length > 0) exportObj.customPokes = customPokes;
+                        if (customStatuses && customStatuses.length > 0) exportObj.customStatuses = customStatuses;
+                        if (customMottos && customMottos.length > 0) exportObj.customMottos = customMottos;
+                        if (customIntros && customIntros.length > 0) exportObj.customIntros = customIntros;
+                        if (window.customReplyGroups && window.customReplyGroups.length > 0) exportObj.customReplyGroups = window.customReplyGroups;
+                        if (window.customPokeGroups && window.customPokeGroups.length > 0) exportObj.customPokeGroups = window.customPokeGroups;
+                        if (window.customStatusGroups && window.customStatusGroups.length > 0) exportObj.customStatusGroups = window.customStatusGroups;
                         exportObj.exportModules.push('customReplies');
                     }
                     if (inclAnn)      { exportObj.anniversaries = anniversaries; exportObj.exportModules.push('anniversaries'); }
                     if (inclThemes)   {
                         exportObj.customThemes = customThemes;
-                        // stickerLibrary 体积较大，这里不再随聊天备份导出
                         exportObj.exportModules.push('themes');
                     }
                     if (inclDiary) {
                         exportObj.companionDiary = _diaryForExport;
                         exportObj.exportModules.push('companionDiary');
+                    }
+                    if (inclMood && _moodForExport && Object.keys(_moodForExport).length > 0) {
+                        exportObj.moodCalendar = _moodForExport;
+                        if (_customMoodOptionsForExport.length > 0) exportObj.customMoodOptions = _customMoodOptionsForExport;
+                        exportObj.exportModules.push('moodCalendar');
                     }
 
                     const dataStr = JSON.stringify(exportObj, null, 2);
@@ -2294,8 +2317,9 @@ function showModal(modalElement, focusElement = null) {
                     const hasAnn       = importedData.anniversaries && Array.isArray(importedData.anniversaries);
                     const hasThemes    = !!importedData.customThemes || !!importedData.stickerLibrary;
                     const hasDiary     = importedData.companionDiary && Array.isArray(importedData.companionDiary);
+                    const hasMood      = !!importedData.moodCalendar && typeof importedData.moodCalendar === 'object';
 
-                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes && !hasDiary) {
+                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes && !hasDiary && !hasMood) {
                         throw new Error('无效的聊天记录文件（未检测到可识别的数据模块）');
                     }
 
@@ -2324,6 +2348,7 @@ function showModal(modalElement, focusElement = null) {
                                 ${makeRow('_imp_ann', 'fas fa-calendar-heart', '纪念日 / 倒计时', '', hasAnn, false)}
                                 ${makeRow('_imp_themes', 'fas fa-palette', '自定义主题配色', '', hasThemes, false)}
                                 ${makeRow('_imp_diary', 'fas fa-book-open', '陪伴日记', hasDiary ? `(${importedData.companionDiary.length} 条)` : '', hasDiary, false)}
+                                ${makeRow('_imp_mood', 'fas fa-face-smile', '心情手账', hasMood ? `(${Object.keys(importedData.moodCalendar).length} 天)` : '', hasMood, false)}
                             </div>
                             <div style="display:flex;gap:10px;">
                                 <button id="_imp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2347,8 +2372,9 @@ function showModal(modalElement, focusElement = null) {
                         const doAnn      = hasAnn       && !!document.getElementById('_imp_ann')?.checked;
                         const doThemes   = hasThemes    && !!document.getElementById('_imp_themes')?.checked;
                         const doDiary    = hasDiary     && !!document.getElementById('_imp_diary')?.checked;
+                        const doMood     = hasMood      && !!document.getElementById('_imp_mood')?.checked;
 
-                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes && !doDiary) {
+                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes && !doDiary && !doMood) {
                             showNotification('请至少选择一项导入内容', 'error');
                             return;
                         }
@@ -2374,11 +2400,21 @@ function showModal(modalElement, focusElement = null) {
                         }
                         if (doReplies  && importedData.customReplies)  customReplies  = importedData.customReplies;
                         if (doReplies  && importedData.customEmojis && Array.isArray(importedData.customEmojis)) customEmojis = importedData.customEmojis;
+                        if (doReplies  && importedData.customPokes && Array.isArray(importedData.customPokes)) customPokes = importedData.customPokes;
+                        if (doReplies  && importedData.customStatuses && Array.isArray(importedData.customStatuses)) customStatuses = importedData.customStatuses;
+                        if (doReplies  && importedData.customMottos && Array.isArray(importedData.customMottos)) customMottos = importedData.customMottos;
+                        if (doReplies  && importedData.customIntros && Array.isArray(importedData.customIntros)) customIntros = importedData.customIntros;
+                        if (doReplies  && importedData.customReplyGroups) window.customReplyGroups = importedData.customReplyGroups;
+                        if (doReplies  && importedData.customPokeGroups) window.customPokeGroups = importedData.customPokeGroups;
+                        if (doReplies  && importedData.customStatusGroups) window.customStatusGroups = importedData.customStatusGroups;
                         if (doAnn      && importedData.anniversaries)   anniversaries  = importedData.anniversaries;
                         if (doThemes   && importedData.customThemes)    customThemes   = importedData.customThemes;
                         if (doThemes   && importedData.stickerLibrary)  stickerLibrary = importedData.stickerLibrary;
                         if (doDiary    && importedData.companionDiary && typeof window._setCompanionDiaryEntries === 'function') {
                             window._setCompanionDiaryEntries(importedData.companionDiary);
+                        }
+                        if (doMood && importedData.moodCalendar && typeof window._setMoodData === 'function') {
+                            window._setMoodData(importedData.moodCalendar, importedData.customMoodOptions || []);
                         }
 
                         saveData();

@@ -80,6 +80,27 @@
             && v.length > 1000;
     }
 
+    // ==== 关键：迁移后同步内存变量，防止 saveData() 用旧 base64 覆盖已迁移数据 ====
+    //
+    // app 的 saveData() 会定期把内存里的 stickerLibrary / myStickerLibrary / messages 写回
+    // localforage。迁移只更新了 localforage，内存变量仍是 base64。
+    // 只要 saveData() 一跑（用户切换标签页、定时保存等），localforage 就被覆盖回去了。
+    // 解决方案：迁移写 localforage 的同时，也把对应的全局内存变量更新成 oss:// 版本。
+    function _syncMemory(key, value) {
+        try {
+            if (key.indexOf('_stickerLibrary') !== -1 && key.indexOf('mySticker') === -1) {
+                /* global stickerLibrary */
+                stickerLibrary = value;
+            } else if (key.indexOf('_myStickerLibrary') !== -1) {
+                /* global myStickerLibrary */
+                myStickerLibrary = value;
+            }
+            // chatMessages 的内存变量（messages）由 _migrateChatImages 逐条更新，不在此处理
+        } catch (e) {
+            // 全局变量不存在时静默跳过（不影响 localforage 已写入的数据）
+        }
+    }
+
     // ==== 通用：对象数组类型的背景图库迁移（backgroundGallery / companionDiaryBgGallery）====
     async function _migrateObjectGallery(sid, keySuffix, category, label) {
         var key = APP_PREFIX_STR + sid + '_' + keySuffix;
@@ -194,6 +215,9 @@
         }
         await localforage.setItem(key, newArr);
 
+        // 同步内存变量，防止 saveData() 把旧 base64 重新写回 localforage
+        _syncMemory(key, newArr);
+
         if (disabledSet !== null) {
             try {
                 localStorage.setItem('disabledStickerItems', JSON.stringify(Array.from(disabledSet)));
@@ -257,13 +281,9 @@
     }
 
     // ==== 收藏语音迁移（旧格式 favAudio）====
-    // 覆盖两类旧键：
-    //   1. `favAudio_<msgId>`（无 SID 前缀，裸 base64）
-    //   2. `CHAT_APP_V3_<SID>_favAudio_<msgId>`（有 SID，值仍是裸 base64）
     async function _migrateFavAudio(sid) {
         var allKeys = await localforage.keys();
 
-        // 收集所有需要处理的键
         var targets = [];
         for (var ki = 0; ki < allKeys.length; ki++) {
             var k = allKeys[ki];
@@ -272,12 +292,9 @@
             if (!isSidKey && !isNoSidKey) continue;
 
             var val = await localforage.getItem(k);
-            // 已经是 oss:// 引用：跳过
             if (typeof val === 'string' && val.indexOf('oss://') === 0) continue;
-            // 不是裸 base64 音频：跳过
             if (!_isRawBase64Audio(val)) continue;
 
-            // 提取 msgId（两种键名格式）
             var msgId = isSidKey
                 ? k.slice((APP_PREFIX_STR + sid + '_favAudio_').length)
                 : k.slice('favAudio_'.length);
@@ -291,7 +308,6 @@
             _notify();
 
             try {
-                // 裸 base64 → Blob（音频统一当 mp3 处理）
                 var binary = atob(t.val);
                 var bytes = new Uint8Array(binary.length);
                 for (var bi = 0; bi < binary.length; bi++) bytes[bi] = binary.charCodeAt(bi);
@@ -300,10 +316,8 @@
                 var r = await window.CloudMedia.upload(blob, 'fav-audio', t.msgId);
                 var newKey = APP_PREFIX_STR + sid + '_favAudio_' + t.msgId;
 
-                // 写新键（oss:// 引用）
                 await localforage.setItem(newKey, r.url);
 
-                // 如果旧键名不同于新键名，删旧键
                 if (t.oldKey !== newKey) {
                     await localforage.removeItem(t.oldKey);
                 }
@@ -320,10 +334,8 @@
 
     // ==== 聊天图片迁移（chatMessages[].image base64 → oss://）====
     //
-    // 改进：分批处理，每批上传完立即写回 localforage。
-    // 好处一：即使页面中途崩溃，已完成批次的 oss:// 引用不会丢失，下次迁移会跳过。
-    // 好处二：每次 setItem 写回时，已替换为短 oss:// 的消息不再占用内存中的 base64，
-    //         减少低内存设备（Safari）的峰值内存压力。
+    // 分批处理，每批完成后立即写回 localforage 并同步内存变量（messages）。
+    // 防止 saveData() 用旧 base64 覆盖已迁移数据。
     async function _migrateChatImages(sid) {
         var key = APP_PREFIX_STR + sid + '_chatMessages';
         var msgs;
@@ -335,7 +347,7 @@
         }
         if (!Array.isArray(msgs) || msgs.length === 0) return;
 
-        // 第一步：找出所有需要迁移的图片索引
+        // 找出所有需要迁移的图片索引
         var toMigrate = [];
         for (var i = 0; i < msgs.length; i++) {
             var msg = msgs[i];
@@ -348,7 +360,7 @@
         }
         if (toMigrate.length === 0) return;
 
-        // 第二步：分批上传，每批完成后立即写回（保留进度，减少内存峰值）
+        // 分批上传，每批完成后写回 localforage + 同步内存变量
         for (var batchStart = 0; batchStart < toMigrate.length; batchStart += CHAT_IMAGE_BATCH_SIZE) {
             var batchEnd = Math.min(batchStart + CHAT_IMAGE_BATCH_SIZE, toMigrate.length);
             var batchChanged = false;
@@ -360,7 +372,6 @@
                 _notify();
                 try {
                     var r = await window.CloudMedia.upload(m.image, 'chat-images');
-                    // 替换单条消息中的 image 字段，释放 base64 内存
                     msgs[idx] = Object.assign({}, msgs[idx], { image: r.url });
                     batchChanged = true;
                     _state.completed++;
@@ -372,14 +383,29 @@
                 _notify();
             }
 
-            // 每批成功后写回，即使后续崩溃也保留本批成果
             if (batchChanged) {
                 try {
                     await localforage.setItem(key, msgs);
                 } catch (saveErr) {
-                    console.error('[migration] 聊天图片写回失败（第 ' + (batchStart / CHAT_IMAGE_BATCH_SIZE + 1) + ' 批）', saveErr);
-                    // 写回失败说明存储已满或其他严重问题，终止后续批次避免数据混乱
+                    console.error('[migration] 聊天图片写回失败（第 ' + Math.floor(batchStart / CHAT_IMAGE_BATCH_SIZE + 1) + ' 批）', saveErr);
                     throw saveErr;
+                }
+
+                // 同步内存变量 messages，防止 saveData() 把旧 base64 重新写回 localforage
+                try {
+                    /* global messages */
+                    if (typeof messages !== 'undefined' && Array.isArray(messages)) {
+                        for (var si = batchStart; si < batchEnd; si++) {
+                            var sidx = toMigrate[si];
+                            if (msgs[sidx] && msgs[sidx].image && msgs[sidx].image.indexOf('oss://') === 0) {
+                                if (messages[sidx]) {
+                                    messages[sidx] = Object.assign({}, messages[sidx], { image: msgs[sidx].image });
+                                }
+                            }
+                        }
+                    }
+                } catch (memErr) {
+                    // 内存同步失败不影响 localforage 写入，静默跳过
                 }
             }
         }
@@ -445,7 +471,6 @@
         }
 
         // 聊天图片：用 try/catch 包裹，防止大数组加载失败导致整个 count 流程中断
-        // 注意：这里只统计数量，不做任何修改
         try {
             var cm = await localforage.getItem(APP_PREFIX_STR + sid + '_chatMessages');
             if (Array.isArray(cm)) {
@@ -455,8 +480,6 @@
             }
         } catch (e) {
             console.warn('[migration] 无法统计聊天图片数量（数据过大？），将在迁移时尝试处理', e);
-            // 不中断，继续返回其他类别的 count
-            // _migrateChatImages 内部会独立处理，有自己的 try/catch
         }
 
         return count;
@@ -502,7 +525,7 @@
             await _migrateObjectGallery(sid, 'companionDiaryBgGallery', 'diary-backgrounds', '日记背景图库');
             await _migrateSingleImage(sid, 'companionDiaryBg', 'diary-backgrounds', '当前日记背景');
 
-            // 贴纸
+            // 贴纸（写 localforage 后同步内存变量）
             await _migrateStickerArray(sid, 'stickerLibrary', 'stickers', '对方表情库');
             await _migrateStickerArray(sid, 'myStickerLibrary', 'my-stickers', '我的表情库');
 
@@ -512,7 +535,7 @@
             // 收藏语音
             await _migrateFavAudio(sid);
 
-            // 聊天图片（分批处理）
+            // 聊天图片（分批，每批同步内存变量）
             await _migrateChatImages(sid);
 
             _state.currentTask = '完成';

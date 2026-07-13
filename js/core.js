@@ -2073,6 +2073,11 @@ function showModal(modalElement, focusElement = null) {
                             <i class="fas fa-palette" style="color:var(--accent-color);width:16px;text-align:center;"></i>
                             <span>自定义主题配色</span>
                         </label>
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);font-size:13px;color:var(--text-primary);transition:border-color 0.2s;">
+                            <input type="checkbox" id="_exp_diary" style="accent-color:var(--accent-color);width:15px;height:15px;">
+                            <i class="fas fa-book-open" style="color:var(--accent-color);width:16px;text-align:center;"></i>
+                            <span>陪伴日记 <span style="font-size:11px;color:var(--text-secondary);">(${(window._companionDiaryEntries || []).length} 条)</span></span>
+                        </label>
                     </div>
                     <div style="display:flex;gap:10px;">
                         <button id="_exp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2095,8 +2100,9 @@ function showModal(modalElement, focusElement = null) {
                 const inclReplies  = !!document.getElementById('_exp_replies')?.checked;
                 const inclAnn      = !!document.getElementById('_exp_ann')?.checked;
                 const inclThemes   = !!document.getElementById('_exp_themes')?.checked;
+                const inclDiary    = !!document.getElementById('_exp_diary')?.checked;
 
-                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes) {
+                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes && !inclDiary) {
                     showNotification('请至少选择一项导出内容', 'error');
                     return;
                 }
@@ -2147,6 +2153,10 @@ function showModal(modalElement, focusElement = null) {
                         exportObj.customThemes = customThemes;
                         // stickerLibrary 体积较大，这里不再随聊天备份导出
                         exportObj.exportModules.push('themes');
+                    }
+                    if (inclDiary) {
+                        exportObj.companionDiary = window._companionDiaryEntries || [];
+                        exportObj.exportModules.push('companionDiary');
                     }
 
                     const dataStr = JSON.stringify(exportObj, null, 2);
@@ -2275,8 +2285,9 @@ function showModal(modalElement, focusElement = null) {
                     const hasReplies   = importedData.customReplies && Array.isArray(importedData.customReplies);
                     const hasAnn       = importedData.anniversaries && Array.isArray(importedData.anniversaries);
                     const hasThemes    = !!importedData.customThemes || !!importedData.stickerLibrary;
+                    const hasDiary     = importedData.companionDiary && Array.isArray(importedData.companionDiary);
 
-                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes) {
+                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes && !hasDiary) {
                         throw new Error('无效的聊天记录文件（未检测到可识别的数据模块）');
                     }
 
@@ -2304,6 +2315,7 @@ function showModal(modalElement, focusElement = null) {
                                 ${makeRow('_imp_replies', 'fas fa-reply', '字卡回复库', '', hasReplies, false)}
                                 ${makeRow('_imp_ann', 'fas fa-calendar-heart', '纪念日 / 倒计时', '', hasAnn, false)}
                                 ${makeRow('_imp_themes', 'fas fa-palette', '自定义主题配色', '', hasThemes, false)}
+                                ${makeRow('_imp_diary', 'fas fa-book-open', '陪伴日记', hasDiary ? `(${importedData.companionDiary.length} 条)` : '', hasDiary, false)}
                             </div>
                             <div style="display:flex;gap:10px;">
                                 <button id="_imp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2326,8 +2338,9 @@ function showModal(modalElement, focusElement = null) {
                         const doReplies  = hasReplies   && !!document.getElementById('_imp_replies')?.checked;
                         const doAnn      = hasAnn       && !!document.getElementById('_imp_ann')?.checked;
                         const doThemes   = hasThemes    && !!document.getElementById('_imp_themes')?.checked;
+                        const doDiary    = hasDiary     && !!document.getElementById('_imp_diary')?.checked;
 
-                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes) {
+                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes && !doDiary) {
                             showNotification('请至少选择一项导入内容', 'error');
                             return;
                         }
@@ -2356,6 +2369,9 @@ function showModal(modalElement, focusElement = null) {
                         if (doAnn      && importedData.anniversaries)   anniversaries  = importedData.anniversaries;
                         if (doThemes   && importedData.customThemes)    customThemes   = importedData.customThemes;
                         if (doThemes   && importedData.stickerLibrary)  stickerLibrary = importedData.stickerLibrary;
+                        if (doDiary    && importedData.companionDiary && typeof window._setCompanionDiaryEntries === 'function') {
+                            window._setCompanionDiaryEntries(importedData.companionDiary);
+                        }
 
                         saveData();
                         if (doMsgs && typeof renderMessages === 'function') renderMessages();

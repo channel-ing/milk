@@ -2038,7 +2038,15 @@ function showModal(modalElement, focusElement = null) {
             document.body.appendChild(modal);
         }
 
-        function exportChatHistory() {
+        async function exportChatHistory() {
+            // 直接从 localforage 读取日记（不依赖内存缓存，防止懒加载未就绪时为空）
+            let _diaryForExport = [];
+            try {
+                const _allKeys = await localforage.keys();
+                const _diaryKey = _allKeys.find(k => k.includes('companionDiary') && !k.includes('Bg') && !k.includes('Gallery'));
+                if (_diaryKey) _diaryForExport = (await localforage.getItem(_diaryKey)) || [];
+            } catch(e) { _diaryForExport = []; }
+
             const overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
             overlay.innerHTML = `
@@ -2076,7 +2084,7 @@ function showModal(modalElement, focusElement = null) {
                         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);font-size:13px;color:var(--text-primary);transition:border-color 0.2s;">
                             <input type="checkbox" id="_exp_diary" style="accent-color:var(--accent-color);width:15px;height:15px;">
                             <i class="fas fa-book-open" style="color:var(--accent-color);width:16px;text-align:center;"></i>
-                            <span>陪伴日记 <span style="font-size:11px;color:var(--text-secondary);">(${(window._companionDiaryEntries || []).length} 条)</span></span>
+                            <span>陪伴日记 <span style="font-size:11px;color:var(--text-secondary);">(${_diaryForExport.length} 条)</span></span>
                         </label>
                     </div>
                     <div style="display:flex;gap:10px;">
@@ -2155,7 +2163,7 @@ function showModal(modalElement, focusElement = null) {
                         exportObj.exportModules.push('themes');
                     }
                     if (inclDiary) {
-                        exportObj.companionDiary = window._companionDiaryEntries || [];
+                        exportObj.companionDiary = _diaryForExport;
                         exportObj.exportModules.push('companionDiary');
                     }
 

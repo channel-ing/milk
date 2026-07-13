@@ -119,6 +119,23 @@
         window._companionDiaryEntries = _diaryEntries;
     };
 
+    // 供导入逻辑调用：合并写入陪伴日记（以 id 去重，不覆盖已有条目）
+    window._setCompanionDiaryEntries = async function(entries) {
+        if (!Array.isArray(entries) || entries.length === 0) return;
+        await loadDiary(); // 确保内存是最新状态
+        const existingIds = new Set(_diaryEntries.map(function(e) { return String(e.id); }));
+        for (var i = 0; i < entries.length; i++) {
+            var e = entries[i];
+            if (!existingIds.has(String(e.id))) {
+                _diaryEntries.push(e);
+                existingIds.add(String(e.id));
+            }
+        }
+        _diaryEntries.sort(function(a, b) { return b.ts - a.ts; });
+        await saveDiary();
+        window._companionDiaryEntries = _diaryEntries;
+    };
+
     // ─── 字卡随机抽取（梦角的备注） ──────────────────
     // 抽 1~2 句，从启用的字卡库里随机；30% 概率返回空（梦角不记录）
     window.pickCompanionDiaryCards = function() {

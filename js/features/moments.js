@@ -326,7 +326,7 @@ function _renderCmtSectionHtml(post){
 function _renderCard(post){
     const isPartner=post.type==='partner';
     const name=isPartner?_mPName():_mMName();
-    const likeOn=post.userLiked||post.partnerLiked;
+    const likeOn=post.userLiked;
     const likeCount=(post.partnerLiked?1:0)+(post.userLiked?1:0);
     const cmtCount=post.comments.length;
     const canDel=post.type==='user';
@@ -387,7 +387,7 @@ window._mSendComment=function(postId){
 window._mToggleLike=function(postId){
     const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;
     p.userLiked=!p.userLiked; saveMomentsData();
-    const likeOn=p.userLiked||p.partnerLiked, likeCount=(p.partnerLiked?1:0)+(p.userLiked?1:0);
+    const likeOn=p.userLiked, likeCount=(p.partnerLiked?1:0)+(p.userLiked?1:0);
     const btn=document.getElementById('cs-lbtn-'+postId);
     if(btn){btn.className='cs-like-btn'+(likeOn?' on':'');btn.querySelector('i').className=likeOn?'fas fa-heart':'far fa-heart';}
     const lc=document.getElementById('cs-lc-'+postId);if(lc)lc.textContent=likeCount>0?' '+likeCount:'';

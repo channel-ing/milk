@@ -496,7 +496,47 @@
         </div>
 
         <div class="cs-panel" id="cs-panel-album">
-            <div class="cs-coming-soon"><i class="fas fa-images"></i><div class="cs-cs-title">相册</div><div class="cs-cs-sub">即将上线</div></div>
+            <!-- 子tab -->
+            <div class="al-subtabs">
+                <button class="al-subtab on" id="al-st-albums" onclick="window._alBackToList()">相册</button>
+                <button class="al-subtab"    id="al-st-trash"  onclick="window._alOpenTrash()">回收站</button>
+            </div>
+            <!-- 视图：相册列表 -->
+            <div id="al-view-list" class="al-view" style="display:flex;">
+                <div id="al-list-grid" class="al-albums-grid"></div>
+            </div>
+            <!-- 视图：图片网格 -->
+            <div id="al-view-grid" class="al-view" style="display:none;">
+                <div class="al-grid-topbar">
+                    <button class="al-back-btn" onclick="window._alBackToList()"><i class="fas fa-chevron-left"></i></button>
+                    <span id="al-grid-title" class="al-grid-title"></span>
+                    <button class="al-upload-btn" onclick="document.getElementById('al-upload-input').click()"><i class="fas fa-plus"></i></button>
+                </div>
+                <div id="al-grid-body" class="al-grid-body"></div>
+                <input type="file" id="al-upload-input" multiple accept="image/*" style="display:none;" onchange="window._alUploadToAlbum(window._alCurrentAlbumId,this)">
+            </div>
+            <!-- 视图：图片详情 -->
+            <div id="al-view-detail" class="al-view al-detail-view" style="display:none;">
+                <div class="al-detail-topbar">
+                    <button class="al-back-btn" onclick="window._alBackToGrid()"><i class="fas fa-chevron-left"></i></button>
+                    <span id="al-detail-date" class="al-detail-date"></span>
+                    <button class="al-del-btn" onclick="window._alDeletePhoto(window._alCurrentPhotoId)"><i class="fas fa-trash-alt"></i></button>
+                </div>
+                <div class="al-detail-main">
+                    <img id="al-detail-img" class="al-detail-img">
+                    <button id="al-detail-fav" class="al-detail-fav" onclick="window._alToggleFav(window._alCurrentPhotoId)"><i class="far fa-heart"></i></button>
+                </div>
+                <div id="al-detail-strip" class="al-detail-strip"></div>
+            </div>
+            <!-- 视图：回收站 -->
+            <div id="al-view-trash" class="al-view" style="display:none;">
+                <div class="al-grid-topbar">
+                    <button class="al-back-btn" onclick="window._alBackToList()"><i class="fas fa-chevron-left"></i></button>
+                    <span class="al-grid-title">回收站</span>
+                    <span style="width:36px;"></span>
+                </div>
+                <div id="al-trash-body" class="al-grid-body"></div>
+            </div>
         </div>
         <div class="cs-panel" id="cs-panel-mood">
             <div class="cs-coming-soon"><i class="fas fa-book-open"></i><div class="cs-cs-title">心情手账</div><div class="cs-cs-sub">即将上线</div></div>
@@ -2965,6 +3005,7 @@
     <script src="js/features/mood.js"></script>
     <script src="js/features/envelope.js"></script>
     <script src="js/features/moments.js"></script>
+    <script src="js/features/album.js"></script>
     <script src="js/features/reply-library.js"></script>
     <script src="js/features/theme-editor.js"></script>
     <script src="js/features/group-chat.js"></script>

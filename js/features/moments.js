@@ -88,9 +88,28 @@ window._mOpenBell=function(){
 };
 
 // ─── 逻辑 ───
+// 梦角发动态内容：纯文字 60% / 文字+图片 20% / 纯图片 20%
+function _mPostContent() {
+    const textPool    = [...(window._customReplies || customReplies || [])];
+    const stickerPool = [...(stickerLibrary || [])];
+    const hasText    = textPool.length > 0;
+    const hasSticker = stickerPool.length > 0;
+    const randText    = () => _mPostText();
+    const randImgs    = () => { const n=1+Math.floor(Math.random()*3); return stickerPool.sort(()=>Math.random()-.5).slice(0,Math.min(n,stickerPool.length)); };
+
+    if (!hasText && !hasSticker) return { text:'想着你呢。', images:[] };
+    if (!hasSticker) return { text:randText(), images:[] };
+    if (!hasText)    return { text:'', images:randImgs() };
+
+    const r = Math.random();
+    if (r < 0.40) return { text:randText(), images:[] };           // 40% 纯文字
+    if (r < 0.70) return { text:'', images:randImgs() };           // 30% 纯图片
+    return { text:randText(), images:randImgs() };                 // 30% 文字+图片
+}
+
 async function generatePartnerMoment() {
     const now=Date.now();
-    const post={id:_mUid('partner'),type:'partner',text:_mPostText(),images:_mPickStickers(),date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
+    const c=_mPostContent();const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
     if(Math.random()<0.10){const c=_mCmtContent();post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);
@@ -396,7 +415,7 @@ window.onCsImagesSelected=function(input){const files=Array.from(input.files),re
 function _refreshPreviews(){const wrap=document.getElementById('cs-compose-previews');if(wrap)wrap.innerHTML=_composeImgs.map((d,i)=>`<div class="cs-prev-thumb"><img src="${d}"><button class="cs-prev-del" onclick="window._mDelImg(${i})">✕</button></div>`).join('');const cnt=document.getElementById('cs-image-count');if(cnt)cnt.textContent=_composeImgs.length>0?`${_composeImgs.length}/6`:'';}
 window._mDelImg=function(i){_composeImgs.splice(i,1);_refreshPreviews();};
 window.submitCsPost=async function(){
-    const ta=document.getElementById('cs-compose-text'),text=ta?ta.value.trim():'';if(!text){if(ta)ta.focus();return;}
+    const ta=document.getElementById('cs-compose-text'),text=ta?ta.value.trim():'';if(!text&&!_composeImgs.length){if(ta)ta.focus();return;}
     const btn=document.getElementById('cs-submit-btn');if(btn){btn.disabled=true;btn.textContent='发布中…';}
     try{let images=[];for(const d of _composeImgs){if(window.CloudSync&&window.CloudSync.isConnected()&&window.CloudMedia){try{const r=await window.CloudMedia.upload(d,'moments-img');images.push(r&&r.url?r.url:d);}catch(e){images.push(d);}}else{images.push(d);}}
     const post={id:_mUid('user'),type:'user',text,images,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};

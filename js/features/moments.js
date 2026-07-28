@@ -202,7 +202,7 @@ window.openCsVideoPlayer=function(src){
     if(!overlay||!player)return;
     const isCloud=src.indexOf('oss://')===0;
     if(isCloud&&window.CloudMedia){
-        window.CloudMedia.getUrl(src).then(url=>{player.src=url;player.play();}).catch(()=>{player.src=src;player.play();});
+        window.CloudMedia.fetchUrl(src).then(url=>{player.src=url;player.play();}).catch(()=>{player.src=src;player.play();});
     }else{player.src=src;player.play();}
     overlay.style.display='flex';
 };

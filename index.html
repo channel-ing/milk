@@ -433,52 +433,130 @@
         </div>
     </div>
 <!-- ═══ 动态：主列表弹窗 ═══ -->
-<div class="modal" id="moments-modal" style="display:none;">
-    <div class="modal-content moments-modal-content">
-        <div class="moments-modal-header">
-            <button onclick="closeMomentsModal()" title="关闭"><i class="fas fa-times"></i></button>
-            <span class="moments-modal-title">动 态</span>
-            <button onclick="openMomentsCompose()" title="发动态"><i class="fas fa-edit"></i></button>
+<!-- ═══════════════════════════════════════
+     情侣空间：全屏页面
+═══════════════════════════════════════ -->
+<div id="couple-space-page">
+
+    <!-- 顶部 header -->
+    <div class="cs-header">
+        <button class="cs-back-btn" onclick="closeCoupleSpace()">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="cs-header-center">
+            <div class="cs-header-avatars">
+                <div class="cs-hav" id="cs-hav-me"></div>
+                <i class="fas fa-heart" style="font-size:11px;color:var(--accent-color);margin:0 4px;"></i>
+                <div class="cs-hav" id="cs-hav-partner"></div>
+            </div>
+            <div class="cs-header-title">我们的空间</div>
         </div>
-        <div id="moments-feed" class="moments-feed"></div>
+        <div style="width:36px;flex-shrink:0;"></div>
     </div>
+
+    <!-- tab 内容区 -->
+    <div class="cs-content">
+
+        <div class="cs-panel cs-panel-active" id="cs-panel-feed">
+            <div id="cs-feed-list"></div>
+            <div style="height:72px;"></div><!-- FAB 占位 -->
+        </div>
+
+        <div class="cs-panel" id="cs-panel-album">
+            <div class="cs-coming-soon">
+                <i class="fas fa-images"></i>
+                <div class="cs-cs-title">相册</div>
+                <div class="cs-cs-sub">即将上线</div>
+            </div>
+        </div>
+
+        <div class="cs-panel" id="cs-panel-mood">
+            <div class="cs-coming-soon">
+                <i class="fas fa-book-open"></i>
+                <div class="cs-cs-title">心情手账</div>
+                <div class="cs-cs-sub">即将上线</div>
+            </div>
+        </div>
+
+        <div class="cs-panel" id="cs-panel-ann">
+            <div class="cs-coming-soon">
+                <i class="fas fa-heart"></i>
+                <div class="cs-cs-title">纪念日</div>
+                <div class="cs-cs-sub">即将上线</div>
+            </div>
+        </div>
+
+        <div class="cs-panel" id="cs-panel-period">
+            <div class="cs-coming-soon">
+                <i class="fas fa-moon"></i>
+                <div class="cs-cs-title">经期记录</div>
+                <div class="cs-cs-sub">即将上线</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 底部 tab bar -->
+    <div class="cs-tab-bar">
+        <button class="cs-tab-btn cs-tab-on" id="cs-tbbtn-feed"        onclick="csSwitchTab('feed')">
+            <i class="fas fa-stream"></i><span>动态</span>
+        </button>
+        <button class="cs-tab-btn" id="cs-tbbtn-album"       onclick="csSwitchTab('album')">
+            <i class="fas fa-images"></i><span>相册</span>
+        </button>
+        <button class="cs-tab-btn" id="cs-tbbtn-mood"        onclick="csSwitchTab('mood')">
+            <i class="fas fa-book-open"></i><span>心情手账</span>
+        </button>
+        <button class="cs-tab-btn" id="cs-tbbtn-ann"         onclick="csSwitchTab('ann')">
+            <i class="fas fa-heart"></i><span>纪念日</span>
+        </button>
+        <button class="cs-tab-btn" id="cs-tbbtn-period"      onclick="csSwitchTab('period')">
+            <i class="fas fa-moon"></i><span>经期</span>
+        </button>
+    </div>
+
 </div>
 
-<!-- ═══ 动态：帖子详情弹窗 ═══ -->
-<div class="modal" id="moments-detail-modal" style="display:none;z-index:2100;">
-    <div class="modal-content moments-detail-content">
-        <div class="moments-detail-header">
-            <button onclick="closeMomentsDetail()"><i class="fas fa-arrow-left"></i></button>
-            <span>动态详情</span>
-            <span style="width:32px;"></span>
-        </div>
-        <div id="moments-detail-body" class="moments-detail-body"></div>
-        <div class="moments-comment-bar">
-            <input type="text" id="moments-comment-input" class="moments-comment-input" placeholder="写评论…"
-                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMomentsComment();}">
-            <button onclick="sendMomentsComment()"><i class="fas fa-paper-plane"></i></button>
-        </div>
+<!-- FAB：发动态按钮（叠在全屏页上） -->
+<button id="cs-fab" onclick="openCsCompose()">
+    <i class="fas fa-plus"></i>
+</button>
+
+<!-- 底部遮罩（sheet 共用） -->
+<div id="cs-overlay" onclick="closeAllCsSheets()"></div>
+
+<!-- 发帖 bottom sheet -->
+<div id="cs-compose-sheet" class="cs-sheet">
+    <div class="cs-sheet-handle-bar"></div>
+    <div class="cs-sheet-header">
+        <button onclick="closeCsCompose()">取消</button>
+        <span>发动态</span>
+        <button id="cs-submit-btn" onclick="submitCsPost()" class="cs-submit-btn">发布</button>
     </div>
+    <textarea id="cs-compose-text" class="cs-compose-ta" placeholder="想说点什么…"></textarea>
+    <div id="cs-compose-previews" class="cs-compose-previews"></div>
+    <div class="cs-sheet-toolbar">
+        <button onclick="document.getElementById('cs-image-input').click()">
+            <i class="fas fa-image"></i> 图片
+        </button>
+        <span id="cs-image-count" style="font-size:12px;color:var(--text-secondary);margin-left:auto;"></span>
+    </div>
+    <input type="file" id="cs-image-input" multiple accept="image/*" style="display:none;" onchange="onCsImagesSelected(this)">
 </div>
 
-<!-- ═══ 动态：发帖弹窗 ═══ -->
-<div class="modal" id="moments-compose-modal" style="display:none;z-index:2100;">
-    <div class="modal-content moments-compose-content">
-        <div class="moments-compose-header">
-            <button onclick="closeMomentsCompose()">取消</button>
-            <span>发动态</span>
-            <button id="moments-submit-btn" onclick="submitMomentsPost()">发布</button>
-        </div>
-        <textarea id="moments-compose-text" class="moments-compose-textarea" placeholder="想说点什么…"></textarea>
-        <div id="moments-compose-previews"></div>
-        <div class="moments-compose-actions">
-            <button onclick="document.getElementById('moments-image-input').click()">
-                <i class="fas fa-image"></i> 添加图片
-            </button>
-            <span id="moments-image-count" style="font-size:12px;color:var(--text-secondary);margin-left:auto;"></span>
-        </div>
-        <input type="file" id="moments-image-input" multiple accept="image/*" style="display:none;"
-            onchange="onMomentsImagesSelected(this)">
+<!-- 帖子详情 bottom sheet -->
+<div id="cs-detail-sheet" class="cs-sheet cs-detail-sheet-size">
+    <div class="cs-sheet-handle-bar"></div>
+    <div class="cs-sheet-header">
+        <button onclick="closeCsDetail()"><i class="fas fa-times"></i></button>
+        <span>详情</span>
+        <span style="width:60px;"></span>
+    </div>
+    <div id="cs-detail-body" class="cs-detail-body"></div>
+    <div class="cs-comment-bar">
+        <input type="text" id="cs-comment-input" class="cs-comment-input" placeholder="写评论…"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();sendCsComment();}">
+        <button onclick="sendCsComment()"><i class="fas fa-paper-plane"></i></button>
     </div>
 </div>
 

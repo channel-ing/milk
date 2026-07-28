@@ -30,7 +30,25 @@ function _mPickStickers() {
     const pool = [...(stickerLibrary||[])]; if (!pool.length) return [];
     const n = 1+Math.floor(Math.random()*3); return pool.sort(()=>Math.random()-.5).slice(0,Math.min(n,pool.length));
 }
-function _mCmtText() { const pool=[...(window._customReplies||customReplies||[])]; return pool.length?pool[Math.floor(Math.random()*pool.length)]:'嗯嗯~'; }
+
+// 梦角评论内容：纯文字 60% / 文字+贴纸 20% / 纯贴纸 20%
+function _mCmtContent() {
+    const textPool   = [...(window._customReplies || customReplies || [])];
+    const stickerPool = [...(stickerLibrary || [])];
+    const hasText    = textPool.length > 0;
+    const hasSticker = stickerPool.length > 0;
+    const randSticker = () => stickerPool[Math.floor(Math.random() * stickerPool.length)];
+    const randText   = () => textPool[Math.floor(Math.random() * textPool.length)] || '嗯嗯~';
+
+    if (!hasText && !hasSticker) return { text: '嗯嗯~', image: null };
+    if (!hasSticker) return { text: randText(), image: null };
+    if (!hasText)    return { text: '', image: randSticker() };
+
+    const r = Math.random();
+    if (r < 0.60) return { text: randText(), image: null };            // 60% 纯文字
+    if (r < 0.80) return { text: randText(), image: randSticker() };   // 20% 文字+贴纸
+    return { text: '', image: randSticker() };                         // 20% 纯贴纸
+}
 
 async function loadMomentsData() {
     try { const s=await localforage.getItem(getStorageKey(_M_STORAGE_KEY)); if(s){momentsData=s;if(!momentsData.notifications)momentsData.notifications=[];} } catch(e){console.warn('[Moments] load 失败',e);}
@@ -73,9 +91,7 @@ window._mOpenBell=function(){
 async function generatePartnerMoment() {
     const now=Date.now();
     const post={id:_mUid('partner'),type:'partner',text:_mPostText(),images:_mPickStickers(),date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:0.70};
-    // 10% 梦角自评
-    if(Math.random()<0.10) post.pendingPartnerComment={text:_mCmtText(),time:now+Math.floor(_mDly()),isSelfComment:true};
-    // 10% 梦角给自己点赞（静默，不通知用户）
+    if(Math.random()<0.10){const c=_mCmtContent();post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);
 }
@@ -83,7 +99,8 @@ async function generatePartnerMoment() {
 function onUserPostCreated(postId) {
     const p=momentsData.posts.find(p=>p.id===postId); if(!p||p.type!=='user')return;
     p.pendingLikeTime=Date.now()+_mDly();p.pendingLikeSilent=false;
-    if(Math.random()<0.90){p.pendingPartnerComment={text:_mCmtText(),time:Date.now()+_mDly(),replyTo:null};p.chainProbability=0.45;}else{p.chainProbability=null;}
+    if(Math.random()<0.90){const c=_mCmtContent();p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:null};p.chainProbability=0.45;}
+    else{p.chainProbability=null;}
     saveMomentsData();
 }
 
@@ -91,7 +108,7 @@ function onUserCommented(postId) {
     const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;
     const prob=p.chainProbability;
     if(prob===null||prob<0.06){p.chainProbability=null;saveMomentsData();return;}
-    if(Math.random()<prob){p.pendingPartnerComment={text:_mCmtText(),time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};p.chainProbability=prob/2;}
+    if(Math.random()<prob){const c=_mCmtContent();p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};p.chainProbability=prob/2;}
     else{p.chainProbability=null;}
     saveMomentsData();
 }
@@ -106,7 +123,7 @@ async function checkMomentsStatus() {
         }
         if(p.pendingPartnerComment&&now>=p.pendingPartnerComment.time){
             const ppc=p.pendingPartnerComment;
-            p.comments.push({id:_mUid('c'),authorType:'partner',text:ppc.text,image:null,timestamp:ppc.time,isNew:true,replyTo:ppc.replyTo||null});
+            p.comments.push({id:_mUid('c'),authorType:'partner',text:ppc.text||'',image:ppc.image||null,timestamp:ppc.time,isNew:true,replyTo:ppc.replyTo||null});
             p.pendingPartnerComment=null;changed=true;
             if(!ppc.isSelfComment)_pushNotif(p.type==='user'?'commented':'replied',p.id);
         }
@@ -135,12 +152,19 @@ function _updateBadge(){
     const bell=document.getElementById('cs-bell-dot');if(bell)bell.style.display=(momentsData.notifications||[]).some(n=>!n.read)?'block':'none';
 }
 
-// ─── 图片 ───
+// ─── 图片工具 ───
 function _imgEl(src){
     if(!src||typeof src!=='string')return'';
     const isCloud=src.indexOf('oss://')===0;
     const ca=!src.startsWith('data:')?`onclick="viewImage('${src}')" style="cursor:pointer;"`:'';
     return isCloud?`<img data-lazy-cloud-ref="${src}" style="width:100%;height:100%;object-fit:cover;" ${ca}>`:`<img src="${src}" style="width:100%;height:100%;object-fit:cover;" ${ca}>`;
+}
+function _imgElThumb(src, style){
+    if(!src||typeof src!=='string')return'';
+    const isCloud=src.indexOf('oss://')===0;
+    const s=style||'max-width:100px;border-radius:8px;cursor:pointer;';
+    const ca=`onclick="viewImage('${src}')"`;
+    return isCloud?`<img data-lazy-cloud-ref="${src}" style="${s}" ${ca}>`:`<img src="${src}" style="${s}" ${ca}>`;
 }
 function _bindLazy(el){if(!window.CloudMedia)return;el.querySelectorAll('img[data-lazy-cloud-ref]').forEach(img=>window.CloudMedia.bindLazyImage(img,img.getAttribute('data-lazy-cloud-ref')));}
 function _imgGrid(images){
@@ -153,35 +177,49 @@ function _fmtDate(d){if(!d)return'';if(d===_mToday())return'今天';const dt=new
 function _getAvSrc(isPartner){const c=window._avatarCache||{};if(isPartner){if(c.partner)return c.partner;const e=document.getElementById('partner-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}else{if(c.me)return c.me;const e=document.getElementById('my-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}}
 function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36,fb=isPartner?'🌸':'🙂';return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;">`:`<span style="font-size:${Math.round(s*0.5)}px;display:block;text-align:center;line-height:${s}px;">${fb}</span>`;}
 
-// ─── 评论状态 ───
-let _replyInfoMap={};    // postId -> { commentId, authorName }
-let _showAllCmtSet=new Set();
-let _commentImgMap={};   // postId -> base64
-let _emojiPickerPostId=null;
-
-// ─── 表情选择器 ───
-const _EMOJIS=['😊','😂','🥰','😍','🤔','😢','😭','💕','❤️','✨','🌸','🥺','😄','🤣','👍','🎉','💪','🙏','😘','🤗','😋','🥳','😎','🫶','🤩','😏','🙈','💖','🌈','🥲','😅','🤭','🫠','🥹','💫','🎀','🌺'];
-window._mToggleEmoji=function(postId){
-    const existing=document.getElementById('cs-emoji-picker');
-    if(existing){existing.remove();if(_emojiPickerPostId===postId){_emojiPickerPostId=null;return;}}
-    _emojiPickerPostId=postId;
-    const btn=document.getElementById('cs-emoji-btn-'+postId);
+// ─── 贴纸选择器（用户自己的 stickerLibrary） ───
+window._mToggleSticker=function(postId){
+    const existing=document.getElementById('cs-sticker-picker');
+    if(existing){existing.remove();return;}
+    const pool=[...(stickerLibrary||[])];
+    if(!pool.length){
+        const toast=document.createElement('div');
+        toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;';
+        toast.textContent='还没有表情包，请先在设置中上传哦~';
+        document.body.appendChild(toast); setTimeout(()=>toast.remove(),2000); return;
+    }
+    const btn=document.getElementById('cs-sticker-btn-'+postId);
     const rect=btn?btn.getBoundingClientRect():{top:300,left:10};
-    const picker=document.createElement('div');picker.id='cs-emoji-picker';
-    const w=Math.min(272,window.innerWidth-20);
-    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:${Math.max(8,rect.left-w/2+14)}px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:grid;grid-template-columns:repeat(7,1fr);gap:2px;width:${w}px;`;
-    picker.innerHTML=_EMOJIS.map(e=>`<button onclick="window._mInsertEmoji('${postId}','${e}')" style="background:none;border:none;font-size:22px;padding:4px;cursor:pointer;border-radius:8px;line-height:1;">${e}</button>`).join('');
+    const w=Math.min(240,window.innerWidth-20);
+    const picker=document.createElement('div'); picker.id='cs-sticker-picker';
+    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:${Math.max(8,rect.left-w/2+14)}px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:${w}px;max-height:220px;overflow-y:auto;`;
+    pool.forEach(src=>{
+        const b=document.createElement('button');
+        b.style.cssText='background:none;border:none;padding:2px;cursor:pointer;border-radius:8px;aspect-ratio:1;overflow:hidden;';
+        const isCloud=src.indexOf('oss://')===0;
+        b.innerHTML=isCloud?`<img data-lazy-cloud-ref="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">`:`<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">`;
+        b.onclick=()=>window._mSelectSticker(postId,src);
+        picker.appendChild(b);
+    });
     document.body.appendChild(picker);
-    setTimeout(()=>{function c(ev){if(!picker.contains(ev.target)&&(!btn||!btn.contains(ev.target))){picker.remove();_emojiPickerPostId=null;document.removeEventListener('click',c);}}document.addEventListener('click',c);},100);
-};
-window._mInsertEmoji=function(postId,emoji){
-    const inp=document.getElementById('cs-ci-'+postId);if(!inp)return;
-    const s=inp.selectionStart||inp.value.length;inp.value=inp.value.slice(0,s)+emoji+inp.value.slice(inp.selectionEnd||s);
-    inp.setSelectionRange(s+emoji.length,s+emoji.length);inp.focus();
-    const pk=document.getElementById('cs-emoji-picker');if(pk)pk.remove();_emojiPickerPostId=null;
+    _bindLazy(picker);
+    setTimeout(()=>{function c(ev){if(!picker.contains(ev.target)&&(!btn||!btn.contains(ev.target))){picker.remove();document.removeEventListener('click',c);}}document.addEventListener('click',c);},100);
 };
 
-// ─── 评论图片 ───
+window._mSelectSticker=function(postId,src){
+    _commentImgMap[postId]=src;
+    const pv=document.getElementById('cs-cmt-img-prev-'+postId);
+    if(pv){
+        const isCloud=src.indexOf('oss://')===0;
+        const imgTag=isCloud?`<img data-lazy-cloud-ref="${src}" style="height:52px;border-radius:8px;">`:`<img src="${src}" style="height:52px;border-radius:8px;">`;
+        pv.innerHTML=`<div style="position:relative;display:inline-block;margin:4px 0;">${imgTag}<button onclick="window._mClearCmtImg('${postId}')" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button></div>`;
+        if(isCloud)_bindLazy(pv);
+    }
+    const picker=document.getElementById('cs-sticker-picker');if(picker)picker.remove();
+};
+window._mClearCmtImg=function(postId){delete _commentImgMap[postId];const pv=document.getElementById('cs-cmt-img-prev-'+postId);if(pv)pv.innerHTML='';};
+
+// ─── 图片评论（相册选图） ───
 window._mCommentImgSelected=function(postId,input){
     const file=input.files[0];if(!file)return;
     optimizeImage(file,600,0.75).then(b64=>{
@@ -190,15 +228,15 @@ window._mCommentImgSelected=function(postId,input){
         if(pv)pv.innerHTML=`<div style="position:relative;display:inline-block;margin:4px 0;"><img src="${b64}" style="height:52px;border-radius:8px;"><button onclick="window._mClearCmtImg('${postId}')" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button></div>`;
     });input.value='';
 };
-window._mClearCmtImg=function(postId){delete _commentImgMap[postId];const pv=document.getElementById('cs-cmt-img-prev-'+postId);if(pv)pv.innerHTML='';};
 
-// ─── 点击评论→回复 ───
+// ─── 评论状态 ───
+let _replyInfoMap={}, _showAllCmtSet=new Set(), _commentImgMap={};
+
 window._mClickComment=function(postId,commentId,authorName){
     _replyInfoMap[postId]={commentId,authorName};
     const ctxEl=document.getElementById('cs-reply-ctx-'+postId);
-    if(ctxEl){ctxEl.style.display='flex';ctxEl.querySelector('.cs-reply-name').textContent='回复 '+authorName+'：';}
-    const inp=document.getElementById('cs-ci-'+postId);
-    if(inp){inp.placeholder='回复内容…';inp.focus();}
+    if(ctxEl){ctxEl.style.display='flex';const nm=ctxEl.querySelector('.cs-reply-name');if(nm)nm.textContent='回复 '+authorName+'：';}
+    const inp=document.getElementById('cs-ci-'+postId);if(inp){inp.placeholder='回复内容…';inp.focus();}
 };
 window._mCancelReply=function(postId){
     delete _replyInfoMap[postId];
@@ -211,21 +249,17 @@ window._mFocusCmt=function(postId){const inp=document.getElementById('cs-ci-'+po
 // ─── 评论区 HTML ───
 function _renderCmtSectionHtml(post){
     const showAll=_showAllCmtSet.has(post.id);
-    const cmts=post.comments;
-    const toShow=showAll?cmts:cmts.slice(0,3);
-    const needMore=!showAll&&cmts.length>3;
-
+    const cmts=post.comments, toShow=showAll?cmts:cmts.slice(0,3), needMore=!showAll&&cmts.length>3;
     let cmtListHtml='';
     toShow.forEach(c=>{
         const isP=c.authorType==='partner';
         const cName=isP?_mPName():_mMName();
         const replyPart=c.replyTo?` <span class="cs-cmt-reply-word">回复</span> <span class="cs-cmt-reply-target">${c.replyTo.authorName}</span>`:'';
         const dot=isP&&c.isNew?'<span style="width:5px;height:5px;background:var(--accent-color);border-radius:50%;display:inline-block;margin-left:3px;vertical-align:middle;"></span>':'';
-        const imgHtml=c.image?`<div style="margin-top:5px;"><img src="${c.image}" style="max-width:100px;border-radius:8px;cursor:pointer;" onclick="viewImage('${c.image}')"></div>`:'';
-        cmtListHtml+=`<div class="cs-cmt-item" onclick="event.stopPropagation();window._mClickComment('${post.id}','${c.id}','${cName}')"><div class="cs-cmt-content"><span class="cs-cmt-name">${cName}</span>${replyPart}：<span class="cs-cmt-text">${c.text}${dot}</span>${imgHtml}</div></div>`;
+        const imgHtml=c.image?`<div style="margin-top:5px;">${_imgElThumb(c.image,'max-width:100px;border-radius:8px;cursor:pointer;')}</div>`:'';
+        cmtListHtml+=`<div class="cs-cmt-item" onclick="event.stopPropagation();window._mClickComment('${post.id}','${c.id}','${cName}')"><div class="cs-cmt-content"><span class="cs-cmt-name">${cName}</span>${replyPart}：${c.text?`<span class="cs-cmt-text">${c.text}${dot}</span>`:''}${imgHtml}</div></div>`;
     });
     if(needMore)cmtListHtml+=`<div class="cs-show-all-cmt" onclick="event.stopPropagation();window._mShowAllCmt('${post.id}')">查看全部 ${cmts.length} 条评论</div>`;
-
     const ri=_replyInfoMap[post.id];
     return`<div class="cs-cmt-section" id="cs-cmt-${post.id}">
         ${cmtListHtml?`<div class="cs-cmt-list">${cmtListHtml}</div>`:''}
@@ -239,7 +273,7 @@ function _renderCmtSectionHtml(post){
             <input type="text" id="cs-ci-${post.id}" class="cs-cmt-input-inline"
                 placeholder="${ri?'回复内容…':'说点什么…'}"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();window._mSendComment('${post.id}');}">
-            <button id="cs-emoji-btn-${post.id}" class="cs-cmt-tool-btn" onclick="event.stopPropagation();window._mToggleEmoji('${post.id}')"><i class="far fa-smile"></i></button>
+            <button id="cs-sticker-btn-${post.id}" class="cs-cmt-tool-btn" onclick="event.stopPropagation();window._mToggleSticker('${post.id}')"><i class="fas fa-icons"></i></button>
             <button class="cs-cmt-tool-btn" onclick="event.stopPropagation();document.getElementById('cs-cmtimg-${post.id}').click()"><i class="far fa-image"></i></button>
             <button class="cs-cmt-send" onclick="event.stopPropagation();window._mSendComment('${post.id}')"><i class="fas fa-paper-plane"></i></button>
             <input type="file" id="cs-cmtimg-${post.id}" accept="image/*" style="display:none;" onchange="window._mCommentImgSelected('${post.id}',this)">
@@ -257,7 +291,6 @@ function _renderCard(post){
     const canDel=post.type==='user';
     const hasNew=post.isNewForUser||post.comments.some(c=>c.authorType==='partner'&&c.isNew);
     const likers=[];if(post.partnerLiked)likers.push(_mPName());if(post.userLiked)likers.push(_mMName());
-
     return`<div class="cs-post" data-pid="${post.id}">
         <div class="cs-post-top">
             <div class="cs-post-av">${_avEl(isPartner,36)}</div>
@@ -282,7 +315,7 @@ function _renderCard(post){
     </div>`;
 }
 
-// ─── 评论区重渲（不动整张卡） ───
+// ─── 评论区局部重渲 ───
 function _rerenderCmtSection(postId){
     const post=momentsData.posts.find(p=>p.id===postId);
     const old=document.getElementById('cs-cmt-'+postId);
@@ -297,36 +330,28 @@ function _rerenderCmtSection(postId){
 // ─── 发评论 ───
 window._mSendComment=function(postId){
     const inp=document.getElementById('cs-ci-'+postId);if(!inp)return;
-    const text=inp.value.trim();const img=_commentImgMap[postId];
+    const text=inp.value.trim(), img=_commentImgMap[postId];
     if(!text&&!img)return;
     const post=momentsData.posts.find(p=>p.id===postId);if(!post)return;
     const ri=_replyInfoMap[postId];
     post.comments.push({id:_mUid('c'),authorType:'user',text:text||'',image:img||null,timestamp:Date.now(),isNew:false,replyTo:ri?{commentId:ri.commentId,authorName:ri.authorName}:null});
-    saveMomentsData();
-    inp.value='';delete _replyInfoMap[postId];delete _commentImgMap[postId];
+    saveMomentsData(); inp.value=''; delete _replyInfoMap[postId]; delete _commentImgMap[postId];
     onUserCommented(postId);
     _rerenderCmtSection(postId);
     const cc=document.getElementById('cs-cc-'+postId);if(cc)cc.textContent=' '+post.comments.length;
     const ci=document.querySelector(`[data-pid="${postId}"] .cs-cmt-btn i`);if(ci)ci.className='fas fa-comment';
 };
 
-// ─── 点赞（不重渲卡片，只更新DOM） ───
+// ─── 点赞（in-place，不闪） ───
 window._mToggleLike=function(postId){
     const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;
     p.userLiked=!p.userLiked; saveMomentsData();
-    const likeOn=p.userLiked||p.partnerLiked;
-    const likeCount=(p.partnerLiked?1:0)+(p.userLiked?1:0);
-    // 更新按钮
+    const likeOn=p.userLiked||p.partnerLiked, likeCount=(p.partnerLiked?1:0)+(p.userLiked?1:0);
     const btn=document.getElementById('cs-lbtn-'+postId);
     if(btn){btn.className='cs-like-btn'+(likeOn?' on':'');btn.querySelector('i').className=likeOn?'fas fa-heart':'far fa-heart';}
     const lc=document.getElementById('cs-lc-'+postId);if(lc)lc.textContent=likeCount>0?' '+likeCount:'';
-    // 更新赞了那行（in-place，不闪）
     const lr=document.getElementById('cs-lr-'+postId);
-    if(lr){
-        const likers=[];if(p.partnerLiked)likers.push(_mPName());if(p.userLiked)likers.push(_mMName());
-        lr.style.display=likers.length?'flex':'none';
-        lr.innerHTML=likers.length?`<i class="fas fa-heart"></i><span>${likers.join('、')} 赞了</span>`:'';
-    }
+    if(lr){const likers=[];if(p.partnerLiked)likers.push(_mPName());if(p.userLiked)likers.push(_mMName());lr.style.display=likers.length?'flex':'none';lr.innerHTML=likers.length?`<i class="fas fa-heart"></i><span>${likers.join('、')} 赞了</span>`:'';}
 };
 
 // ─── 删除 ───
@@ -350,8 +375,7 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
 window.closeCoupleSpace=window.closeMomentsModal=function(){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.classList.remove('cs-open');window.closeAllCsSheets();
-    const np=document.getElementById('cs-notif-popup');if(np)np.style.display='none';
-    const ep=document.getElementById('cs-emoji-picker');if(ep)ep.remove();
+    [document.getElementById('cs-notif-popup'),document.getElementById('cs-sticker-picker')].forEach(el=>{if(el)el.style.display='none';});
     setTimeout(()=>{page.style.display='none';},380);
 };
 window.csSwitchTab=function(tab){_csSetTab(tab);if(tab==='feed')_csRenderFeed();};

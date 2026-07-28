@@ -438,91 +438,81 @@
 ═══════════════════════════════════════ -->
 <div id="couple-space-page">
 
-    <!-- 顶部 header -->
-    <div class="cs-header">
-        <button class="cs-back-btn" onclick="closeCoupleSpace()">
-            <i class="fas fa-chevron-left"></i>
-        </button>
-        <div class="cs-header-center">
-            <div class="cs-header-avatars">
-                <div class="cs-hav" id="cs-hav-me"></div>
-                <i class="fas fa-heart" style="font-size:11px;color:var(--accent-color);margin:0 4px;"></i>
-                <div class="cs-hav" id="cs-hav-partner"></div>
-            </div>
-            <div class="cs-header-title">我们的空间</div>
-        </div>
-        <div style="width:36px;flex-shrink:0;"></div>
+    <!-- 顶部操作栏 -->
+    <div class="cs-topbar">
+        <button class="cs-icon-btn" onclick="closeCoupleSpace()"><i class="fas fa-chevron-left"></i></button>
+        <div style="flex:1;"></div>
+        <button class="cs-icon-btn"><i class="fas fa-cog"></i></button>
     </div>
 
-    <!-- tab 内容区 -->
+    <!-- 双头像 + 心电图 + 天数 -->
+    <div class="cs-couple-section">
+        <div class="cs-couple-row">
+            <div class="cs-big-av" id="cs-bav-partner">🌸</div>
+            <div class="cs-hb-wrap">
+                <svg viewBox="0 0 140 44" xmlns="http://www.w3.org/2000/svg" class="cs-hb-svg">
+                    <polyline points="0,22 18,22 26,8 34,36 42,12 50,30 58,22 80,22 88,8 96,36 104,14 112,28 120,22 140,22"
+                        fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="cs-big-av" id="cs-bav-me">🙂</div>
+        </div>
+        <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+    </div>
+
+    <!-- Tab 图标 pill -->
+    <div class="cs-pills-wrap">
+        <div class="cs-pills">
+            <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><i class="fas fa-comment-dots"></i></button>
+            <button class="cs-pill"             id="csp-album"  onclick="csSwitchTab('album')"  title="相册"><i class="fas fa-images"></i></button>
+            <button class="cs-pill"             id="csp-mood"   onclick="csSwitchTab('mood')"   title="心情手账"><i class="fas fa-book-open"></i></button>
+            <button class="cs-pill"             id="csp-ann"    onclick="csSwitchTab('ann')"    title="纪念日"><i class="fas fa-heart"></i></button>
+            <button class="cs-pill"             id="csp-period" onclick="csSwitchTab('period')" title="经期记录"><i class="fas fa-moon"></i></button>
+        </div>
+    </div>
+
+    <!-- 内容区 -->
     <div class="cs-content">
 
         <div class="cs-panel cs-panel-active" id="cs-panel-feed">
+            <!-- 动态 section header -->
+            <div class="cs-feed-hd">
+                <span class="cs-feed-hd-title">动态</span>
+                <button class="cs-icon-btn cs-bell-btn">
+                    <i class="fas fa-bell"></i>
+                    <span class="cs-bell-dot" id="cs-bell-dot" style="display:none;"></span>
+                </button>
+            </div>
+            <!-- 发帖输入行 -->
+            <div class="cs-compose-row" onclick="openCsCompose()">
+                <i class="fas fa-pencil-alt cs-compose-icon"></i>
+                <span class="cs-compose-ph">今天想记录什么？</span>
+                <div class="cs-compose-plus">+</div>
+            </div>
+            <!-- 帖子列表 -->
             <div id="cs-feed-list"></div>
-            <div style="height:72px;"></div><!-- FAB 占位 -->
+            <div style="height:20px;"></div>
         </div>
 
         <div class="cs-panel" id="cs-panel-album">
-            <div class="cs-coming-soon">
-                <i class="fas fa-images"></i>
-                <div class="cs-cs-title">相册</div>
-                <div class="cs-cs-sub">即将上线</div>
-            </div>
+            <div class="cs-coming-soon"><i class="fas fa-images"></i><div class="cs-cs-title">相册</div><div class="cs-cs-sub">即将上线</div></div>
         </div>
-
         <div class="cs-panel" id="cs-panel-mood">
-            <div class="cs-coming-soon">
-                <i class="fas fa-book-open"></i>
-                <div class="cs-cs-title">心情手账</div>
-                <div class="cs-cs-sub">即将上线</div>
-            </div>
+            <div class="cs-coming-soon"><i class="fas fa-book-open"></i><div class="cs-cs-title">心情手账</div><div class="cs-cs-sub">即将上线</div></div>
         </div>
-
         <div class="cs-panel" id="cs-panel-ann">
-            <div class="cs-coming-soon">
-                <i class="fas fa-heart"></i>
-                <div class="cs-cs-title">纪念日</div>
-                <div class="cs-cs-sub">即将上线</div>
-            </div>
+            <div class="cs-coming-soon"><i class="fas fa-heart"></i><div class="cs-cs-title">纪念日</div><div class="cs-cs-sub">即将上线</div></div>
         </div>
-
         <div class="cs-panel" id="cs-panel-period">
-            <div class="cs-coming-soon">
-                <i class="fas fa-moon"></i>
-                <div class="cs-cs-title">经期记录</div>
-                <div class="cs-cs-sub">即将上线</div>
-            </div>
+            <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>
         </div>
 
-    </div>
-
-    <!-- 底部 tab bar -->
-    <div class="cs-tab-bar">
-        <button class="cs-tab-btn cs-tab-on" id="cs-tbbtn-feed"        onclick="csSwitchTab('feed')">
-            <i class="fas fa-stream"></i><span>动态</span>
-        </button>
-        <button class="cs-tab-btn" id="cs-tbbtn-album"       onclick="csSwitchTab('album')">
-            <i class="fas fa-images"></i><span>相册</span>
-        </button>
-        <button class="cs-tab-btn" id="cs-tbbtn-mood"        onclick="csSwitchTab('mood')">
-            <i class="fas fa-book-open"></i><span>心情手账</span>
-        </button>
-        <button class="cs-tab-btn" id="cs-tbbtn-ann"         onclick="csSwitchTab('ann')">
-            <i class="fas fa-heart"></i><span>纪念日</span>
-        </button>
-        <button class="cs-tab-btn" id="cs-tbbtn-period"      onclick="csSwitchTab('period')">
-            <i class="fas fa-moon"></i><span>经期</span>
-        </button>
     </div>
 
 </div>
 
-<!-- FAB：发动态按钮（叠在全屏页上） -->
-<button id="cs-fab" onclick="openCsCompose()">
-    <i class="fas fa-plus"></i>
-</button>
-
-<!-- 底部遮罩（sheet 共用） -->
+<!-- 遮罩 -->
 <div id="cs-overlay" onclick="closeAllCsSheets()"></div>
 
 <!-- 发帖 bottom sheet -->
@@ -536,9 +526,7 @@
     <textarea id="cs-compose-text" class="cs-compose-ta" placeholder="想说点什么…"></textarea>
     <div id="cs-compose-previews" class="cs-compose-previews"></div>
     <div class="cs-sheet-toolbar">
-        <button onclick="document.getElementById('cs-image-input').click()">
-            <i class="fas fa-image"></i> 图片
-        </button>
+        <button onclick="document.getElementById('cs-image-input').click()"><i class="fas fa-image"></i> 图片</button>
         <span id="cs-image-count" style="font-size:12px;color:var(--text-secondary);margin-left:auto;"></span>
     </div>
     <input type="file" id="cs-image-input" multiple accept="image/*" style="display:none;" onchange="onCsImagesSelected(this)">

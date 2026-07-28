@@ -1,12 +1,11 @@
 /**
  * moments.js — 情侣空间：动态功能
- * 数据逻辑 + 全屏 UI（对照设计稿）
  */
 
 // ─────────────────────────────────
 //  数据结构
 // ─────────────────────────────────
-let momentsData = { posts: [] };
+let momentsData = { posts: [], notifications: [] };
 
 // ─────────────────────────────────
 //  常量
@@ -57,7 +56,10 @@ function _mCmtText() {
 async function loadMomentsData() {
     try {
         const s = await localforage.getItem(getStorageKey(_M_STORAGE_KEY));
-        if (s) momentsData = s;
+        if (s) {
+            momentsData = s;
+            if (!momentsData.notifications) momentsData.notifications = [];
+        }
     } catch(e) { console.warn('[Moments] load 失败', e); }
 }
 function saveMomentsData() {
@@ -66,10 +68,32 @@ function saveMomentsData() {
 }
 
 // ─────────────────────────────────
-//  通知队列
+//  通知系统
 // ─────────────────────────────────
 let _nQ = [], _nBusy = false;
-const _qN = (type, postId) => { _nQ.push({type, postId}); _drainN(); };
+
+function _pushNotif(type, postId) {
+    // 存入通知历史
+    momentsData.notifications = momentsData.notifications || [];
+    const name = _mPName();
+    const texts = {
+        newPost:   `${name}发了新动态`,
+        liked:     `${name}为你的动态点了赞`,
+        commented: `${name}评论了你的动态`,
+        replied:   `${name}回复了你`,
+    };
+    momentsData.notifications.unshift({
+        id: _mUid('n'), type, postId,
+        text: texts[type] || type,
+        timestamp: Date.now(), read: false
+    });
+    if (momentsData.notifications.length > 50) momentsData.notifications = momentsData.notifications.slice(0, 50);
+    saveMomentsData();
+    _updateBadge();
+    // 也走弹窗队列
+    _nQ.push({type, postId}); _drainN();
+}
+
 function _drainN() {
     if (_nBusy || !_nQ.length) return;
     _nBusy = true; _showN(_nQ.shift());
@@ -102,6 +126,60 @@ function _showN({type, postId}) {
 window._mND = () => { _nBusy = false; setTimeout(_drainN, 400); };
 
 // ─────────────────────────────────
+//  铃铛弹出层
+// ─────────────────────────────────
+window._mOpenBell = function() {
+    let popup = document.getElementById('cs-notif-popup');
+    if (popup && popup.style.display !== 'none') {
+        popup.style.display = 'none'; return;
+    }
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'cs-notif-popup';
+        popup.className = 'cs-notif-popup';
+        document.getElementById('couple-space-page').appendChild(popup);
+    }
+    popup.style.display = 'block';
+    _renderNotifPopup(popup);
+    // 标记全部已读
+    (momentsData.notifications || []).forEach(n => { n.read = true; });
+    saveMomentsData(); _updateBadge();
+    // 点外面关闭
+    setTimeout(() => {
+        function closeOnOut(e) {
+            const btn = document.getElementById('cs-bell-btn');
+            if (!popup.contains(e.target) && (!btn || !btn.contains(e.target))) {
+                popup.style.display = 'none';
+                document.removeEventListener('click', closeOnOut);
+            }
+        }
+        document.addEventListener('click', closeOnOut);
+    }, 100);
+};
+
+function _renderNotifPopup(popup) {
+    const notifs = (momentsData.notifications || []).slice(0, 15);
+    if (!notifs.length) {
+        popup.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px;opacity:0.6;">暂无通知</div>';
+        return;
+    }
+    const icons = { newPost:'📸', liked:'❤️', commented:'💬', replied:'💬' };
+    popup.innerHTML = '<div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--text-secondary);">互动通知</div>' +
+        notifs.map(n => {
+            const t = new Date(n.timestamp);
+            const timeStr = `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+            return `<div class="cs-notif-item${n.read?'':' cs-notif-unread'}" onclick="window._openMomentsPost('${n.postId}');document.getElementById('cs-notif-popup').style.display='none';">
+                <span style="font-size:18px;flex-shrink:0;">${icons[n.type]||'🔔'}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;color:var(--text-primary);line-height:1.4;">${n.text}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${timeStr}</div>
+                </div>
+                ${!n.read?'<div style="width:7px;height:7px;background:var(--accent-color);border-radius:50%;flex-shrink:0;margin-top:4px;"></div>':''}
+            </div>`;
+        }).join('');
+}
+
+// ─────────────────────────────────
 //  梦角发动态
 // ─────────────────────────────────
 async function generatePartnerMoment() {
@@ -119,7 +197,7 @@ async function generatePartnerMoment() {
         post.pendingPartnerComment = { text: _mCmtText(), time: now + Math.floor(_mDly()), isSelfComment: true };
     momentsData.posts.unshift(post);
     saveMomentsData();
-    _qN('newPost', post.id);
+    _pushNotif('newPost', post.id);
 }
 
 // ─────────────────────────────────
@@ -130,14 +208,17 @@ function onUserPostCreated(postId) {
     if (!p || p.type !== 'user') return;
     p.pendingLikeTime = Date.now() + _mDly();
     if (Math.random() < 0.90) {
-        p.pendingPartnerComment = { text: _mCmtText(), time: Date.now() + _mDly() };
+        p.pendingPartnerComment = {
+            text: _mCmtText(), time: Date.now() + _mDly(),
+            replyTo: null
+        };
         p.chainProbability = 0.45;
     } else { p.chainProbability = null; }
     saveMomentsData();
 }
 
 // ─────────────────────────────────
-//  用户评论触发链
+//  评论链
 // ─────────────────────────────────
 function onUserCommented(postId) {
     const p = momentsData.posts.find(p => p.id === postId);
@@ -145,7 +226,10 @@ function onUserCommented(postId) {
     const prob = p.chainProbability;
     if (prob === null || prob < 0.06) { p.chainProbability = null; saveMomentsData(); return; }
     if (Math.random() < prob) {
-        p.pendingPartnerComment = { text: _mCmtText(), time: Date.now() + _mDly() };
+        p.pendingPartnerComment = {
+            text: _mCmtText(), time: Date.now() + _mDly(),
+            replyTo: { authorName: _mMName() } // 梦角回复用户
+        };
         p.chainProbability = prob / 2;
     } else { p.chainProbability = null; }
     saveMomentsData();
@@ -160,13 +244,17 @@ async function checkMomentsStatus() {
     for (const p of momentsData.posts) {
         if (p.pendingLikeTime && !p.partnerLiked && now >= p.pendingLikeTime) {
             p.partnerLiked = true; p.pendingLikeTime = null; changed = true;
-            _qN('liked', p.id);
+            _pushNotif('liked', p.id);
         }
         if (p.pendingPartnerComment && now >= p.pendingPartnerComment.time) {
             const ppc = p.pendingPartnerComment;
-            p.comments.push({ id: _mUid('c'), authorType: 'partner', text: ppc.text, timestamp: ppc.time, isNew: true });
+            p.comments.push({
+                id: _mUid('c'), authorType: 'partner',
+                text: ppc.text, timestamp: ppc.time,
+                isNew: true, replyTo: ppc.replyTo || null
+            });
             p.pendingPartnerComment = null; changed = true;
-            if (!ppc.isSelfComment) _qN(p.type === 'user' ? 'commented' : 'replied', p.id);
+            if (!ppc.isSelfComment) _pushNotif(p.type === 'user' ? 'commented' : 'replied', p.id);
         }
     }
     if (changed) { saveMomentsData(); _updateBadge(); }
@@ -202,6 +290,9 @@ function getMomentsUnreadCount() {
     }
     return n;
 }
+function _countUnreadNotifs() {
+    return (momentsData.notifications || []).filter(n => !n.read).length;
+}
 function markPostRead(postId) {
     const p = momentsData.posts.find(p => p.id === postId);
     if (!p) return;
@@ -210,19 +301,25 @@ function markPostRead(postId) {
     saveMomentsData(); _updateBadge();
 }
 function _updateBadge() {
+    // 主页面角标
     const b = document.getElementById('moments-header-badge');
     if (b) b.style.display = getMomentsUnreadCount() > 0 ? 'inline-block' : 'none';
+    // 铃铛红点
     const bell = document.getElementById('cs-bell-dot');
-    if (bell) bell.style.display = getMomentsUnreadCount() > 0 ? 'block' : 'none';
+    if (bell) bell.style.display = _countUnreadNotifs() > 0 ? 'block' : 'none';
 }
 
 // ─────────────────────────────────
 //  UI：图片渲染
 // ─────────────────────────────────
 function _imgEl(src) {
-    const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
-    const attr = `style="width:100%;height:100%;object-fit:cover;cursor:pointer;" onclick="viewImage('${src}')"`;
-    return isCloud ? `<img data-lazy-cloud-ref="${src}" ${attr}>` : `<img src="${src}" ${attr}>`;
+    if (!src || typeof src !== 'string') return '';
+    const isCloud = src.indexOf('oss://') === 0;
+    // 避免 data URL 放进 onclick 属性导致问题
+    const clickable = !src.startsWith('data:');
+    const clickAttr = clickable ? `onclick="viewImage('${src}')" style="cursor:pointer;"` : '';
+    if (isCloud) return `<img data-lazy-cloud-ref="${src}" style="width:100%;height:100%;object-fit:cover;" ${clickAttr}>`;
+    return `<img src="${src}" style="width:100%;height:100%;object-fit:cover;" ${clickAttr}>`;
 }
 function _bindLazy(el) {
     if (!window.CloudMedia) return;
@@ -246,57 +343,230 @@ function _fmtDate(dateStr) {
     if (dateStr === today) return '今天';
     const d = new Date(dateStr);
     const now = new Date();
-    if (d.getFullYear() === now.getFullYear())
-        return `${d.getMonth()+1}月${d.getDate()}日`;
-    return dateStr;
+    return d.getFullYear() === now.getFullYear()
+        ? `${d.getMonth()+1}月${d.getDate()}日`
+        : dateStr;
 }
 
 // ─────────────────────────────────
-//  UI：帖子卡片（设计稿样式）
+//  UI：头像
 // ─────────────────────────────────
-function _renderCard(post, isDetail) {
+function _getAvSrc(isPartner) {
+    const cache = window._avatarCache || {};
+    if (isPartner) {
+        if (cache.partner) return cache.partner;
+        const el = document.getElementById('partner-avatar');
+        return el && el.src && !el.src.endsWith('/') ? el.src : null;
+    } else {
+        if (cache.me) return cache.me;
+        const el = document.getElementById('my-avatar');
+        return el && el.src && !el.src.endsWith('/') ? el.src : null;
+    }
+}
+function _avEl(isPartner, size) {
+    const src = _getAvSrc(isPartner);
+    const s = size || 36;
+    const fallback = isPartner ? '🌸' : '🙂';
+    return src
+        ? `<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;">`
+        : `<span style="font-size:${Math.round(s*0.5)}px;">${fallback}</span>`;
+}
+
+// ─────────────────────────────────
+//  UI：帖子卡片
+// ─────────────────────────────────
+let _openCmtPostId = null;
+let _replyInfo = null;
+
+function _renderCard(post) {
     const isPartner = post.type === 'partner';
-    const avCache   = window._avatarCache || {};
-    const avSrc     = isPartner ? avCache.partner : avCache.me;
-    const avInner   = avSrc ? `<img src="${avSrc}">` : (isPartner ? '🌸' : '🙂');
-    const name      = isPartner ? _mPName() : _mMName();
-    const likeOn    = isPartner ? post.userLiked : post.partnerLiked;
+    const name = isPartner ? _mPName() : _mMName();
+    const likeOn = post.userLiked || post.partnerLiked;
     const likeCount = (post.partnerLiked ? 1 : 0) + (post.userLiked ? 1 : 0);
-    const cmtCount  = post.comments.length;
-
-    // 评论预览（最多2条）
-    const previewCmts = post.comments.slice(-2);
-    const cmtPreviewHTML = previewCmts.length
-        ? `<div class="cs-cmt-preview">
-            ${previewCmts.map(c => {
-                const cName = c.authorType === 'partner' ? _mPName() : _mMName();
-                return `<div class="cs-cmt-preview-item"><span class="cs-cmt-author">${cName}：</span>${c.text}</div>`;
-            }).join('')}
-           </div>`
-        : '';
-
+    const cmtCount = post.comments.length;
+    const cmtOpen = _openCmtPostId === post.id;
+    const hasNew = post.isNewForUser || post.comments.some(c => c.authorType === 'partner' && c.isNew);
     const canDel = post.type === 'user';
 
-    return `<div class="cs-post">
-        <div class="cs-post-top" onclick="${!isDetail ? `_mOpenDetail('${post.id}')` : 'void 0'}">
-            <div class="cs-post-av">${avInner}</div>
-            <div class="cs-post-name">${name}</div>
+    return `<div class="cs-post" data-pid="${post.id}">
+        <div class="cs-post-top">
+            <div class="cs-post-av">${_avEl(isPartner, 36)}</div>
+            <div class="cs-post-name">${name}${hasNew ? '<span style="width:7px;height:7px;background:var(--accent-color);border-radius:50%;display:inline-block;margin-left:6px;vertical-align:middle;"></span>' : ''}</div>
             ${canDel ? `<button class="cs-post-del" onclick="event.stopPropagation();_mDeletePost('${post.id}')"><i class="fas fa-trash-alt"></i></button>` : '<div style="width:24px;"></div>'}
         </div>
-        <div class="cs-post-body" ${!isDetail ? `onclick="_mOpenDetail('${post.id}')"` : ''} style="cursor:${isDetail?'default':'pointer'}">${post.text}</div>
+        <div class="cs-post-body">${post.text}</div>
         ${_imgGrid(post.images)}
-        <div class="cs-post-foot" onclick="event.stopPropagation()">
+        <div class="cs-post-foot">
             <span class="cs-post-date">${_fmtDate(post.date)}</span>
-            <button class="cs-like-btn${likeOn?' on':''}" onclick="_mToggleLike('${post.id}')">
-                <i class="${likeOn?'fas':'far'} fa-heart"></i>${likeCount>0?' '+likeCount:''}
+            <button class="cs-like-btn${likeOn?' on':''}" onclick="event.stopPropagation();_mToggleLike('${post.id}')">
+                <i class="${likeOn?'fas':'far'} fa-heart"></i><span id="cs-lc-${post.id}">${likeCount>0?' '+likeCount:''}</span>
             </button>
-            <button class="cs-cmt-btn" onclick="_mOpenDetail('${post.id}')">
-                <i class="${cmtCount>0?'fas':'far'} fa-comment"></i>${cmtCount>0?' '+cmtCount:''}
+            <button class="cs-cmt-btn${cmtOpen?' on':''}" onclick="event.stopPropagation();_mToggleCmt('${post.id}')">
+                <i class="${cmtCount>0?'fas':'far'} fa-comment"></i><span id="cs-cc-${post.id}">${cmtCount>0?' '+cmtCount:''}</span>
             </button>
         </div>
-        ${!isDetail ? cmtPreviewHTML : ''}
+        <div class="cs-cmt-section" id="cs-cmt-${post.id}" style="display:${cmtOpen?'block':'none'};"></div>
     </div>`;
 }
+
+// ─────────────────────────────────
+//  UI：评论区渲染（内联）
+// ─────────────────────────────────
+function _renderCmtSection(postId) {
+    const section = document.getElementById('cs-cmt-' + postId);
+    if (!section) return;
+    const post = momentsData.posts.find(p => p.id === postId);
+    if (!post) return;
+    const isMyPost = _openCmtPostId === postId;
+    if (!isMyPost) { section.style.display = 'none'; return; }
+
+    const showAll = section.dataset.showAll === '1';
+    const MAX = 3;
+    const cmts = post.comments;
+    const toShow = showAll ? cmts : cmts.slice(0, MAX);
+    const needMore = !showAll && cmts.length > MAX;
+
+    let html = '<div class="cs-cmt-list">';
+    if (!cmts.length) {
+        html += '<div style="text-align:center;padding:10px 0;color:var(--text-secondary);font-size:12px;opacity:0.6;">还没有评论，来说点什么~</div>';
+    } else {
+        html += toShow.map(c => {
+            const isP = c.authorType === 'partner';
+            const cName = isP ? _mPName() : _mMName();
+            const replyPart = c.replyTo
+                ? ` <span style="color:var(--text-secondary);font-size:11px;">回复</span> <span style="color:var(--accent-color);">${c.replyTo.authorName}</span>`
+                : '';
+            const dot = isP && c.isNew ? '<span style="width:5px;height:5px;background:var(--accent-color);border-radius:50%;display:inline-block;margin-left:3px;vertical-align:middle;"></span>' : '';
+            return `<div class="cs-cmt-item">
+                <div class="cs-cmt-content">
+                    <span class="cs-cmt-name">${cName}</span>${replyPart}：
+                    <span class="cs-cmt-text">${c.text}${dot}</span>
+                </div>
+                <button class="cs-cmt-reply-btn" onclick="_mSetReply('${postId}','${c.id}','${cName}')">回复</button>
+            </div>`;
+        }).join('');
+        if (needMore) {
+            html += `<div class="cs-show-all-cmt" onclick="_mShowAllCmt('${postId}')">查看全部 ${cmts.length} 条评论</div>`;
+        }
+    }
+    html += '</div>';
+
+    const replyLabel = _replyInfo ? `回复 ${_replyInfo.authorName}：` : '';
+    html += `<div class="cs-cmt-input-area">
+        ${_replyInfo ? `<div class="cs-reply-label"><span>${replyLabel}</span><button onclick="_mCancelReply('${postId}')">✕</button></div>` : ''}
+        <div class="cs-cmt-row">
+            <input type="text" id="cs-ci-${postId}" class="cs-cmt-input-inline"
+                placeholder="${_replyInfo ? '回复…' : '发表评论…'}"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();_mSendComment('${postId}');}">
+            <button class="cs-cmt-send" onclick="_mSendComment('${postId}')"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>`;
+
+    section.innerHTML = html;
+    _bindLazy(section);
+    setTimeout(() => {
+        const inp = document.getElementById('cs-ci-' + postId);
+        if (inp) inp.focus();
+    }, 100);
+}
+
+window._mToggleCmt = function(postId) {
+    if (_openCmtPostId === postId) {
+        _openCmtPostId = null;
+        _replyInfo = null;
+        const s = document.getElementById('cs-cmt-' + postId);
+        if (s) s.style.display = 'none';
+        // update button style
+        const btn = document.querySelector(`[data-pid="${postId}"] .cs-cmt-btn`);
+        if (btn) btn.classList.remove('on');
+    } else {
+        // close previous
+        if (_openCmtPostId) {
+            const prev = document.getElementById('cs-cmt-' + _openCmtPostId);
+            if (prev) prev.style.display = 'none';
+            const prevBtn = document.querySelector(`[data-pid="${_openCmtPostId}"] .cs-cmt-btn`);
+            if (prevBtn) prevBtn.classList.remove('on');
+        }
+        _openCmtPostId = postId;
+        _replyInfo = null;
+        markPostRead(postId);
+        const s = document.getElementById('cs-cmt-' + postId);
+        if (s) { s.style.display = 'block'; _renderCmtSection(postId); }
+        const btn = document.querySelector(`[data-pid="${postId}"] .cs-cmt-btn`);
+        if (btn) btn.classList.add('on');
+    }
+};
+
+window._mSetReply = function(postId, commentId, authorName) {
+    _replyInfo = { commentId, authorName };
+    _renderCmtSection(postId);
+};
+window._mCancelReply = function(postId) {
+    _replyInfo = null; _renderCmtSection(postId);
+};
+window._mShowAllCmt = function(postId) {
+    const s = document.getElementById('cs-cmt-' + postId);
+    if (s) { s.dataset.showAll = '1'; _renderCmtSection(postId); }
+};
+
+window._mSendComment = function(postId) {
+    const inp = document.getElementById('cs-ci-' + postId);
+    if (!inp) return;
+    const text = inp.value.trim();
+    if (!text) return;
+    const post = momentsData.posts.find(p => p.id === postId);
+    if (!post) return;
+    post.comments.push({
+        id: _mUid('c'), authorType: 'user', text,
+        timestamp: Date.now(), isNew: false,
+        replyTo: _replyInfo ? { commentId: _replyInfo.commentId, authorName: _replyInfo.authorName } : null
+    });
+    saveMomentsData();
+    inp.value = ''; _replyInfo = null;
+    onUserCommented(postId);
+    // 更新评论数
+    const cc = document.getElementById('cs-cc-' + postId);
+    if (cc) cc.textContent = ' ' + post.comments.length;
+    const cmtBtn = document.querySelector(`[data-pid="${postId}"] .cs-cmt-btn i`);
+    if (cmtBtn) cmtBtn.className = 'fas fa-comment';
+    // 重新渲染评论区（不重渲整个 feed）
+    _renderCmtSection(postId);
+};
+
+// ─────────────────────────────────
+//  UI：点赞（用户可以给任何帖子点赞）
+// ─────────────────────────────────
+window._mToggleLike = function(postId) {
+    const p = momentsData.posts.find(p => p.id === postId);
+    if (!p) return;
+    if (p.type === 'partner') {
+        p.userLiked = !p.userLiked;
+    } else {
+        // 用户自己的帖子也可以点赞
+        p.userLiked = !p.userLiked;
+    }
+    saveMomentsData();
+    // 只更新这张卡的点赞按钮，不重渲整个 feed
+    const likeOn = p.userLiked || p.partnerLiked;
+    const likeCount = (p.partnerLiked ? 1 : 0) + (p.userLiked ? 1 : 0);
+    const btn = document.querySelector(`[data-pid="${postId}"] .cs-like-btn`);
+    if (btn) {
+        btn.className = 'cs-like-btn' + (likeOn ? ' on' : '');
+        btn.querySelector('i').className = likeOn ? 'fas fa-heart' : 'far fa-heart';
+    }
+    const lc = document.getElementById('cs-lc-' + postId);
+    if (lc) lc.textContent = likeCount > 0 ? ' ' + likeCount : '';
+};
+
+// ─────────────────────────────────
+//  UI：删除帖子
+// ─────────────────────────────────
+window._mDeletePost = function(postId) {
+    if (!confirm('确定删除这条动态吗？')) return;
+    momentsData.posts = momentsData.posts.filter(p => p.id !== postId);
+    if (_openCmtPostId === postId) _openCmtPostId = null;
+    saveMomentsData(); _csRenderFeed();
+};
 
 // ─────────────────────────────────
 //  UI：相识天数
@@ -316,25 +586,24 @@ function _updateDaysCounter() {
 }
 
 // ─────────────────────────────────
-//  UI：大头像更新
+//  UI：大头像
 // ─────────────────────────────────
 function _updateBigAvatars() {
-    const avCache = window._avatarCache || {};
     const ptEl = document.getElementById('cs-bav-partner');
     const meEl = document.getElementById('cs-bav-me');
-    if (ptEl) ptEl.innerHTML = avCache.partner
-        ? `<img src="${avCache.partner}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-        : '🌸';
-    if (meEl) meEl.innerHTML = avCache.me
-        ? `<img src="${avCache.me}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-        : '🙂';
+    if (ptEl) {
+        const src = _getAvSrc(true);
+        ptEl.innerHTML = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🌸';
+    }
+    if (meEl) {
+        const src = _getAvSrc(false);
+        meEl.innerHTML = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🙂';
+    }
 }
 
 // ─────────────────────────────────
-//  UI：打开情侣空间
+//  UI：主入口
 // ─────────────────────────────────
-let _csCurrentTab = 'feed';
-
 window.openCoupleSpace = window.openMomentsModal = function(scrollToPostId) {
     const page = document.getElementById('couple-space-page');
     if (!page) return;
@@ -354,13 +623,16 @@ window.closeCoupleSpace = window.closeMomentsModal = function() {
     const page = document.getElementById('couple-space-page');
     if (!page) return;
     page.classList.remove('cs-open');
+    // 关闭所有 sheet 和 popup
+    window.closeAllCsSheets();
+    const np = document.getElementById('cs-notif-popup');
+    if (np) np.style.display = 'none';
     setTimeout(() => { page.style.display = 'none'; }, 380);
 };
 
 window.csSwitchTab = function(tab) { _csSetTab(tab); if (tab === 'feed') _csRenderFeed(); };
 
 function _csSetTab(tab) {
-    _csCurrentTab = tab;
     document.querySelectorAll('.cs-panel').forEach(p => p.classList.remove('cs-panel-active'));
     const panel = document.getElementById('cs-panel-' + tab);
     if (panel) panel.classList.add('cs-panel-active');
@@ -376,8 +648,13 @@ function _csRenderFeed() {
         list.innerHTML = `<div class="cs-empty"><i class="fas fa-wind"></i><div class="cs-empty-label">还没有动态<br>来发第一条吧~</div></div>`;
         return;
     }
-    list.innerHTML = momentsData.posts.map(p => _renderCard(p, false)).join('');
+    list.innerHTML = momentsData.posts.map(p => _renderCard(p)).join('');
     _bindLazy(list);
+    // 如果有展开的评论区，重新渲染
+    if (_openCmtPostId) {
+        const s = document.getElementById('cs-cmt-' + _openCmtPostId);
+        if (s) { s.style.display = 'block'; _renderCmtSection(_openCmtPostId); }
+    }
 }
 
 function _csScrollTo(postId) {
@@ -387,84 +664,6 @@ function _csScrollTo(postId) {
     const cards = panel.querySelectorAll('.cs-post');
     if (cards[idx]) cards[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-
-// ─────────────────────────────────
-//  UI：详情 sheet
-// ─────────────────────────────────
-let _detailPostId = null;
-
-window._mOpenDetail = function(postId) {
-    _detailPostId = postId;
-    markPostRead(postId);
-    _csRenderDetail(postId);
-    _openSheet('cs-detail-sheet');
-    _csRenderFeed();
-};
-
-window.closeCsDetail = function() {
-    _closeSheet('cs-detail-sheet');
-    _detailPostId = null;
-};
-
-function _csRenderDetail(postId) {
-    const post = momentsData.posts.find(p => p.id === postId);
-    if (!post) return;
-    const body = document.getElementById('cs-detail-body');
-    if (!body) return;
-    const cmts = post.comments.map(c => {
-        const isP = c.authorType === 'partner';
-        const dot = isP && c.isNew ? '<span style="width:6px;height:6px;background:var(--accent-color);border-radius:50%;display:inline-block;margin-left:4px;vertical-align:middle;"></span>' : '';
-        return `<div style="display:flex;gap:8px;margin-bottom:10px;font-size:13px;align-items:flex-start;">
-            <span style="font-weight:600;color:var(--accent-color);flex-shrink:0;">${isP?_mPName():_mMName()}：</span>
-            <span style="color:var(--text-primary);line-height:1.55;">${c.text}${dot}</span>
-        </div>`;
-    }).join('');
-    body.innerHTML = `${_renderCard(post, true)}
-        <div style="margin-top:16px;">
-            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;font-weight:600;">评论 ${post.comments.length}</div>
-            ${cmts || '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:13px;opacity:0.6;">还没有评论，来说点什么~</div>'}
-        </div>`;
-    _bindLazy(body);
-}
-
-// ─────────────────────────────────
-//  UI：删除帖子
-// ─────────────────────────────────
-window._mDeletePost = function(postId) {
-    if (!confirm('确定删除这条动态吗？')) return;
-    momentsData.posts = momentsData.posts.filter(p => p.id !== postId);
-    saveMomentsData();
-    _csRenderFeed();
-};
-
-// ─────────────────────────────────
-//  UI：点赞
-// ─────────────────────────────────
-window._mToggleLike = function(postId) {
-    const p = momentsData.posts.find(p => p.id === postId);
-    if (!p) return;
-    if (p.type === 'partner') p.userLiked = !p.userLiked;
-    saveMomentsData();
-    _csRenderFeed();
-    if (_detailPostId === postId) _csRenderDetail(postId);
-};
-
-// ─────────────────────────────────
-//  UI：评论
-// ─────────────────────────────────
-window.sendCsComment = function() {
-    const input = document.getElementById('cs-comment-input');
-    if (!input || !_detailPostId) return;
-    const text = input.value.trim();
-    if (!text) return;
-    const post = momentsData.posts.find(p => p.id === _detailPostId);
-    if (!post) return;
-    post.comments.push({ id: _mUid('c'), authorType: 'user', text, timestamp: Date.now(), isNew: false });
-    saveMomentsData();
-    input.value = '';
-    onUserCommented(_detailPostId);
-    _csRenderDetail(_detailPostId);
-};
 
 // ─────────────────────────────────
 //  UI：发帖 sheet
@@ -479,7 +678,6 @@ window.openCsCompose = function() {
     _openSheet('cs-compose-sheet');
     setTimeout(() => { const ta = document.getElementById('cs-compose-text'); if(ta) ta.focus(); }, 350);
 };
-
 window.closeCsCompose = function() { _closeSheet('cs-compose-sheet'); _composeImgs = []; };
 
 window.onCsImagesSelected = function(input) {
@@ -500,7 +698,6 @@ function _refreshPreviews() {
     const cnt = document.getElementById('cs-image-count');
     if (cnt) cnt.textContent = _composeImgs.length > 0 ? `${_composeImgs.length}/6` : '';
 }
-
 window._mDelImg = function(i) { _composeImgs.splice(i, 1); _refreshPreviews(); };
 
 window.submitCsPost = async function() {
@@ -513,8 +710,10 @@ window.submitCsPost = async function() {
         let images = [];
         for (const d of _composeImgs) {
             if (window.CloudSync && window.CloudSync.isConnected() && window.CloudMedia) {
-                try { images.push(await window.CloudMedia.upload(d, 'moments-img')); }
-                catch(e) { images.push(d); }
+                try {
+                    const r = await window.CloudMedia.upload(d, 'moments-img');
+                    images.push(r && r.url ? r.url : d);
+                } catch(e) { images.push(d); }
             } else { images.push(d); }
         }
         const post = {
@@ -556,7 +755,6 @@ window.closeAllCsSheets = function() {
     document.querySelectorAll('.cs-sheet').forEach(s => s.classList.remove('cs-sheet-open'));
     const o = document.getElementById('cs-overlay');
     if (o) o.classList.remove('cs-overlay-on');
-    _detailPostId = null;
 };
 
 // ─────────────────────────────────
@@ -564,7 +762,10 @@ window.closeAllCsSheets = function() {
 // ─────────────────────────────────
 window._openMomentsPost = function(postId) {
     window.openCoupleSpace();
-    setTimeout(() => window._mOpenDetail(postId), 400);
+    setTimeout(() => {
+        _csScrollTo(postId);
+        setTimeout(() => _mToggleCmt(postId), 300);
+    }, 400);
 };
 
 // ─────────────────────────────────

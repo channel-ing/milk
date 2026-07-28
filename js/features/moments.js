@@ -329,6 +329,7 @@ function _renderCard(post){
     const likeOn=post.userLiked;
     const likeCount=(post.partnerLiked?1:0)+(post.userLiked?1:0);
     const cmtCount=post.comments.length;
+    const userCommented=post.comments.some(c=>c.authorType==='user');
     const canDel=post.type==='user';
     const hasNew=post.isNewForUser||post.comments.some(c=>c.authorType==='partner'&&c.isNew);
     const likers=[];if(post.partnerLiked)likers.push(_mPName());if(post.userLiked)likers.push(_mMName());
@@ -346,7 +347,7 @@ function _renderCard(post){
                 <i class="${likeOn?'fas':'far'} fa-heart"></i><span id="cs-lc-${post.id}">${likeCount>0?' '+likeCount:''}</span>
             </button>
             <button class="cs-cmt-btn" onclick="event.stopPropagation();window._mFocusCmt('${post.id}')">
-                <i class="${cmtCount>0?'fas':'far'} fa-comment"></i><span id="cs-cc-${post.id}">${cmtCount>0?' '+cmtCount:''}</span>
+                <i class="${userCommented?'fas':'far'} fa-comment"></i><span id="cs-cc-${post.id}">${cmtCount>0?' '+cmtCount:''}</span>
             </button>
         </div>
         <div class="cs-likes-row" id="cs-lr-${post.id}" style="display:${likers.length?'flex':'none'};">

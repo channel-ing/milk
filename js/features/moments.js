@@ -1,19 +1,12 @@
 /**
  * moments.js — 情侣空间：动态功能
- * 数据逻辑 + 情侣空间全屏 UI
+ * 数据逻辑 + 全屏 UI（对照设计稿）
  */
 
 // ─────────────────────────────────
 //  数据结构
 // ─────────────────────────────────
 let momentsData = { posts: [] };
-
-// Post { id, type:'partner'|'user', text, images:string[],
-//   date:'YYYY-MM-DD', timestamp, isNewForUser,
-//   userLiked, partnerLiked, pendingLikeTime,
-//   comments:Comment[], pendingPartnerComment:{text,time,isSelfComment?},
-//   chainProbability:number|null }
-// Comment { id, authorType:'partner'|'user', text, timestamp, isNew }
 
 // ─────────────────────────────────
 //  常量
@@ -219,17 +212,17 @@ function markPostRead(postId) {
 function _updateBadge() {
     const b = document.getElementById('moments-header-badge');
     if (b) b.style.display = getMomentsUnreadCount() > 0 ? 'inline-block' : 'none';
+    const bell = document.getElementById('cs-bell-dot');
+    if (bell) bell.style.display = getMomentsUnreadCount() > 0 ? 'block' : 'none';
 }
 
 // ─────────────────────────────────
 //  UI：图片渲染
 // ─────────────────────────────────
-function _imgEl(src, cls) {
+function _imgEl(src) {
     const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
-    const attr = `class="${cls||''}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;" onclick="viewImage('${src}')"`;
-    return isCloud
-        ? `<img data-lazy-cloud-ref="${src}" ${attr}>`
-        : `<img src="${src}" ${attr}>`;
+    const attr = `style="width:100%;height:100%;object-fit:cover;cursor:pointer;" onclick="viewImage('${src}')"`;
+    return isCloud ? `<img data-lazy-cloud-ref="${src}" ${attr}>` : `<img src="${src}" ${attr}>`;
 }
 function _bindLazy(el) {
     if (!window.CloudMedia) return;
@@ -238,58 +231,107 @@ function _bindLazy(el) {
 }
 function _imgGrid(images) {
     if (!images || !images.length) return '';
-    const n = images.length;
-    const cols = n === 1 ? '1fr' : n === 2 ? '1fr 1fr' : '1fr 1fr 1fr';
-    return `<div class="cs-post-imgs n${Math.min(n,6)}" style="grid-template-columns:${cols};">
-        ${images.map(src => `<div style="aspect-ratio:1;overflow:hidden;border-radius:8px;">${_imgEl(src)}</div>`).join('')}
+    const n = Math.min(images.length, 6);
+    return `<div class="cs-post-imgs n${n}">
+        ${images.slice(0, n).map(src => `<div style="aspect-ratio:1;overflow:hidden;border-radius:8px;">${_imgEl(src)}</div>`).join('')}
     </div>`;
 }
 
 // ─────────────────────────────────
-//  UI：帖子卡片
+//  UI：日期格式化
+// ─────────────────────────────────
+function _fmtDate(dateStr) {
+    if (!dateStr) return '';
+    const today = _mToday();
+    if (dateStr === today) return '今天';
+    const d = new Date(dateStr);
+    const now = new Date();
+    if (d.getFullYear() === now.getFullYear())
+        return `${d.getMonth()+1}月${d.getDate()}日`;
+    return dateStr;
+}
+
+// ─────────────────────────────────
+//  UI：帖子卡片（设计稿样式）
 // ─────────────────────────────────
 function _renderCard(post, isDetail) {
     const isPartner = post.type === 'partner';
-    const avCache = window._avatarCache || {};
-    const avSrc   = isPartner ? avCache.partner : avCache.me;
-    const avInner = avSrc
-        ? `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;">`
-        : (isPartner ? '🌸' : '🙂');
-    const name    = isPartner ? _mPName() : _mMName();
-    const MAX = 120;
-    const needExpand = !isDetail && post.text.length > MAX;
-    const textHTML = needExpand
-        ? `<div id="mpt-${post.id}" class="cs-post-body" style="-webkit-line-clamp:4;-webkit-box-orient:vertical;display:-webkit-box;overflow:hidden;">${post.text}</div>
-           <button onclick="event.stopPropagation();_mExpand('${post.id}')" style="background:none;border:none;color:var(--accent-color);font-size:12px;padding:0 14px 10px;cursor:pointer;">展开全文</button>`
-        : `<div class="cs-post-body">${post.text}</div>`;
-    const likeCount = (post.partnerLiked ? 1 : 0) + (post.userLiked ? 1 : 0);
+    const avCache   = window._avatarCache || {};
+    const avSrc     = isPartner ? avCache.partner : avCache.me;
+    const avInner   = avSrc ? `<img src="${avSrc}">` : (isPartner ? '🌸' : '🙂');
+    const name      = isPartner ? _mPName() : _mMName();
     const likeOn    = isPartner ? post.userLiked : post.partnerLiked;
+    const likeCount = (post.partnerLiked ? 1 : 0) + (post.userLiked ? 1 : 0);
     const cmtCount  = post.comments.length;
-    const hasNew    = post.isNewForUser || post.comments.some(c => c.authorType === 'partner' && c.isNew);
-    return `<div class="cs-post" ${!isDetail ? `onclick="_mOpenDetail('${post.id}')"` : ''}>
-        <div class="cs-post-head">
+
+    // 评论预览（最多2条）
+    const previewCmts = post.comments.slice(-2);
+    const cmtPreviewHTML = previewCmts.length
+        ? `<div class="cs-cmt-preview">
+            ${previewCmts.map(c => {
+                const cName = c.authorType === 'partner' ? _mPName() : _mMName();
+                return `<div class="cs-cmt-preview-item"><span class="cs-cmt-author">${cName}：</span>${c.text}</div>`;
+            }).join('')}
+           </div>`
+        : '';
+
+    const canDel = post.type === 'user';
+
+    return `<div class="cs-post">
+        <div class="cs-post-top" onclick="${!isDetail ? `_mOpenDetail('${post.id}')` : 'void 0'}">
             <div class="cs-post-av">${avInner}</div>
-            <div class="cs-post-meta" style="flex:1;">
-                <div class="cs-post-name">${name}</div>
-                <div class="cs-post-date">${post.date}</div>
-            </div>
-            ${hasNew && !isDetail ? '<div class="cs-new-dot"></div>' : ''}
+            <div class="cs-post-name">${name}</div>
+            ${canDel ? `<button class="cs-post-del" onclick="event.stopPropagation();_mDeletePost('${post.id}')"><i class="fas fa-trash-alt"></i></button>` : '<div style="width:24px;"></div>'}
         </div>
-        ${textHTML}
+        <div class="cs-post-body" ${!isDetail ? `onclick="_mOpenDetail('${post.id}')"` : ''} style="cursor:${isDetail?'default':'pointer'}">${post.text}</div>
         ${_imgGrid(post.images)}
         <div class="cs-post-foot" onclick="event.stopPropagation()">
-            <button class="cs-like-btn${likeOn ? ' on' : ''}" onclick="_mToggleLike('${post.id}')">
-                <i class="${likeOn ? 'fas' : 'far'} fa-heart"></i>${likeCount > 0 ? ` ${likeCount}` : ''}
+            <span class="cs-post-date">${_fmtDate(post.date)}</span>
+            <button class="cs-like-btn${likeOn?' on':''}" onclick="_mToggleLike('${post.id}')">
+                <i class="${likeOn?'fas':'far'} fa-heart"></i>${likeCount>0?' '+likeCount:''}
             </button>
             <button class="cs-cmt-btn" onclick="_mOpenDetail('${post.id}')">
-                <i class="far fa-comment"></i>${cmtCount > 0 ? ` ${cmtCount}` : ' 评论'}
+                <i class="${cmtCount>0?'fas':'far'} fa-comment"></i>${cmtCount>0?' '+cmtCount:''}
             </button>
         </div>
+        ${!isDetail ? cmtPreviewHTML : ''}
     </div>`;
 }
 
 // ─────────────────────────────────
-//  UI：情侣空间主页面
+//  UI：相识天数
+// ─────────────────────────────────
+function _updateDaysCounter() {
+    const el = document.getElementById('cs-days-num');
+    if (!el) return;
+    try {
+        const list = Array.isArray(anniversaries) ? anniversaries : [];
+        const main = list.find(a => a.type === 'anniversary') || list[0];
+        if (main && main.date) {
+            const diff = Math.floor((Date.now() - new Date(main.date)) / 86400000) + 1;
+            if (diff > 0) { el.textContent = diff; return; }
+        }
+    } catch(e) {}
+    el.textContent = '---';
+}
+
+// ─────────────────────────────────
+//  UI：大头像更新
+// ─────────────────────────────────
+function _updateBigAvatars() {
+    const avCache = window._avatarCache || {};
+    const ptEl = document.getElementById('cs-bav-partner');
+    const meEl = document.getElementById('cs-bav-me');
+    if (ptEl) ptEl.innerHTML = avCache.partner
+        ? `<img src="${avCache.partner}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+        : '🌸';
+    if (meEl) meEl.innerHTML = avCache.me
+        ? `<img src="${avCache.me}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+        : '🙂';
+}
+
+// ─────────────────────────────────
+//  UI：打开情侣空间
 // ─────────────────────────────────
 let _csCurrentTab = 'feed';
 
@@ -301,6 +343,8 @@ window.openCoupleSpace = window.openMomentsModal = function(scrollToPostId) {
         page.classList.add('cs-open');
         _csSetTab('feed');
         _csRenderFeed();
+        _updateBigAvatars();
+        _updateDaysCounter();
         _updateBadge();
         if (scrollToPostId) setTimeout(() => _csScrollTo(scrollToPostId), 350);
     }));
@@ -310,30 +354,19 @@ window.closeCoupleSpace = window.closeMomentsModal = function() {
     const page = document.getElementById('couple-space-page');
     if (!page) return;
     page.classList.remove('cs-open');
-    // 也关 FAB
-    const fab = document.getElementById('cs-fab');
-    if (fab) fab.classList.remove('cs-fab-visible');
     setTimeout(() => { page.style.display = 'none'; }, 380);
 };
 
-window.csSwitchTab = function(tab) {
-    _csSetTab(tab);
-    if (tab === 'feed') _csRenderFeed();
-};
+window.csSwitchTab = function(tab) { _csSetTab(tab); if (tab === 'feed') _csRenderFeed(); };
 
 function _csSetTab(tab) {
     _csCurrentTab = tab;
-    // 切换 panel
     document.querySelectorAll('.cs-panel').forEach(p => p.classList.remove('cs-panel-active'));
     const panel = document.getElementById('cs-panel-' + tab);
     if (panel) panel.classList.add('cs-panel-active');
-    // 切换 tab 按钮高亮
-    document.querySelectorAll('.cs-tab-btn').forEach(b => b.classList.remove('cs-tab-on'));
-    const btn = document.getElementById('cs-tbbtn-' + tab);
-    if (btn) btn.classList.add('cs-tab-on');
-    // FAB 只在动态 tab 显示
-    const fab = document.getElementById('cs-fab');
-    if (fab) fab.classList.toggle('cs-fab-visible', tab === 'feed');
+    document.querySelectorAll('.cs-pill').forEach(b => b.classList.remove('cs-pill-on'));
+    const btn = document.getElementById('csp-' + tab);
+    if (btn) btn.classList.add('cs-pill-on');
 }
 
 function _csRenderFeed() {
@@ -345,16 +378,6 @@ function _csRenderFeed() {
     }
     list.innerHTML = momentsData.posts.map(p => _renderCard(p, false)).join('');
     _bindLazy(list);
-    // 刷新头像展示
-    _csUpdateHeaderAvatars();
-}
-
-function _csUpdateHeaderAvatars() {
-    const avCache = window._avatarCache || {};
-    const me = document.getElementById('cs-hav-me');
-    const pt = document.getElementById('cs-hav-partner');
-    if (me) me.innerHTML = avCache.me ? `<img src="${avCache.me}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🙂';
-    if (pt) pt.innerHTML = avCache.partner ? `<img src="${avCache.partner}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🌸';
 }
 
 function _csScrollTo(postId) {
@@ -366,7 +389,7 @@ function _csScrollTo(postId) {
 }
 
 // ─────────────────────────────────
-//  UI：详情 bottom sheet
+//  UI：详情 sheet
 // ─────────────────────────────────
 let _detailPostId = null;
 
@@ -375,7 +398,7 @@ window._mOpenDetail = function(postId) {
     markPostRead(postId);
     _csRenderDetail(postId);
     _openSheet('cs-detail-sheet');
-    _csRenderFeed(); // 刷新已读状态
+    _csRenderFeed();
 };
 
 window.closeCsDetail = function() {
@@ -392,17 +415,27 @@ function _csRenderDetail(postId) {
         const isP = c.authorType === 'partner';
         const dot = isP && c.isNew ? '<span style="width:6px;height:6px;background:var(--accent-color);border-radius:50%;display:inline-block;margin-left:4px;vertical-align:middle;"></span>' : '';
         return `<div style="display:flex;gap:8px;margin-bottom:10px;font-size:13px;align-items:flex-start;">
-            <span style="font-weight:600;color:var(--accent-color);flex-shrink:0;">${isP ? _mPName() : _mMName()}：</span>
+            <span style="font-weight:600;color:var(--accent-color);flex-shrink:0;">${isP?_mPName():_mMName()}：</span>
             <span style="color:var(--text-primary);line-height:1.55;">${c.text}${dot}</span>
         </div>`;
     }).join('');
     body.innerHTML = `${_renderCard(post, true)}
         <div style="margin-top:16px;">
-            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;font-weight:600;padding:0 2px;">评论 ${post.comments.length}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;font-weight:600;">评论 ${post.comments.length}</div>
             ${cmts || '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:13px;opacity:0.6;">还没有评论，来说点什么~</div>'}
         </div>`;
     _bindLazy(body);
 }
+
+// ─────────────────────────────────
+//  UI：删除帖子
+// ─────────────────────────────────
+window._mDeletePost = function(postId) {
+    if (!confirm('确定删除这条动态吗？')) return;
+    momentsData.posts = momentsData.posts.filter(p => p.id !== postId);
+    saveMomentsData();
+    _csRenderFeed();
+};
 
 // ─────────────────────────────────
 //  UI：点赞
@@ -414,17 +447,6 @@ window._mToggleLike = function(postId) {
     saveMomentsData();
     _csRenderFeed();
     if (_detailPostId === postId) _csRenderDetail(postId);
-};
-
-// ─────────────────────────────────
-//  UI：展开文字
-// ─────────────────────────────────
-window._mExpand = function(postId) {
-    const el = document.getElementById('mpt-' + postId);
-    if (!el) return;
-    el.style.cssText = 'padding:0 14px 10px;font-size:14px;color:var(--text-primary);line-height:1.65;';
-    const btn = el.nextElementSibling;
-    if (btn && btn.tagName === 'BUTTON') btn.remove();
 };
 
 // ─────────────────────────────────
@@ -445,7 +467,7 @@ window.sendCsComment = function() {
 };
 
 // ─────────────────────────────────
-//  UI：发帖 bottom sheet
+//  UI：发帖 sheet
 // ─────────────────────────────────
 let _composeImgs = [];
 
@@ -458,29 +480,23 @@ window.openCsCompose = function() {
     setTimeout(() => { const ta = document.getElementById('cs-compose-text'); if(ta) ta.focus(); }, 350);
 };
 
-window.closeCsCompose = function() {
-    _closeSheet('cs-compose-sheet');
-    _composeImgs = [];
-};
+window.closeCsCompose = function() { _closeSheet('cs-compose-sheet'); _composeImgs = []; };
 
 window.onCsImagesSelected = function(input) {
     const files = Array.from(input.files);
     const rem = 6 - _composeImgs.length;
     if (rem <= 0) { alert('最多 6 张'); return; }
     Promise.all(files.slice(0, rem).map(f => optimizeImage(f, 800, 0.75))).then(results => {
-        results.forEach(d => _composeImgs.push(d));
-        _refreshPreviews();
+        results.forEach(d => _composeImgs.push(d)); _refreshPreviews();
     });
     input.value = '';
 };
 
 function _refreshPreviews() {
     const wrap = document.getElementById('cs-compose-previews');
-    if (wrap) wrap.innerHTML = _composeImgs.map((d, i) => `
-        <div class="cs-prev-thumb">
-            <img src="${d}">
-            <button class="cs-prev-del" onclick="_mDelImg(${i})">✕</button>
-        </div>`).join('');
+    if (wrap) wrap.innerHTML = _composeImgs.map((d, i) =>
+        `<div class="cs-prev-thumb"><img src="${d}"><button class="cs-prev-del" onclick="_mDelImg(${i})">✕</button></div>`
+    ).join('');
     const cnt = document.getElementById('cs-image-count');
     if (cnt) cnt.textContent = _composeImgs.length > 0 ? `${_composeImgs.length}/6` : '';
 }
@@ -488,7 +504,7 @@ function _refreshPreviews() {
 window._mDelImg = function(i) { _composeImgs.splice(i, 1); _refreshPreviews(); };
 
 window.submitCsPost = async function() {
-    const ta  = document.getElementById('cs-compose-text');
+    const ta = document.getElementById('cs-compose-text');
     const text = ta ? ta.value.trim() : '';
     if (!text) { if(ta) ta.focus(); return; }
     const btn = document.getElementById('cs-submit-btn');
@@ -501,10 +517,9 @@ window.submitCsPost = async function() {
                 catch(e) { images.push(d); }
             } else { images.push(d); }
         }
-        const now = Date.now();
         const post = {
             id: _mUid('user'), type: 'user',
-            text, images, date: _mToday(), timestamp: now,
+            text, images, date: _mToday(), timestamp: Date.now(),
             isNewForUser: false, userLiked: false,
             partnerLiked: false, pendingLikeTime: null,
             comments: [], pendingPartnerComment: null, chainProbability: null,
@@ -520,27 +535,27 @@ window.submitCsPost = async function() {
 };
 
 // ─────────────────────────────────
-//  UI：sheet 开关
+//  UI：sheet 控制
 // ─────────────────────────────────
 function _openSheet(id) {
-    const sheet   = document.getElementById(id);
-    const overlay = document.getElementById('cs-overlay');
-    if (!sheet) return;
-    sheet.classList.add('cs-sheet-open');
-    if (overlay) overlay.classList.add('cs-overlay-on');
+    const s = document.getElementById(id);
+    const o = document.getElementById('cs-overlay');
+    if (s) s.classList.add('cs-sheet-open');
+    if (o) o.classList.add('cs-overlay-on');
 }
 function _closeSheet(id) {
-    const sheet   = document.getElementById(id);
-    const overlay = document.getElementById('cs-overlay');
-    if (sheet) sheet.classList.remove('cs-sheet-open');
-    // 如果两个 sheet 都关了才关遮罩
+    const s = document.getElementById(id);
+    if (s) s.classList.remove('cs-sheet-open');
     const anyOpen = document.querySelectorAll('.cs-sheet.cs-sheet-open').length > 0;
-    if (!anyOpen && overlay) overlay.classList.remove('cs-overlay-on');
+    if (!anyOpen) {
+        const o = document.getElementById('cs-overlay');
+        if (o) o.classList.remove('cs-overlay-on');
+    }
 }
 window.closeAllCsSheets = function() {
     document.querySelectorAll('.cs-sheet').forEach(s => s.classList.remove('cs-sheet-open'));
-    const overlay = document.getElementById('cs-overlay');
-    if (overlay) overlay.classList.remove('cs-overlay-on');
+    const o = document.getElementById('cs-overlay');
+    if (o) o.classList.remove('cs-overlay-on');
     _detailPostId = null;
 };
 

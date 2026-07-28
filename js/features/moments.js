@@ -190,6 +190,28 @@ function _imgGrid(images){
     if(!images||!images.length)return'';const n=Math.min(images.length,6);
     return`<div class="cs-post-imgs n${n}">${images.slice(0,n).map(src=>`<div style="aspect-ratio:1;overflow:hidden;border-radius:8px;">${_imgEl(src)}</div>`).join('')}</div>`;
 }
+function _videoThumb(videoSrc, coverSrc){
+    const cover=coverSrc||'';
+    const isCloud=cover.indexOf('oss://')===0;
+    const coverTag=cover?(isCloud?`<img data-lazy-cloud-ref="${cover}" class="cs-video-cover">`:`<img src="${cover}" class="cs-video-cover">`):`<div class="cs-video-cover cs-video-cover-empty"><i class="fas fa-film"></i></div>`;
+    return`<div class="cs-video-thumb" onclick="window.openCsVideoPlayer('${videoSrc}')">${coverTag}<div class="cs-video-play-btn"><i class="fas fa-play"></i></div></div>`;
+}
+window.openCsVideoPlayer=function(src){
+    const overlay=document.getElementById('cs-video-player-overlay');
+    const player=document.getElementById('cs-video-player');
+    if(!overlay||!player)return;
+    const isCloud=src.indexOf('oss://')===0;
+    if(isCloud&&window.CloudMedia){
+        window.CloudMedia.getUrl(src).then(url=>{player.src=url;player.play();}).catch(()=>{player.src=src;player.play();});
+    }else{player.src=src;player.play();}
+    overlay.style.display='flex';
+};
+window.closeCsVideoPlayer=function(){
+    const overlay=document.getElementById('cs-video-player-overlay');
+    const player=document.getElementById('cs-video-player');
+    if(player){player.pause();player.src='';}
+    if(overlay)overlay.style.display='none';
+};
 function _fmtDate(d){if(!d)return'';if(d===_mToday())return'今天';const dt=new Date(d),now=new Date();return dt.getFullYear()===now.getFullYear()?`${dt.getMonth()+1}月${dt.getDate()}日`:d;}
 
 // ─── 头像 ───
@@ -317,7 +339,7 @@ function _renderCard(post){
             ${canDel?`<button class="cs-post-del" onclick="event.stopPropagation();window._mDeletePost('${post.id}')"><i class="fas fa-trash-alt"></i></button>`:'<div style="width:24px;"></div>'}
         </div>
         <div class="cs-post-body">${post.text}</div>
-        ${_imgGrid(post.images)}
+        ${post.video?_videoThumb(post.video,post.videoCover):_imgGrid(post.images)}
         <div class="cs-post-foot">
             <span class="cs-post-date">${_fmtDate(post.date)}</span>
             <button class="cs-like-btn${likeOn?' on':''}" id="cs-lbtn-${post.id}" onclick="event.stopPropagation();window._mToggleLike('${post.id}')">
@@ -408,18 +430,111 @@ function _csRenderFeed(){
 function _csScrollTo(postId){const idx=momentsData.posts.findIndex(p=>p.id===postId);const panel=document.getElementById('cs-panel-feed');if(!panel||idx<0)return;const cards=panel.querySelectorAll('.cs-post');if(cards[idx])cards[idx].scrollIntoView({behavior:'smooth',block:'start'});}
 
 // ─── 发帖 sheet ───
-let _composeImgs=[];
-window.openCsCompose=function(){_composeImgs=[];const ta=document.getElementById('cs-compose-text');if(ta)ta.value='';_refreshPreviews();_openSheet('cs-compose-sheet');setTimeout(()=>{const ta=document.getElementById('cs-compose-text');if(ta)ta.focus();},350);};
-window.closeCsCompose=function(){_closeSheet('cs-compose-sheet');_composeImgs=[];};
-window.onCsImagesSelected=function(input){const files=Array.from(input.files),rem=6-_composeImgs.length;if(rem<=0){alert('最多 6 张');return;}Promise.all(files.slice(0,rem).map(f=>optimizeImage(f,800,0.75))).then(results=>{results.forEach(d=>_composeImgs.push(d));_refreshPreviews();});input.value='';};
-function _refreshPreviews(){const wrap=document.getElementById('cs-compose-previews');if(wrap)wrap.innerHTML=_composeImgs.map((d,i)=>`<div class="cs-prev-thumb"><img src="${d}"><button class="cs-prev-del" onclick="window._mDelImg(${i})">✕</button></div>`).join('');const cnt=document.getElementById('cs-image-count');if(cnt)cnt.textContent=_composeImgs.length>0?`${_composeImgs.length}/6`:'';}
-window._mDelImg=function(i){_composeImgs.splice(i,1);_refreshPreviews();};
+const _VIDEO_MAX_BYTES = 50 * 1024 * 1024; // 50MB
+let _composeImgs=[], _composeVideo=null; // _composeVideo = { file, coverB64, blobUrl }
+
+function _setComposeModeImg(on){
+    const imgBtn=document.getElementById('cs-add-img-btn'),vidBtn=document.getElementById('cs-add-video-btn');
+    if(imgBtn)imgBtn.disabled=on?false:!!_composeVideo;
+    if(vidBtn)vidBtn.disabled=on?!!_composeImgs.length:false;
+}
+
+window.openCsCompose=function(){
+    _composeImgs=[];_composeVideo=null;
+    const ta=document.getElementById('cs-compose-text');if(ta)ta.value='';
+    _refreshPreviews();_openSheet('cs-compose-sheet');
+    _setComposeModeImg(true);
+    setTimeout(()=>{const ta=document.getElementById('cs-compose-text');if(ta)ta.focus();},350);
+};
+window.closeCsCompose=function(){
+    _closeSheet('cs-compose-sheet');
+    if(_composeVideo&&_composeVideo.blobUrl)URL.revokeObjectURL(_composeVideo.blobUrl);
+    _composeImgs=[];_composeVideo=null;
+};
+window.onCsImagesSelected=function(input){
+    if(_composeVideo){input.value='';return;}
+    const files=Array.from(input.files),rem=6-_composeImgs.length;
+    if(rem<=0){alert('最多 6 张');return;}
+    Promise.all(files.slice(0,rem).map(f=>optimizeImage(f,800,0.75))).then(results=>{
+        results.forEach(d=>_composeImgs.push(d));_refreshPreviews();
+        const vidBtn=document.getElementById('cs-add-video-btn');if(vidBtn)vidBtn.disabled=true;
+    });
+    input.value='';
+};
+window.onCsVideoClick=function(){
+    if(_composeImgs.length>0){alert('图片和视频不能同时发布，请先清除已选图片');return;}
+    document.getElementById('cs-video-input').click();
+};
+window.onCsVideoSelected=function(input){
+    const file=input.files[0];if(!file)return;
+    if(file.size>_VIDEO_MAX_BYTES){alert('视频太大啦，最多支持 50MB 哦');input.value='';return;}
+    if(!(window.CloudSync&&window.CloudSync.isConnected())){
+        alert('上传视频需要先配置云存储，视频文件太大无法保存在本地');input.value='';return;
+    }
+    const blobUrl=URL.createObjectURL(file);
+    // 取第一帧作封面
+    const vid=document.createElement('video');vid.src=blobUrl;vid.muted=true;vid.playsInline=true;
+    vid.addEventListener('loadeddata',()=>{
+        vid.currentTime=0.1;
+    });
+    vid.addEventListener('seeked',()=>{
+        const cvs=document.createElement('canvas');cvs.width=vid.videoWidth||320;cvs.height=vid.videoHeight||240;
+        cvs.getContext('2d').drawImage(vid,0,0,cvs.width,cvs.height);
+        const coverB64=cvs.toDataURL('image/jpeg',0.7);
+        _composeVideo={file,coverB64,blobUrl};
+        _refreshPreviews();
+        const imgBtn=document.getElementById('cs-add-img-btn');if(imgBtn)imgBtn.disabled=true;
+    });
+    vid.load();
+    input.value='';
+};
+function _refreshPreviews(){
+    const wrap=document.getElementById('cs-compose-previews');
+    if(!wrap)return;
+    if(_composeVideo){
+        wrap.innerHTML=`<div class="cs-prev-thumb cs-prev-video"><img src="${_composeVideo.coverB64}"><div class="cs-prev-video-icon"><i class="fas fa-play"></i></div><button class="cs-prev-del" onclick="window._mDelVideo()">✕</button></div>`;
+    } else {
+        wrap.innerHTML=_composeImgs.map((d,i)=>`<div class="cs-prev-thumb"><img src="${d}"><button class="cs-prev-del" onclick="window._mDelImg(${i})">✕</button></div>`).join('');
+    }
+    const cnt=document.getElementById('cs-image-count');
+    if(cnt)cnt.textContent=_composeImgs.length>0?`${_composeImgs.length}/6`:(_composeVideo?'1段视频':'');
+}
+window._mDelImg=function(i){
+    _composeImgs.splice(i,1);_refreshPreviews();
+    if(_composeImgs.length===0){const vidBtn=document.getElementById('cs-add-video-btn');if(vidBtn)vidBtn.disabled=false;}
+};
+window._mDelVideo=function(){
+    if(_composeVideo&&_composeVideo.blobUrl)URL.revokeObjectURL(_composeVideo.blobUrl);
+    _composeVideo=null;_refreshPreviews();
+    const imgBtn=document.getElementById('cs-add-img-btn');if(imgBtn)imgBtn.disabled=false;
+};
 window.submitCsPost=async function(){
-    const ta=document.getElementById('cs-compose-text'),text=ta?ta.value.trim():'';if(!text&&!_composeImgs.length){if(ta)ta.focus();return;}
+    const ta=document.getElementById('cs-compose-text'),text=ta?ta.value.trim():'';
+    if(!text&&!_composeImgs.length&&!_composeVideo){if(ta)ta.focus();return;}
     const btn=document.getElementById('cs-submit-btn');if(btn){btn.disabled=true;btn.textContent='发布中…';}
-    try{let images=[];for(const d of _composeImgs){if(window.CloudSync&&window.CloudSync.isConnected()&&window.CloudMedia){try{const r=await window.CloudMedia.upload(d,'moments-img');images.push(r&&r.url?r.url:d);}catch(e){images.push(d);}}else{images.push(d);}}
-    const post={id:_mUid('user'),type:'user',text,images,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};
-    momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);window.closeCsCompose();_csRenderFeed();
+    try{
+        let images=[], video=null, videoCover=null;
+        if(_composeVideo){
+            // 上传视频封面
+            try{const cr=await window.CloudMedia.upload(_composeVideo.coverB64,'moments-cover');videoCover=cr&&cr.url?cr.url:null;}catch(e){videoCover=null;}
+            // 上传视频
+            const vidUrl=await new Promise((resolve,reject)=>{
+                const reader=new FileReader();
+                reader.onload=async e=>{
+                    try{const r=await window.CloudMedia.upload(e.target.result,'moments-video');resolve(r&&r.url?r.url:null);}catch(err){reject(err);}
+                };
+                reader.readAsDataURL(_composeVideo.file);
+            });
+            video=vidUrl;
+        } else {
+            for(const d of _composeImgs){
+                if(window.CloudSync&&window.CloudSync.isConnected()&&window.CloudMedia){
+                    try{const r=await window.CloudMedia.upload(d,'moments-img');images.push(r&&r.url?r.url:d);}catch(e){images.push(d);}
+                }else{images.push(d);}
+            }
+        }
+        const post={id:_mUid('user'),type:'user',text,images,video:video||null,videoCover:videoCover||null,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};
+        momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);window.closeCsCompose();_csRenderFeed();
     }finally{if(btn){btn.disabled=false;btn.textContent='发布';}}
 };
 function _openSheet(id){const s=document.getElementById(id),o=document.getElementById('cs-overlay');if(s)s.classList.add('cs-sheet-open');if(o)o.classList.add('cs-overlay-on');}

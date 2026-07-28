@@ -11966,3 +11966,78 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-coming-soon i { font-size: 50px; opacity: 0.18; }
 .cs-cs-title { font-size: 15px; font-weight: 600; opacity: 0.45; }
 .cs-cs-sub { font-size: 12px; opacity: 0.35; }
+
+/* ── 内联评论区 ── */
+.cs-cmt-section {
+    border-top: 1px solid rgba(var(--accent-color-rgb),.1);
+    background: rgba(var(--accent-color-rgb),.04);
+    padding: 10px 12px 12px;
+}
+.cs-cmt-list { margin-bottom: 10px; }
+.cs-cmt-item {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 6px;
+    margin-bottom: 7px; font-size: 13px;
+}
+.cs-cmt-content { flex: 1; line-height: 1.55; color: var(--text-primary); }
+.cs-cmt-name { font-weight: 600; color: var(--accent-color); }
+.cs-cmt-reply-btn {
+    background: none; border: none;
+    color: var(--text-secondary); font-size: 11px;
+    cursor: pointer; padding: 2px 6px; flex-shrink: 0;
+    border-radius: 6px; font-family: inherit;
+    transition: var(--transition);
+}
+.cs-cmt-reply-btn:active { background: rgba(var(--accent-color-rgb),.1); color: var(--accent-color); }
+.cs-show-all-cmt {
+    font-size: 12px; color: var(--accent-color);
+    cursor: pointer; padding: 4px 0; margin-bottom: 8px;
+    opacity: 0.8;
+}
+.cs-cmt-input-area { margin-top: 4px; }
+.cs-reply-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--accent-color);
+    margin-bottom: 7px; padding: 5px 10px;
+    background: rgba(var(--accent-color-rgb),.1);
+    border-radius: 10px;
+}
+.cs-reply-label button {
+    background: none; border: none; color: var(--text-secondary);
+    cursor: pointer; font-size: 12px; padding: 0 2px;
+}
+.cs-cmt-row { display: flex; gap: 8px; align-items: center; }
+.cs-cmt-input-inline {
+    flex: 1; background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px; padding: 7px 12px;
+    font-size: 13px; color: var(--text-primary);
+    outline: none; font-family: inherit;
+    caret-color: var(--accent-color);
+}
+.cs-cmt-input-inline::placeholder { color: var(--text-secondary); opacity: 0.7; }
+.cs-cmt-send {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: none; background: var(--accent-color); color: #fff;
+    font-size: 12px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+}
+.cs-cmt-btn.on { color: var(--accent-color); }
+
+/* ── 铃铛通知弹出层 ── */
+.cs-notif-popup {
+    position: absolute; top: 52px; right: 12px;
+    width: 270px; max-height: 340px;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    z-index: 1700;
+}
+.cs-notif-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 14px; cursor: pointer; transition: background 0.15s;
+}
+.cs-notif-item:active { background: rgba(var(--accent-color-rgb),.07); }
+.cs-notif-unread { background: rgba(var(--accent-color-rgb),.05); }

@@ -516,6 +516,7 @@ const loadData = async () => {
             applyAllAvatarFrames();
             manageAutoSendTimer(); 
             checkEnvelopeStatus(); 
+            if (typeof checkMomentsStatus === 'function') checkMomentsStatus();
             updateUI();
             if (settings.customBubbleCss) {
                 try { applyCustomBubbleCss(settings.customBubbleCss); } catch(e) {}

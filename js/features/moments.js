@@ -53,7 +53,7 @@ function _mCmtContent() {
 async function loadMomentsData() {
     try { const s=await localforage.getItem(getStorageKey(_M_STORAGE_KEY)); if(s){momentsData=s;if(!momentsData.notifications)momentsData.notifications=[];} } catch(e){console.warn('[Moments] load 失败',e);}
 }
-function saveMomentsData() { try{localforage.setItem(getStorageKey(_M_STORAGE_KEY),momentsData);}catch(e){console.warn('[Moments] save 失败',e);} }
+async function saveMomentsData() { try{await localforage.setItem(getStorageKey(_M_STORAGE_KEY),momentsData);}catch(e){console.warn('[Moments] save 失败',e);} }
 
 // ─── 通知 ───
 let _nQ=[], _nBusy=false;
@@ -181,7 +181,7 @@ function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36,fb=isPa
 window._mToggleSticker=function(postId){
     const existing=document.getElementById('cs-sticker-picker');
     if(existing){existing.remove();return;}
-    const pool=[...(stickerLibrary||[])];
+    const pool=[...(myStickerLibrary||[])];
     if(!pool.length){
         const toast=document.createElement('div');
         toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;';
@@ -273,7 +273,7 @@ function _renderCmtSectionHtml(post){
             <input type="text" id="cs-ci-${post.id}" class="cs-cmt-input-inline"
                 placeholder="${ri?'回复内容…':'说点什么…'}"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();window._mSendComment('${post.id}');}">
-            <button id="cs-sticker-btn-${post.id}" class="cs-cmt-tool-btn" onclick="event.stopPropagation();window._mToggleSticker('${post.id}')"><i class="fas fa-icons"></i></button>
+            <button id="cs-sticker-btn-${post.id}" class="cs-cmt-tool-btn" onclick="event.stopPropagation();window._mToggleSticker('${post.id}')"><i class="far fa-smile"></i></button>
             <button class="cs-cmt-tool-btn" onclick="event.stopPropagation();document.getElementById('cs-cmtimg-${post.id}').click()"><i class="far fa-image"></i></button>
             <button class="cs-cmt-send" onclick="event.stopPropagation();window._mSendComment('${post.id}')"><i class="fas fa-paper-plane"></i></button>
             <input type="file" id="cs-cmtimg-${post.id}" accept="image/*" style="display:none;" onchange="window._mCommentImgSelected('${post.id}',this)">
@@ -410,4 +410,69 @@ window._openMomentsPost=function(postId){window.openCoupleSpace();setTimeout(()=
 
 // ─── 暴露 ───
 window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;window.checkMomentsStatus=checkMomentsStatus;window.generatePartnerMoment=generatePartnerMoment;window.onUserPostCreated=onUserPostCreated;window.onUserCommented=onUserCommented;window.getMomentsUnreadCount=getMomentsUnreadCount;window.markPostRead=markPostRead;window._updateMomentsBadge=_updateBadge;
+
+// ─── 测试工具 ───
+// 交付某帖的所有待处理项（传 postId 或不传默认第一条）
+window._testDeliver = async function(postId) {
+    const p = momentsData.posts.find(p => p.id === (postId || momentsData.posts[0]?.id));
+    if (!p) { console.log('❌ 找不到帖子，用 window._momentsData.posts 查看'); return; }
+    let done = [];
+    if (p.pendingLikeTime && !p.partnerLiked) { p.pendingLikeTime = 1; done.push('点赞'); }
+    if (p.pendingPartnerComment) { p.pendingPartnerComment.time = 1; done.push('评论'); }
+    if (!done.length) { console.log('ℹ️ 该帖暂无待交付项'); return; }
+    await saveMomentsData();
+    await checkMomentsStatus();
+    console.log('✅ 已交付:', done.join('、'));
+};
+
+// 一键交付所有帖子的所有待处理项
+window._testDeliverAll = async function() {
+    let count = 0;
+    for (const p of momentsData.posts) {
+        if (p.pendingLikeTime && !p.partnerLiked) { p.pendingLikeTime = 1; count++; }
+        if (p.pendingPartnerComment) { p.pendingPartnerComment.time = 1; count++; }
+    }
+    if (!count) { console.log('ℹ️ 没有待交付项'); return; }
+    await saveMomentsData();
+    await checkMomentsStatus();
+    console.log('✅ 已交付', count, '项');
+};
+
+// 概率 & 时间分布统计
+window._testStats = function(n) {
+    n = n || 500;
+    // 响应延迟
+    const delays = Array.from({length:n}, ()=>(_M_DLY_MIN+Math.random()*(_M_DLY_MAX-_M_DLY_MIN))/60000);
+    delays.sort((a,b)=>a-b);
+    const avg = delays.reduce((s,d)=>s+d,0)/n;
+    console.log('\n📊 点赞/评论延迟（'+n+'次）');
+    console.log('  最短: '+delays[0].toFixed(1)+' 分钟');
+    console.log('  平均: '+avg.toFixed(1)+' 分钟');
+    console.log('  最长: '+delays[n-1].toFixed(1)+' 分钟');
+
+    // 评论类型分布
+    const hasSt = (stickerLibrary||[]).length > 0;
+    let to=0, ti=0, io=0;
+    for (let i=0;i<n;i++){const r=Math.random();if(!hasSt||r<0.60)to++;else if(r<0.80)ti++;else io++;}
+    console.log('\n📊 梦角评论类型（贴纸库'+(hasSt?'已':'未')+'配置）');
+    console.log('  纯文字: '+(to/n*100).toFixed(1)+'%  (期望: 60%)');
+    console.log('  文字+贴纸: '+(ti/n*100).toFixed(1)+'%  (期望: 20%)');
+    console.log('  纯贴纸: '+(io/n*100).toFixed(1)+'%  (期望: 20%)');
+
+    // 触发率
+    let triggered=0, letter=0, moment=0;
+    for (let i=0;i<n;i++){if(Math.random()<_M_PROB){triggered++;if(Math.random()<0.5)letter++;else moment++;}}
+    console.log('\n📊 梦角主动行为（'+n+'次检查）');
+    console.log('  触发率: '+(triggered/n*100).toFixed(1)+'%  (期望: '+(_M_PROB*100)+'%)');
+    console.log('  写信: '+(letter/n*100).toFixed(1)+'%');
+    console.log('  发动态: '+(moment/n*100).toFixed(1)+'%');
+
+    // 自评/自赞概率
+    let selfCmt=0, selfLike=0;
+    for (let i=0;i<n;i++){if(Math.random()<0.10)selfCmt++;if(Math.random()<0.10)selfLike++;}
+    console.log('\n📊 梦角发动态后（'+n+'次）');
+    console.log('  自评概率: '+(selfCmt/n*100).toFixed(1)+'%  (期望: 10%)');
+    console.log('  自赞概率: '+(selfLike/n*100).toFixed(1)+'%  (期望: 10%)');
+};
+
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});

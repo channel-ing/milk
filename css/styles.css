@@ -11967,34 +11967,44 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-cs-title { font-size: 15px; font-weight: 600; opacity: 0.45; }
 .cs-cs-sub { font-size: 12px; opacity: 0.35; }
 
+/* ── 赞了那一行 ── */
+.cs-likes-row {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px 6px;
+    font-size: 12px; color: var(--text-secondary);
+    border-top: 1px solid rgba(var(--accent-color-rgb),.08);
+}
+.cs-likes-row i { color: #ff6b8a; font-size: 11px; flex-shrink: 0; }
+
 /* ── 内联评论区 ── */
 .cs-cmt-section {
     border-top: 1px solid rgba(var(--accent-color-rgb),.1);
     background: rgba(var(--accent-color-rgb),.04);
-    padding: 10px 12px 12px;
+    padding: 8px 12px 10px;
 }
-.cs-cmt-list { margin-bottom: 10px; }
+.cs-cmt-list { margin-bottom: 8px; }
 .cs-cmt-item {
     display: flex; align-items: flex-start;
     justify-content: space-between; gap: 6px;
-    margin-bottom: 7px; font-size: 13px;
+    margin-bottom: 6px; font-size: 13px;
 }
 .cs-cmt-content { flex: 1; line-height: 1.55; color: var(--text-primary); }
 .cs-cmt-name { font-weight: 600; color: var(--accent-color); }
+.cs-cmt-reply-word { color: var(--text-secondary); font-size: 11px; }
+.cs-cmt-reply-target { color: var(--accent-color); }
 .cs-cmt-reply-btn {
     background: none; border: none;
     color: var(--text-secondary); font-size: 11px;
     cursor: pointer; padding: 2px 6px; flex-shrink: 0;
     border-radius: 6px; font-family: inherit;
-    transition: var(--transition);
+    opacity: 0.7; transition: opacity 0.15s;
 }
-.cs-cmt-reply-btn:active { background: rgba(var(--accent-color-rgb),.1); color: var(--accent-color); }
+.cs-cmt-reply-btn:active { opacity: 1; color: var(--accent-color); }
 .cs-show-all-cmt {
     font-size: 12px; color: var(--accent-color);
-    cursor: pointer; padding: 4px 0; margin-bottom: 8px;
+    cursor: pointer; padding: 3px 0; margin-bottom: 6px;
     opacity: 0.8;
 }
-.cs-cmt-input-area { margin-top: 4px; }
 .cs-reply-label {
     display: flex; align-items: center; justify-content: space-between;
     font-size: 12px; color: var(--accent-color);
@@ -12002,27 +12012,32 @@ body #user-sticker-picker .empty-sticker-tip {
     background: rgba(var(--accent-color-rgb),.1);
     border-radius: 10px;
 }
-.cs-reply-label button {
-    background: none; border: none; color: var(--text-secondary);
-    cursor: pointer; font-size: 12px; padding: 0 2px;
+.cs-reply-label button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.cs-cmt-input-row {
+    display: flex; align-items: center; gap: 8px;
 }
-.cs-cmt-row { display: flex; gap: 8px; align-items: center; }
+.cs-cmt-input-av {
+    width: 28px; height: 28px; border-radius: 50%;
+    overflow: hidden; flex-shrink: 0;
+    background: rgba(var(--accent-color-rgb),.15);
+    display: flex; align-items: center; justify-content: center;
+}
 .cs-cmt-input-inline {
-    flex: 1; background: var(--secondary-bg);
+    flex: 1; background: var(--primary-bg);
     border: 1px solid var(--border-color);
     border-radius: 16px; padding: 7px 12px;
     font-size: 13px; color: var(--text-primary);
     outline: none; font-family: inherit;
     caret-color: var(--accent-color);
 }
-.cs-cmt-input-inline::placeholder { color: var(--text-secondary); opacity: 0.7; }
+.cs-cmt-input-inline::placeholder { color: var(--text-secondary); opacity: 0.6; }
+.cs-cmt-input-inline:focus { border-color: rgba(var(--accent-color-rgb),.4); }
 .cs-cmt-send {
     width: 30px; height: 30px; border-radius: 50%;
     border: none; background: var(--accent-color); color: #fff;
     font-size: 12px; cursor: pointer; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
 }
-.cs-cmt-btn.on { color: var(--accent-color); }
 
 /* ── 铃铛通知弹出层 ── */
 .cs-notif-popup {

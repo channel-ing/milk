@@ -420,7 +420,7 @@ window.closeCoupleSpace=window.closeMomentsModal=function(){
     [document.getElementById('cs-notif-popup'),document.getElementById('cs-sticker-picker')].forEach(el=>{if(el)el.style.display='none';});
     setTimeout(()=>{page.style.display='none';},380);
 };
-window.csSwitchTab=function(tab){_csSetTab(tab);if(tab==='feed')_csRenderFeed();};
+window.csSwitchTab=function(tab){_csSetTab(tab);if(tab==='feed')_csRenderFeed();if(tab==='album'&&typeof window._alInit==='function')window._alInit();};
 function _csSetTab(tab){document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));const panel=document.getElementById('cs-panel-'+tab);if(panel)panel.classList.add('cs-panel-active');document.querySelectorAll('.cs-pill').forEach(b=>b.classList.remove('cs-pill-on'));const btn=document.getElementById('csp-'+tab);if(btn)btn.classList.add('cs-pill-on');}
 function _csRenderFeed(){
     const list=document.getElementById('cs-feed-list');if(!list)return;
@@ -535,7 +535,9 @@ window.submitCsPost=async function(){
             }
         }
         const post={id:_mUid('user'),type:'user',text,images,video:video||null,videoCover:videoCover||null,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};
-        momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);window.closeCsCompose();_csRenderFeed();
+        momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);
+        if(images.length&&typeof window._albumSyncMomentsPost==="function")window._albumSyncMomentsPost(post.id,images);
+        window.closeCsCompose();_csRenderFeed();
     }finally{if(btn){btn.disabled=false;btn.textContent='发布';}}
 };
 function _openSheet(id){const s=document.getElementById(id),o=document.getElementById('cs-overlay');if(s)s.classList.add('cs-sheet-open');if(o)o.classList.add('cs-overlay-on');}

@@ -57,33 +57,15 @@ async function checkEnvelopeStatus() {
         if (newReplyLetter) showEnvelopeReplyPopup(newReplyLetter);
     }
 
-    // 梦角主动来信检查
-    await checkPartnerInitiatedLetter();
+    // 梦角主动来信检查已移至 moments.js 的共享触发器（_checkPartnerInitiatedAction）
 }
 
-async function checkPartnerInitiatedLetter() {
-    const COOLDOWN_MIN = 24 * 60 * 60 * 1000;
-    const COOLDOWN_MAX = 48 * 60 * 60 * 1000;
-    const PROB = 0.40;
-    const KEY = getStorageKey('partnerLetterNextTime');
-
-    const nextTimeRaw = await localforage.getItem(KEY);
-    const now = Date.now();
-
-    if (nextTimeRaw !== null && now < nextTimeRaw) return;
-
-    if (Math.random() >= PROB) {
-        // 未触发，设下次检查窗口（下次启动时重新随机）
-        const cooldown = COOLDOWN_MIN + Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN);
-        await localforage.setItem(KEY, now + cooldown);
-        return;
-    }
-
-    // 触发：生成梦角主动来信（与回信逻辑相同，从字卡池随机抽取）
+// 生成梦角主动来信（由 moments.js 的共享触发器调用，不含冷却逻辑）
+window._generatePartnerLetter = function() {
     const content = generateEnvelopeReplyText();
-    const letterId = 'partner_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    const now = Date.now();
     const inboxLetter = {
-        id: letterId,
+        id: 'partner_' + now + '_' + Math.random().toString(36).substr(2, 4),
         refId: null,
         originalContent: null,
         content,
@@ -93,13 +75,8 @@ async function checkPartnerInitiatedLetter() {
     };
     envelopeData.inbox.push(inboxLetter);
     saveEnvelopeData();
-
-    // 设冷却，下次最早 48~72 小时后再触发
-    const cooldown = COOLDOWN_MIN + Math.random() * (COOLDOWN_MAX - COOLDOWN_MIN);
-    await localforage.setItem(KEY, now + cooldown);
-
     showEnvelopeReplyPopup(inboxLetter);
-}
+};
 
 function showEnvelopeReplyPopup(letter) {
     const existing = document.getElementById('envelope-reply-popup');

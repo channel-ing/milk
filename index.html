@@ -526,10 +526,12 @@
     <textarea id="cs-compose-text" class="cs-compose-ta" placeholder="想说点什么…"></textarea>
     <div id="cs-compose-previews" class="cs-compose-previews"></div>
     <div class="cs-sheet-toolbar">
-        <button onclick="document.getElementById('cs-image-input').click()"><i class="fas fa-image"></i> 图片</button>
+        <button id="cs-add-img-btn" onclick="document.getElementById('cs-image-input').click()"><i class="fas fa-image"></i> 图片</button>
+        <button id="cs-add-video-btn" onclick="onCsVideoClick()"><i class="fas fa-video"></i> 视频</button>
         <span id="cs-image-count" style="font-size:12px;color:var(--text-secondary);margin-left:auto;"></span>
     </div>
     <input type="file" id="cs-image-input" multiple accept="image/*" style="display:none;" onchange="onCsImagesSelected(this)">
+    <input type="file" id="cs-video-input" accept="video/*" style="display:none;" onchange="onCsVideoSelected(this)">
 </div>
 
 <!-- 帖子详情 bottom sheet -->
@@ -2986,5 +2988,10 @@
     <script src="js/cloud-media-migration.js"></script>
     <script src="js/cloud-sync-ui.js"></script>
     <script src="js/app.js"></script>
+<!-- 全屏视频播放弹层 -->
+<div id="cs-video-player-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:10000;flex-direction:column;align-items:center;justify-content:center;">
+    <button onclick="closeCsVideoPlayer()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    <video id="cs-video-player" controls playsinline style="max-width:100%;max-height:90vh;border-radius:8px;"></video>
+</div>
 </body>
 </html>

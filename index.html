@@ -465,10 +465,10 @@
     <div class="cs-pills-wrap">
         <div class="cs-pills">
             <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><i class="fas fa-comment-dots"></i></button>
-            <button class="cs-pill"             id="csp-album"  onclick="csSwitchTab('album')"  title="相册"><i class="fas fa-images"></i></button>
-            <button class="cs-pill"             id="csp-mood"   onclick="csSwitchTab('mood')"   title="心情手账"><i class="fas fa-book-open"></i></button>
-            <button class="cs-pill"             id="csp-ann"    onclick="csSwitchTab('ann')"    title="纪念日"><i class="fas fa-heart"></i></button>
-            <button class="cs-pill"             id="csp-period" onclick="csSwitchTab('period')" title="经期记录"><i class="fas fa-moon"></i></button>
+            <button class="cs-pill"             id="csp-album"  onclick="csSwitchTab('album')"  title="相册"><i class="fas fa-image"></i></button>
+            <button class="cs-pill"             id="csp-mood"   onclick="csSwitchTab('mood')"   title="心情手账"><i class="fas fa-book"></i></button>
+            <button class="cs-pill"             id="csp-ann"    onclick="csSwitchTab('ann')"    title="纪念日"><i class="fas fa-calendar-alt"></i></button>
+            <button class="cs-pill"             id="csp-period" onclick="csSwitchTab('period')" title="经期记录"><i class="fas fa-seedling"></i></button>
         </div>
     </div>
 
@@ -479,7 +479,7 @@
             <!-- 动态 section header -->
             <div class="cs-feed-hd">
                 <span class="cs-feed-hd-title">动态</span>
-                <button class="cs-icon-btn cs-bell-btn">
+                <button class="cs-icon-btn cs-bell-btn" id="cs-bell-btn" onclick="window._mOpenBell()">
                     <i class="fas fa-bell"></i>
                     <span class="cs-bell-dot" id="cs-bell-dot" style="display:none;"></span>
                 </button>

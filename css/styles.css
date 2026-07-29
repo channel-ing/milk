@@ -11759,12 +11759,12 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-content {
     flex: 1; overflow: hidden; position: relative;
 }
-.cs-panel {
+.cs-content .cs-panel {
     position: absolute; inset: 0;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     display: none; padding: 0 14px;
 }
-.cs-panel.cs-panel-active { display: block; }
+.cs-content .cs-panel.cs-panel-active { display: block; }
 
 /* ── 动态 section header ── */
 .cs-feed-hd {

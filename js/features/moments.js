@@ -536,7 +536,7 @@ window.submitCsPost=async function(){
         }
         const post={id:_mUid('user'),type:'user',text,images,video:video||null,videoCover:videoCover||null,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};
         momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);
-        if(images.length&&typeof window._albumSyncMomentsPost==="function")window._albumSyncMomentsPost(post.id,images);
+        if(typeof window._albumSyncMomentsPost==="function")window._albumSyncMomentsPost(post.id,images,video,videoCover);
         window.closeCsCompose();_csRenderFeed();
     }finally{if(btn){btn.disabled=false;btn.textContent='发布';}}
 };

@@ -510,31 +510,22 @@
                 <div class="al-grid-topbar">
                     <button class="al-back-btn" onclick="window._alBackToList()"><i class="fas fa-chevron-left"></i></button>
                     <span id="al-grid-title" class="al-grid-title"></span>
-                    <button class="al-upload-btn" onclick="document.getElementById('al-upload-input').click()"><i class="fas fa-plus"></i></button>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button class="al-sel-btn" id="al-sel-btn" onclick="window._alToggleSelectMode()">选择</button>
+                        <button class="al-upload-btn" id="al-upload-btn" onclick="document.getElementById('al-upload-input').click()"><i class="fas fa-plus"></i></button>
+                    </div>
                 </div>
                 <div id="al-grid-body" class="al-grid-body"></div>
+                <!-- 批量选择操作栏 -->
+                <div id="al-select-bar" class="al-select-bar" style="display:none;">
+                    <span id="al-sel-count" class="al-sel-count">点击照片选择</span>
+                    <button id="al-sel-all" class="al-sel-all" onclick="window._alSelectAll()">全选</button>
+                    <button id="al-sel-del" class="al-sel-del" onclick="window._alDeleteSelected()" disabled>删除</button>
+                </div>
                 <input type="file" id="al-upload-input" multiple accept="image/*" style="display:none;" onchange="window._alUploadToAlbum(window._alCurrentAlbumId,this)">
             </div>
-            <!-- 视图：图片详情 -->
-            <div id="al-view-detail" class="al-view al-detail-view" style="display:none;">
-                <div class="al-detail-topbar">
-                    <button class="al-back-btn" onclick="window._alBackToGrid()"><i class="fas fa-chevron-left"></i></button>
-                    <span id="al-detail-date" class="al-detail-date"></span>
-                    <button class="al-del-btn" onclick="window._alDeletePhoto(window._alCurrentPhotoId)"><i class="fas fa-trash-alt"></i></button>
-                </div>
-                <div class="al-detail-main">
-                    <img id="al-detail-img" class="al-detail-img">
-                    <button id="al-detail-fav" class="al-detail-fav" onclick="window._alToggleFav(window._alCurrentPhotoId)"><i class="far fa-heart"></i></button>
-                </div>
-                <div id="al-detail-strip" class="al-detail-strip"></div>
-            </div>
-            <!-- 视图：回收站 -->
+            <!-- 视图：回收站（无topbar，subtab已说明） -->
             <div id="al-view-trash" class="al-view" style="display:none;">
-                <div class="al-grid-topbar">
-                    <button class="al-back-btn" onclick="window._alBackToList()"><i class="fas fa-chevron-left"></i></button>
-                    <span class="al-grid-title">回收站</span>
-                    <span style="width:36px;"></span>
-                </div>
                 <div id="al-trash-body" class="al-grid-body"></div>
             </div>
         </div>
@@ -3029,6 +3020,18 @@
     <script src="js/cloud-media-migration.js"></script>
     <script src="js/cloud-sync-ui.js"></script>
     <script src="js/app.js"></script>
+<!-- 相册图片详情（全屏） -->
+<div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">
+    <div class="al-detail-topbar">
+        <button class="al-back-btn" onclick="window._alBackToGrid()"><i class="fas fa-chevron-left"></i></button>
+        <span id="al-detail-date" class="al-detail-date"></span>
+        <button id="al-detail-del" class="al-del-btn" onclick="window._alDeletePhoto(window._alCurrentPhotoId)" title="删除"><i class="fas fa-trash-alt"></i></button>
+    </div>
+    <div id="al-detail-main" class="al-detail-main"></div>
+    <button id="al-detail-fav" class="al-detail-fav" onclick="window._alToggleFav(window._alCurrentPhotoId)"><i class="far fa-heart"></i></button>
+    <div id="al-detail-strip" class="al-detail-strip"></div>
+</div>
+
 <!-- 全屏视频播放弹层 -->
 <div id="cs-video-player-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:10000;flex-direction:column;align-items:center;justify-content:center;">
     <button onclick="closeCsVideoPlayer()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>

@@ -12531,3 +12531,16 @@ body #user-sticker-picker .empty-sticker-tip {
 .mdd-act-btn:hover { background: var(--message-received-bg); }
 .mdd-act-del { color: #e05c5c !important; border-color: rgba(224,92,92,0.3) !important; }
 .mdd-act-del:hover { background: rgba(224,92,92,0.07) !important; }
+
+/* ── 心情手账 tab 内容卡片 ── */
+.cs-mood-card {
+    background: var(--secondary-bg);
+    border-radius: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+/* 统计容器内直接使用现有 mood-stat-group 样式，不需要外层 card 样式 */
+.cs-mood-card #mood-stats-container {
+    padding: 0;
+}

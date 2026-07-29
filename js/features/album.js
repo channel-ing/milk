@@ -138,15 +138,13 @@ function _alRenderNoOss() {
     const wrap = document.getElementById('al-list-grid'); if (!wrap) return;
     wrap.innerHTML = `
         <div class="al-no-oss">
-            <div class="al-no-oss-icon"><i class="fas fa-cloud-slash"></i></div>
-            <div class="al-no-oss-title">相册暂不可用</div>
+            <div class="al-no-oss-icon"><i class="fas fa-images"></i></div>
+            <div class="al-no-oss-title">相册需要云端存储</div>
             <div class="al-no-oss-desc">
-                相册依赖云端存储来保存图片。<br>
-                直接存在本地的话，大量图片会撑爆内存导致页面崩溃，所以没有配置云存储就没办法用相册功能。
+                图片如果直接存在本地，大量照片会快速撑满浏览器内存，导致页面崩溃。为了避免这种情况，相册功能需要先配置云端存储才能使用。
             </div>
             <div class="al-no-oss-path">
-                <i class="fas fa-route"></i>
-                右上角 ⚙️ 设置 → 数据管理 → 阿里云 OSS
+                <i class="fas fa-route"></i> 配置路径：右上角 ⚙️ 设置 → 数据管理 → 阿里云 OSS
             </div>
             <button class="al-no-oss-btn" onclick="window._alGoOssConfig()">去配置</button>
         </div>`;
@@ -192,9 +190,10 @@ function _alRenderList() {
                             : `<div class="al-cover-empty"><i class="fas fa-images"></i></div>`;
         const lock = album.isSystem ? '<i class="fas fa-lock al-sys-lock"></i>' : '';
         const cntHtml = n > 0 ? `<span class="al-album-cnt">${n}张</span>` : '';
+        const moreBtn = album.isSystem ? '' : `<button class="al-album-more" onclick="event.stopPropagation();window._alAlbumMore(event,'${album.id}')" title="更多操作"><i class="fas fa-ellipsis-h"></i></button>`;
         html += `<div class="al-album-card" onclick="window._alOpenAlbum('${album.id}')">
             <div class="al-cover">${coverHtml}</div>
-            <div class="al-album-info">${lock}<span class="al-album-name">${album.name}</span>${cntHtml}</div>
+            <div class="al-album-info">${lock}<span class="al-album-name">${album.name}</span>${cntHtml}${moreBtn}</div>
         </div>`;
     });
 
@@ -216,7 +215,15 @@ function _alRenderGrid(albumId) {
     const isSys = isMoments || isFavorites;
 
     const titleEl = document.getElementById('al-grid-title');
-    if (titleEl) titleEl.textContent = album.name;
+    if (titleEl) {
+        titleEl.textContent = album.name;
+        if (!album.isSystem) {
+            titleEl.style.cursor = 'text'; titleEl.title = '点击修改名称';
+            titleEl.onclick = () => _alRenameAlbum(albumId);
+        } else {
+            titleEl.style.cursor = ''; titleEl.title = ''; titleEl.onclick = null;
+        }
+    }
 
     // 上传按钮：系统相册隐藏
     const uploadBtn = document.getElementById('al-upload-btn');
@@ -428,20 +435,20 @@ function _alRenderTrash() {
     if (!trashed.length) {
         html = `<div class="al-empty"><i class="fas fa-trash"></i><div>回收站是空的</div></div>`;
     } else {
-        html += `<div class="al-trash-tip">照片将在删除后 30 天自动清除</div><div class="al-photo-grid al-trash-grid">`;
+        html += `<div class="al-photo-grid al-trash-grid">`;
         trashed.forEach(p => {
             const d = Math.ceil((_AL_TRASH_TTL-(Date.now()-p.deletedAt))/86400000);
-            html += `<div class="al-photo-cell al-trash-cell">
+            html += `<div class="al-photo-cell al-trash-cell" onclick="window._alOpenTrashDetail('${p.id}')">
                 ${_alImgEl(p.src)}
                 ${p.isVideo ? '<div class="al-cell-play"><i class="fas fa-play"></i></div>' : ''}
                 <div class="al-trash-days">${d}天</div>
                 <div class="al-trash-actions">
-                    <button onclick="window._alRestore('${p.id}')"><i class="fas fa-undo"></i></button>
-                    <button onclick="window._alPermDelete('${p.id}')"><i class="fas fa-times"></i></button>
+                    <button onclick="event.stopPropagation();window._alRestore('${p.id}')"><i class="fas fa-undo"></i></button>
+                    <button onclick="event.stopPropagation();window._alPermDelete('${p.id}')"><i class="fas fa-times"></i></button>
                 </div>
             </div>`;
         });
-        html += `</div>`;
+        html += `</div><div class="al-trash-tip">照片将在删除后 30 天自动清除</div>`;
     }
     const body = document.getElementById('al-trash-body'); if (!body) return;
     body.innerHTML = html;
@@ -464,7 +471,7 @@ function _alSetSubTab(tab) {
 }
 
 // ─── 对外 API ───
-window._alOpenAlbum = function(albumId) { _alRenderGrid(albumId); };
+window._alOpenAlbum = function(albumId) { _alSelectMode=false; _alSelectedIds.clear(); _alRenderGrid(albumId); };
 
 window._alOpenDetail = _alOpenDetail;
 function _alOpenDetail(photoId, albumId) {
@@ -543,3 +550,107 @@ document.addEventListener('DOMContentLoaded', () => {
         det.addEventListener('touchend',   window._alSwipeEnd,   { passive:true });
     }
 });
+
+// ─── 相册重命名 ───
+function _alRenameAlbum(albumId) {
+    const album = albumData.albums.find(a => a.id === albumId);
+    if (!album || album.isSystem) return;
+    const name = prompt('修改相册名称：', album.name);
+    if (!name || !name.trim() || name.trim() === album.name) return;
+    album.name = name.trim();
+    saveAlbumData();
+    const t = document.getElementById('al-grid-title');
+    if (t) t.textContent = album.name;
+    _alRenderList(); // 列表页也同步
+}
+
+// ─── 相册更多操作（重命名 / 删除） ───
+window._alAlbumMore = function(e, albumId) {
+    const album = albumData.albums.find(a => a.id === albumId);
+    if (!album || album.isSystem) return;
+
+    // 移除旧 action sheet
+    const old = document.getElementById('al-action-sheet');
+    if (old) old.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'al-action-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:8000;';
+    sheet.innerHTML = `
+        <div class="al-action-mask" onclick="document.getElementById('al-action-sheet').remove()"></div>
+        <div class="al-action-body">
+            <button class="al-action-item" onclick="document.getElementById('al-action-sheet').remove();_alRenameAlbum('${albumId}')">
+                <i class="fas fa-pen"></i> 重命名
+            </button>
+            <div class="al-action-divider"></div>
+            <button class="al-action-item al-action-danger" onclick="document.getElementById('al-action-sheet').remove();window._alDeleteAlbum('${albumId}')">
+                <i class="fas fa-trash-alt"></i> 删除相册
+            </button>
+            <div class="al-action-cancel" onclick="document.getElementById('al-action-sheet').remove()">取消</div>
+        </div>`;
+    document.body.appendChild(sheet);
+};
+
+// ─── 删除相册 ───
+window._alDeleteAlbum = function(albumId) {
+    const album = albumData.albums.find(a => a.id === albumId);
+    if (!album || album.isSystem) return;
+    const cnt = albumData.photos.filter(p => p.albumId === albumId && !p.deletedAt).length;
+    const msg = cnt > 0
+        ? `删除「${album.name}」后，相册内 ${cnt} 张照片也会进入回收站。确定删除吗？`
+        : `确定删除「${album.name}」吗？`;
+    if (!confirm(msg)) return;
+    // 相册内所有图片进回收站
+    albumData.photos.filter(p => p.albumId === albumId && !p.deletedAt)
+        .forEach(p => { p.deletedAt = Date.now(); });
+    // 删除相册记录
+    albumData.albums = albumData.albums.filter(a => a.id !== albumId);
+    saveAlbumData();
+    _alRenderList();
+};
+
+// ─── 回收站照片查看大图 ───
+window._alOpenTrashDetail = function(photoId) {
+    window._alCurrentAlbumId = '__trash__';
+    window._alCurrentPhotoId = photoId;
+    const photo = albumData.photos.find(p => p.id === photoId); if (!photo) return;
+
+    const mainArea = document.getElementById('al-detail-main');
+    if (mainArea) {
+        const src = photo.src || '';
+        if (src.indexOf('oss://') === 0 && window.CloudMedia) {
+            mainArea.innerHTML = `<img id="al-detail-img" class="al-detail-img" src="">`;
+            window.CloudMedia.fetchUrl(src)
+                .then(url => { const el=document.getElementById('al-detail-img'); if(el) el.src=url; })
+                .catch(() => { const el=document.getElementById('al-detail-img'); if(el) el.src=src; });
+        } else {
+            mainArea.innerHTML = src ? `<img id="al-detail-img" class="al-detail-img" src="${src}">` : '<div class="al-cell-empty al-detail-empty"><i class="fas fa-images"></i></div>';
+        }
+    }
+
+    const dateEl = document.getElementById('al-detail-date');
+    if (dateEl) dateEl.textContent = _alFmtDate(photo.date);
+
+    // 顶部删除按钮变成「恢复」
+    const delBtn = document.getElementById('al-detail-del');
+    if (delBtn) { delBtn.title = '恢复'; delBtn.innerHTML = '<i class="fas fa-undo"></i>'; delBtn.onclick = () => { window._alRestore(photoId); _alShowView('trash'); }; }
+
+    // 隐藏收藏
+    const favBtn = document.getElementById('al-detail-fav');
+    if (favBtn) favBtn.style.display = 'none';
+
+    // 缩略图条：回收站里的其他照片
+    const strip = document.getElementById('al-detail-strip');
+    if (strip) {
+        const siblings = albumData.photos.filter(p => p.deletedAt).sort((a,b) => b.deletedAt - a.deletedAt);
+        strip.innerHTML = siblings.map(p => `
+            <div class="al-strip-thumb${p.id===photoId?' active':''}" onclick="window._alOpenTrashDetail('${p.id}')">
+                ${_alImgEl(p.src, 'width:100%;height:100%;object-fit:cover;')}
+            </div>`).join('');
+        _alBindLazy(strip);
+        const active = strip.querySelector('.al-strip-thumb.active');
+        if (active) setTimeout(() => active.scrollIntoView({inline:'center',behavior:'smooth'}), 100);
+    }
+
+    _alShowView('detail');
+};

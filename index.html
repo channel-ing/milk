@@ -2254,92 +2254,77 @@
 
     <div class="mood-selector-overlay" id="mood-selector-overlay">
         <div class="mood-selector-card" id="mood-editor-view">
-            <h3 id="mood-selector-date">--月--日</h3>
-            
-            <div id="mood-edit-target-tabs" style="display:flex; gap:6px; justify-content:center; margin:8px 0 4px;">
-                <button class="mood-tab-btn active" id="mood-tab-me" onclick="switchMoodEditTarget('me')" data-name-me>我的记录</button>
-                <button class="mood-tab-btn" id="mood-tab-partner" onclick="switchMoodEditTarget('partner')" data-name-partner>梦角的记录</button>
+            <div class="mde-header">
+                <h3 id="mood-selector-date" style="margin:0; font-size:16px; font-weight:600;">--月--日</h3>
+                <button class="mde-close-btn" onclick="closeMoodOverlay()"><i class="fas fa-times"></i></button>
             </div>
-
-            <div style="display:flex; align-items:center; justify-content:space-between; margin:8px 0 4px;">
-                <button class="mood-page-btn" id="mood-page-prev" onclick="switchMoodPage(-1)">&#8249;</button>
-                <span id="mood-page-indicator" style="font-size:12px; opacity:0.7;">第 1 页 · 心情</span>
-                <button class="mood-page-btn" id="mood-page-next" onclick="switchMoodPage(1)">&#8250;</button>
+            <div class="mood-options-slider-wrapper" style="max-height:180px;">
+                <div class="mood-options-grid" id="mood-options-grid"></div>
             </div>
-
-            <div id="mood-page-1">
-                <div class="mood-options-slider-wrapper">
-                    <div class="mood-options-grid" id="mood-options-grid"></div>
-                </div>
-                <button class="mood-custom-add-btn" id="mood-custom-add" onclick="openCustomMoodDialog()">
-                    <i class="fas fa-plus"></i> 自定义心情
-                </button>
+            <button class="mood-custom-add-btn" id="mood-custom-add" onclick="openCustomMoodDialog()">
+                <i class="fas fa-plus"></i> 自定义心情
+            </button>
+            <div style="margin-top:10px;">
+                <textarea id="mood-note-input" class="mood-note-input" rows="3" placeholder="开始今天的记录吧..."></textarea>
             </div>
-
-            <div id="mood-page-2" style="display:none;">
-                <div class="mood-input-wrapper">
-                    <label style="font-size:12px; font-weight:500;" id="mood-note-label">随记:</label>
-                    <textarea id="mood-note-input" class="mood-note-input" rows="3" placeholder="记录下今天发生的小事..."></textarea>
-                </div>
-                <div style="margin-top:10px;">
-                    <label style="font-size:12px; font-weight:500; display:flex; align-items:center; gap:5px; margin-bottom:6px;" id="mood-weather-label">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg>
-                        今日天气&nbsp;
-                    </label>
-                    <input type="text" id="mood-weather-input" maxlength="20" placeholder="例如：晴朗 / 阴天 / 小雨..." style="width:100%; padding:9px 14px; border:1px solid var(--border-color); border-radius:10px; font-size:13px; background:var(--primary-bg); color:var(--text-primary); outline:none; font-family:var(--font-family);">
-                </div>
-            </div>
-    
-            <div style="display:flex; gap:10px; margin-top:15px;">
+            <div style="display:flex; gap:10px; margin-top:12px;">
                 <button class="modal-btn modal-btn-secondary" id="cancel-mood-edit" style="flex:1;">取消</button>
-                <button class="modal-btn modal-btn-secondary" id="view-mood-detail-btn" onclick="viewMoodDetailFromEditor()" style="flex:1;">查看详情</button>
                 <button class="modal-btn modal-btn-primary" id="confirm-mood-save" style="flex:1;">保存</button>
             </div>
         </div>
 
         <div id="custom-mood-dialog" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--secondary-bg); padding:20px; border-radius:16px; width:80%; max-width:280px; z-index:2200; box-shadow:0 10px 30px rgba(0,0,0,0.3); text-align:center;">
-            <h4 style="margin-bottom:12px; font-size:14px;">自定义心情</h4>
-            <div style="display:flex; gap:8px; margin-bottom:10px;">
-                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="表情" style="width:60px; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:20px; background:var(--primary-bg); color:var(--text-primary);">
-                <input id="custom-mood-label" type="text" maxlength="6" placeholder="名称（最多6字）" style="flex:1; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:13px; background:var(--primary-bg); color:var(--text-primary);">
+            <h4 style="margin-bottom:12px; font-size:14px; font-weight:600;">自定义心情</h4>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="表情" style="width:56px; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:22px; background:var(--primary-bg); color:var(--text-primary);">
+                <input id="custom-mood-label" type="text" maxlength="6" placeholder="名称（最多6字）" style="flex:1; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:14px; background:var(--primary-bg); color:var(--text-primary); font-family:var(--font-family);">
             </div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:12px;">
-                <span style="font-size:11px; opacity:0.6; width:100%;">选择颜色:</span>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;">
+                <span style="font-size:12px; opacity:0.6; width:100%;">选择颜色:</span>
                 <div id="custom-mood-colors" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;"></div>
             </div>
             <div style="display:flex; gap:8px;">
-                <button class="modal-btn modal-btn-secondary" onclick="closeCustomMoodDialog()" style="flex:1; font-size:12px;">取消</button>
-                <button class="modal-btn modal-btn-primary" onclick="saveCustomMood()" style="flex:1; font-size:12px;">添加</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeCustomMoodDialog()" style="flex:1; font-size:13px;">取消</button>
+                <button class="modal-btn modal-btn-primary" onclick="saveCustomMood()" style="flex:1; font-size:13px;">添加</button>
             </div>
         </div>
     
-        <div class="day-detail-card" id="mood-detail-view" style="display:none; width:85%; max-width:320px;">
-            <div class="day-detail-date" id="detail-date">--</div>
-            <div id="detail-my-section" style="margin-bottom:12px;">
-                <div style="font-size:11px; opacity:0.6; margin-bottom:6px; font-weight:600;">我的</div>
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-                    <span id="detail-kaomoji" style="font-size:24px;"></span>
-                    <span id="detail-label" style="font-weight:600;"></span>
-                </div>
-                <div class="day-detail-content" id="detail-text"></div>
-                <div id="detail-my-weather" style="font-size:12px;color:var(--text-secondary);margin-top:4px;display:none;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg><span id="detail-my-weather-val"></span></div>
+        <div class="day-detail-card" id="mood-detail-view" style="display:none; width:88%; max-width:360px;">
+            <div class="mdd-header">
+                <span class="day-detail-date" id="detail-date">--</span>
+                <button class="mde-close-btn" onclick="closeMoodOverlay()"><i class="fas fa-times"></i></button>
             </div>
-                <div id="detail-partner-section" style="border-top:1px dashed var(--border-color); padding-top:10px; margin-top:4px;">
-                <div style="font-size:11px; opacity:0.6; margin-bottom:6px; font-weight:600;" id="detail-partner-title">梦角的</div>
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-                    <span id="detail-partner-kaomoji" style="font-size:24px;"></span>
-                    <span id="detail-partner-label" style="font-weight:600;"></span>
+            <!-- 我的 section -->
+            <div class="mdd-section" id="detail-my-section">
+                <div class="mdd-section-lbl">我的</div>
+                <div id="mdd-my-content">
+                    <div class="mdd-mood-row">
+                        <span id="detail-kaomoji" class="mdd-emoji"></span>
+                        <span id="detail-label" class="mdd-mood-label"></span>
+                    </div>
+                    <div class="mdd-note-text" id="detail-text"></div>
                 </div>
-                <div class="day-detail-content" id="detail-partner-text"></div>
-                <div id="detail-partner-weather" style="font-size:12px;color:var(--text-secondary);margin-top:4px;display:none;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg><span id="detail-partner-weather-val"></span></div>
+                <div id="mdd-my-empty" class="mdd-empty-msg" style="display:none;">今天还没有记录</div>
+                <div class="mdd-section-acts">
+                    <button class="mdd-act-btn" onclick="window._moodOpenEditor(window.selectedDateStr,'me')"><i class="fas fa-pencil-alt"></i></button>
+                    <button class="mdd-act-btn mdd-act-del" id="delete-my-mood" style="display:none;" onclick="deleteDailyMood(window.selectedDateStr,'me')"><i class="fas fa-trash"></i></button>
+                </div>
             </div>
-            <div id="detail-partner-no-record" style="display:none; border-top:1px dashed var(--border-color); padding-top:10px; margin-top:4px; font-size:13px; color:var(--text-secondary); font-style:italic; text-align:center;" id="detail-partner-no-record-msg">Ta 这天还没有留下记录</div>
-            <div style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
-                <button class="modal-btn modal-btn-secondary" onclick="closeMoodOverlay()" style="font-size:12px; padding:6px 12px;">关闭</button>
-                <button class="modal-btn modal-btn-secondary" id="delete-my-mood" onclick="deleteDailyMood(selectedDateStr,'me')" style="font-size:12px; padding:6px 12px; color:#ff6b6b; border-color:rgba(255,107,107,0.4);" data-delete-me>删除我的</button>
-                <button class="modal-btn modal-btn-secondary" id="delete-partner-mood" onclick="deleteDailyMood(selectedDateStr,'partner')" style="font-size:12px; padding:6px 12px; color:#ff6b6b; border-color:rgba(255,107,107,0.4);" data-delete-partner>删除梦角</button>
-                <button class="modal-btn modal-btn-primary" id="edit-existing-mood" style="font-size:12px; padding:6px 12px;">修改我的</button>
-                <button class="modal-btn modal-btn-primary" id="edit-partner-mood" onclick="editPartnerMoodRecord()" style="font-size:12px; padding:6px 12px; background:rgba(255,107,107,0.8);" data-edit-partner>修改梦角</button>
+            <!-- 梦角的 section -->
+            <div class="mdd-section" id="detail-partner-section">
+                <div class="mdd-section-lbl" id="detail-partner-title">梦角的</div>
+                <div id="mdd-partner-content">
+                    <div class="mdd-mood-row">
+                        <span id="detail-partner-kaomoji" class="mdd-emoji"></span>
+                        <span id="detail-partner-label" class="mdd-mood-label"></span>
+                    </div>
+                    <div class="mdd-note-text" id="detail-partner-text"></div>
+                </div>
+                <div id="detail-partner-no-record" class="mdd-empty-msg" style="display:none;">Ta 这天还没有留下记录</div>
+                <div class="mdd-section-acts">
+                    <button class="mdd-act-btn" onclick="window._moodOpenEditor(window.selectedDateStr,'partner')"><i class="fas fa-pencil-alt"></i></button>
+                    <button class="mdd-act-btn mdd-act-del" id="delete-partner-mood" style="display:none;" onclick="deleteDailyMood(window.selectedDateStr,'partner')"><i class="fas fa-trash"></i></button>
+                </div>
             </div>
         </div>
     </div>

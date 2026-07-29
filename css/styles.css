@@ -12142,7 +12142,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .al-subtab.on { color: var(--accent-color); border-bottom-color: var(--accent-color); }
 
 /* 视图容器 */
-.al-view { flex: 1; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.al-view { flex: 1; flex-direction: column; overflow: hidden; }
 
 /* ── 相册列表 ── */
 .al-albums-grid {
@@ -12153,9 +12153,11 @@ body #user-sticker-picker .empty-sticker-tip {
     border-radius: 12px; overflow: hidden;
     background: var(--secondary-bg); cursor: pointer;
     transition: transform 0.15s;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    border: 1px solid var(--border-color);
 }
 .al-album-card:active { transform: scale(0.97); }
-.al-new-card { border: 1.5px dashed var(--border-color); background: transparent; }
+.al-new-card { border: 1.5px dashed color-mix(in srgb, var(--accent-color) 40%, transparent); background: rgba(var(--accent-color-rgb),.03); }
 .al-cover { width: 100%; aspect-ratio: 1; overflow: hidden; }
 .al-new-cover {
     width: 100%; aspect-ratio: 1; display: flex;
@@ -12199,7 +12201,7 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 
 /* ── 日期分组 + 图片网格 ── */
-.al-grid-body { padding: 8px 10px 80px; overflow-y: auto; flex: 1; }
+.al-grid-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 10px 16px; }
 .al-date-label { font-size: 12px; color: var(--text-secondary); padding: 8px 4px 5px; font-weight: 500; }
 .al-photo-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; }
 .al-photo-cell {
@@ -12233,8 +12235,7 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* ── 批量选择栏 ── */
 .al-select-bar {
-    position: sticky; bottom: 0; display: flex;
-    align-items: center; gap: 8px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
     background: var(--secondary-bg); border-top: 1px solid var(--border-color);
     flex-shrink: 0;
 }
@@ -12350,3 +12351,62 @@ body #user-sticker-picker .empty-sticker-tip {
     font-size: 13px; opacity: 0.6; padding: 40px;
 }
 .al-empty i { font-size: 36px; }
+
+/* ── OSS缺省页居中修正 ── */
+.al-no-oss { text-align: center; }
+.al-no-oss-desc { text-align: left; }
+.al-no-oss-path { text-align: left; }
+
+/* ── 相册卡 ⋯ 按钮 ── */
+.al-album-more {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-secondary); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-left: auto;
+    transition: background 0.15s;
+}
+.al-album-more:active { background: var(--border-color); }
+
+/* ── 相册更多操作 Action Sheet ── */
+.al-action-mask {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.4);
+}
+.al-action-body {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--secondary-bg);
+    border-radius: 16px 16px 0 0;
+    padding: 8px 0 env(safe-area-inset-bottom,0);
+    animation: alSheetUp 0.22s ease;
+}
+@keyframes alSheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+.al-action-item {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 14px 20px;
+    background: none; border: none; cursor: pointer;
+    font-size: 15px; color: var(--text-primary);
+    text-align: left;
+}
+.al-action-item:active { background: var(--border-color); }
+.al-action-item i { width: 18px; text-align: center; color: var(--accent-color); }
+.al-action-danger { color: #ff5050 !important; }
+.al-action-danger i { color: #ff5050 !important; }
+.al-action-divider { height: 1px; background: var(--border-color); margin: 0 16px; }
+.al-action-cancel {
+    margin: 8px 12px 4px;
+    padding: 14px; text-align: center;
+    background: var(--primary-bg);
+    border-radius: 12px; font-size: 15px;
+    color: var(--text-secondary); cursor: pointer;
+}
+.al-action-cancel:active { opacity: 0.7; }
+
+/* ── 回收站 tip 在底部 ── */
+.al-trash-tip {
+    font-size: 12px; color: var(--text-secondary);
+    padding: 12px 14px 4px; text-align: center;
+}

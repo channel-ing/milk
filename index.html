@@ -496,12 +496,10 @@
         </div>
 
         <div class="cs-panel" id="cs-panel-album">
-            <!-- 标题栏（与动态/心情手账一致） -->
-            <div class="cs-al-hd">
-                <span class="cs-al-hd-title" id="cs-al-hd-title">相册</span>
-                <button class="cs-icon-btn" id="cs-al-trash-btn" onclick="window._alOpenTrash()" title="回收站">
-                    <i class="fas fa-recycle"></i>
-                </button>
+            <!-- 子tab -->
+            <div class="al-subtabs">
+                <button class="al-subtab on" id="al-st-albums" onclick="window._alBackToList()">相册</button>
+                <button class="al-subtab"    id="al-st-trash"  onclick="window._alOpenTrash()">回收站</button>
             </div>
             <!-- 视图：相册列表 -->
             <div id="al-view-list" class="al-view" style="display:flex;">

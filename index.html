@@ -538,20 +538,24 @@
                     <i class="fas fa-recycle"></i>
                 </button>
             </div>
-            <!-- 日历 -->
-            <div id="mood-calendar-view" class="mood-view-section">
-                <div class="calendar-header">
-                    <button class="calendar-nav-btn" id="prev-month"><i class="fas fa-chevron-left"></i></button>
-                    <div class="current-month-label" id="calendar-month-label">--</div>
-                    <button class="calendar-nav-btn" id="next-month"><i class="fas fa-chevron-right"></i></button>
+            <!-- 日历卡片 -->
+            <div class="cs-mood-card">
+                <div id="mood-calendar-view" class="mood-view-section">
+                    <div class="calendar-header">
+                        <button class="calendar-nav-btn" id="prev-month"><i class="fas fa-chevron-left"></i></button>
+                        <div class="current-month-label" id="calendar-month-label">--</div>
+                        <button class="calendar-nav-btn" id="next-month"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
                 </div>
-                <div class="calendar-weekdays">
-                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-                </div>
-                <div class="calendar-grid" id="calendar-grid"></div>
             </div>
-            <!-- 统计区 -->
-            <div id="mood-stats-container" class="mood-stats-card" style="border:none;box-shadow:none;padding:0;background:transparent;margin-top:8px;"></div>
+            <!-- 统计卡片 -->
+            <div class="cs-mood-card" style="margin-top:10px;">
+                <div id="mood-stats-container"></div>
+            </div>
             <div style="height:20px;"></div>
         </div>
         <div class="cs-panel" id="cs-panel-ann">
@@ -2275,9 +2279,9 @@
 
         <div id="custom-mood-dialog" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--secondary-bg); padding:20px; border-radius:16px; width:80%; max-width:280px; z-index:2200; box-shadow:0 10px 30px rgba(0,0,0,0.3); text-align:center;">
             <h4 style="margin-bottom:12px; font-size:14px; font-weight:600;">自定义心情</h4>
-            <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="表情" style="width:56px; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:22px; background:var(--primary-bg); color:var(--text-primary);">
-                <input id="custom-mood-label" type="text" maxlength="6" placeholder="名称（最多6字）" style="flex:1; border:1px solid var(--border-color); border-radius:8px; padding:8px; font-size:14px; background:var(--primary-bg); color:var(--text-primary); font-family:var(--font-family);">
+            <div style="display:flex; gap:8px; margin-bottom:12px; overflow:hidden;">
+                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="😊" style="width:52px; flex-shrink:0; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px 4px; font-size:20px; background:var(--primary-bg); color:var(--text-primary);">
+                <input id="custom-mood-label" type="text" maxlength="6" placeholder="名称（最多6字）" style="flex:1; min-width:0; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:13px; background:var(--primary-bg); color:var(--text-primary); font-family:var(--font-family);">
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;">
                 <span style="font-size:12px; opacity:0.6; width:100%;">选择颜色:</span>
@@ -2296,7 +2300,7 @@
             </div>
             <!-- 我的 section -->
             <div class="mdd-section" id="detail-my-section">
-                <div class="mdd-section-lbl">我的</div>
+                <div class="mdd-section-lbl" id="detail-my-title">我</div>
                 <div id="mdd-my-content">
                     <div class="mdd-mood-row">
                         <span id="detail-kaomoji" class="mdd-emoji"></span>
@@ -2312,7 +2316,7 @@
             </div>
             <!-- 梦角的 section -->
             <div class="mdd-section" id="detail-partner-section">
-                <div class="mdd-section-lbl" id="detail-partner-title">梦角的</div>
+                <div class="mdd-section-lbl" id="detail-partner-title">梦角</div>
                 <div id="mdd-partner-content">
                     <div class="mdd-mood-row">
                         <span id="detail-partner-kaomoji" class="mdd-emoji"></span>

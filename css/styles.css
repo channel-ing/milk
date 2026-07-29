@@ -11717,7 +11717,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-pills {
     display: flex; justify-content: space-around; align-items: center;
     background: var(--secondary-bg);
-    border-radius: 20px; padding: 10px 8px;
+    border-radius: 28px; padding: 10px 8px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.07);
     border: 1px solid var(--border-color);
 }
@@ -11791,7 +11791,7 @@ body #user-sticker-picker .empty-sticker-tip {
     display: flex; align-items: center; gap: 10px;
     background: var(--secondary-bg);
     border: 1px solid var(--border-color);
-    border-radius: 14px; padding: 11px 14px;
+    border-radius: 22px; padding: 11px 14px;
     margin-bottom: 14px; cursor: pointer;
     transition: var(--transition);
 }
@@ -12539,6 +12539,10 @@ body #user-sticker-picker .empty-sticker-tip {
     padding: 12px 14px;
     border: 1px solid var(--border-color);
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+/* 日历卡片背景用 primary-bg，让 secondary-bg 的日期格子可见 */
+#cs-mood-cal-card {
+    background: var(--primary-bg);
 }
 /* 统计容器内直接使用现有 mood-stat-group 样式，不需要外层 card 样式 */
 .cs-mood-card #mood-stats-container {

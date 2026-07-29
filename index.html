@@ -531,7 +531,28 @@
             </div>
         </div>
         <div class="cs-panel" id="cs-panel-mood">
-            <div class="cs-coming-soon"><i class="fas fa-book-open"></i><div class="cs-cs-title">心情手账</div><div class="cs-cs-sub">即将上线</div></div>
+            <!-- 标题栏 -->
+            <div class="cs-mood-hd">
+                <span class="cs-mood-hd-title">心情手账</span>
+                <button class="cs-icon-btn" id="cs-mood-trash-btn" title="回收站">
+                    <i class="fas fa-recycle"></i>
+                </button>
+            </div>
+            <!-- 日历 -->
+            <div id="mood-calendar-view" class="mood-view-section">
+                <div class="calendar-header">
+                    <button class="calendar-nav-btn" id="prev-month"><i class="fas fa-chevron-left"></i></button>
+                    <div class="current-month-label" id="calendar-month-label">--</div>
+                    <button class="calendar-nav-btn" id="next-month"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="calendar-weekdays">
+                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                </div>
+                <div class="calendar-grid" id="calendar-grid"></div>
+            </div>
+            <!-- 统计区 -->
+            <div id="mood-stats-container" class="mood-stats-card" style="border:none;box-shadow:none;padding:0;background:transparent;margin-top:8px;"></div>
+            <div style="height:20px;"></div>
         </div>
         <div class="cs-panel" id="cs-panel-ann">
             <div class="cs-coming-soon"><i class="fas fa-heart"></i><div class="cs-cs-title">纪念日</div><div class="cs-cs-sub">即将上线</div></div>
@@ -1939,7 +1960,7 @@
                     <div class="settings-item" id="stats-function">
                         <i class="fas fa-chart-bar"></i><span>消息统计</span>
                     </div>
-                    <div class="settings-item" id="mood-function">
+                    <div class="settings-item" id="mood-function" style="display:none;">
                         <i class="fas fa-calendar-day"></i><span>心情手账</span>
                     </div>
                     <div class="settings-item" id="anniversary-function">
@@ -2217,52 +2238,18 @@
     <div id="lenormand-modal" style="display:none;"></div>
 
 
-    <div class="modal" id="mood-modal">
-       <div class="modal-content">
-        <div class="mood-header-actions">
-            <div class="modal-title" style="margin-bottom:0; border:none; padding:0;">
-                <i class="fas fa-book-open"></i><span>心晴手帐</span>
-            </div>
-            <div style="display:flex; gap:8px;">
-                <button class="view-switch-btn active" id="btn-view-calendar">
-                    <i class="fas fa-calendar-alt"></i> 日历
-                </button>
-                <button class="view-switch-btn" id="btn-view-stats">
-                    <i class="fas fa-chart-pie"></i> 统计
-                </button>
-                <button class="view-switch-btn" id="btn-view-trash">
-                    <i class="fas fa-recycle"></i> 回收站
-                </button>
-            </div>
-        </div>
-        <div id="mood-calendar-view" class="mood-view-section">
-            <div class="calendar-header">
-                <button class="calendar-nav-btn" id="prev-month"><i class="fas fa-chevron-left"></i></button>
-                <div class="current-month-label" id="calendar-month-label">--</div>
-                <button class="calendar-nav-btn" id="next-month"><i class="fas fa-chevron-right"></i></button>
-            </div>
-            <div class="calendar-weekdays">
-                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-            </div>
-            <div class="calendar-grid" id="calendar-grid"></div>
-        </div>
-    
-        <div id="mood-stats-view" class="mood-view-section hidden-view">
-            <div id="mood-stats-container" class="mood-stats-card" style="border:none; box-shadow:none; padding:0; background:transparent;">
-            </div>
-        </div>
+    <!-- mood-modal 已移入情侣空间 #cs-panel-mood，此处保留导入导出的隐藏元素 -->
+    <input type="file" id="mood-import-file-input" accept="application/json" style="display:none;">
 
-        <div id="mood-trash-view" class="mood-view-section hidden-view">
-            <div id="mood-trash-list" style="padding:0 14px;"></div>
+    <!-- 心情手账回收站 overlay -->
+    <div class="cs-mood-trash-overlay" id="cs-mood-trash-overlay" style="display:none;">
+        <div class="cs-mood-trash-card">
+            <div class="cs-mood-trash-header">
+                <span>回收站</span>
+                <button class="cs-icon-btn" id="cs-mood-trash-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="mood-trash-list" style="padding:0 14px; overflow-y:auto; flex:1;"></div>
         </div>
-    
-        <div class="modal-buttons">
-            <button class="modal-btn modal-btn-secondary" id="mood-export-btn" style="flex:1;">导出</button>
-            <button class="modal-btn modal-btn-secondary" id="mood-import-btn" style="flex:1;">导入</button>
-            <input type="file" id="mood-import-file-input" accept="application/json" style="display:none;">
-            <button class="modal-btn modal-btn-secondary" id="close-mood">关闭</button>
-        </div>
-       </div>
     </div>
 
     <div class="mood-selector-overlay" id="mood-selector-overlay">

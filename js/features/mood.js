@@ -477,7 +477,10 @@ function updateDualMoodStats(stats) {
     const myBarHTML = createMoodBarHTML(stats.me.counts, myTotal);
     const partnerBarHTML = createMoodBarHTML(stats.partner.counts, partnerTotal);
 
+    const monthLabel = currentCalendarDate.getMonth() + 1;
+
     container.innerHTML = `
+        <div style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:12px; opacity:0.7;">本月心情 &middot; ${monthLabel}月</div>
         <div class="mood-circles-wrapper" style="margin-bottom:20px;">
             <div class="mood-circle-item">
                 <div class="mood-circle" style="--percent: ${myPercent}%">

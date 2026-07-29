@@ -486,7 +486,17 @@ function _alOpenDetail(photoId, albumId) {
     _alRenderDetail(photoId);
 }
 
-window._alBackToList = function() { _alRenderList(); };
+window._alBackToList = function() {
+    _alRenderList();
+    const title = document.getElementById('cs-al-hd-title');
+    const btn = document.getElementById('cs-al-trash-btn');
+    if (title) title.textContent = '相册';
+    if (btn) {
+        btn.onclick = window._alOpenTrash;
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = 'fas fa-recycle';
+    }
+};
 window._alBackToGrid = function() {
     if (window._alCurrentAlbumId === '__trash__') { window._alOpenTrash(); return; }
     if (window._alCurrentAlbumId) _alRenderGrid(window._alCurrentAlbumId);
@@ -545,16 +555,24 @@ window._alUploadToAlbum = function(albumId, input) {
 };
 
 window._alOpenTrash = function() {
-    _alView='trash'; _alSetSubTab('trash'); _alRenderTrash(); _alShowView('trash');
+    _alView='trash'; _alRenderTrash(); _alShowView('trash');
+    const title = document.getElementById('cs-al-hd-title');
+    const btn = document.getElementById('cs-al-trash-btn');
+    if (title) title.textContent = '回收站';
+    if (btn) {
+        btn.onclick = window._alBackToList;
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-left';
+    }
 };
 
 // ─── 主入口 ───
 window._alInit = async function() {
     await loadAlbumData();
     const hasOss = window.CloudSync && window.CloudSync.isConnected();
-    // 没有 OSS 时隐藏 subtab，避免用户切到回收站后再切回相册绕过检测
-    const subtabs = document.querySelector('#cs-panel-album .al-subtabs');
-    if (subtabs) subtabs.style.display = hasOss ? '' : 'none';
+    // 无 OSS 时隐藏回收站按钮
+    const trashBtn = document.getElementById('cs-al-trash-btn');
+    if (trashBtn) trashBtn.style.display = hasOss ? '' : 'none';
     if (!hasOss) {
         _alRenderNoOss();
         return;

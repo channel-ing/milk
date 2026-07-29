@@ -496,10 +496,12 @@
         </div>
 
         <div class="cs-panel" id="cs-panel-album">
-            <!-- 子tab -->
-            <div class="al-subtabs">
-                <button class="al-subtab on" id="al-st-albums" onclick="window._alBackToList()">相册</button>
-                <button class="al-subtab"    id="al-st-trash"  onclick="window._alOpenTrash()">回收站</button>
+            <!-- 标题栏（与动态/心情手账一致） -->
+            <div class="cs-al-hd">
+                <span class="cs-al-hd-title" id="cs-al-hd-title">相册</span>
+                <button class="cs-icon-btn" id="cs-al-trash-btn" onclick="window._alOpenTrash()" title="回收站">
+                    <i class="fas fa-recycle"></i>
+                </button>
             </div>
             <!-- 视图：相册列表 -->
             <div id="al-view-list" class="al-view" style="display:flex;">
@@ -524,7 +526,7 @@
                 </div>
                 <input type="file" id="al-upload-input" multiple accept="image/*" style="display:none;" onchange="window._alUploadToAlbum(window._alCurrentAlbumId,this)">
             </div>
-            <!-- 视图：回收站（无topbar，subtab已说明） -->
+            <!-- 视图：回收站 -->
             <div id="al-view-trash" class="al-view" style="display:none;">
                 <div id="al-trash-body" class="al-grid-body"></div>
                 <div id="al-trash-tip-bar" class="al-trash-tip" style="display:none;">照片将在删除后 30 天自动清除</div>
@@ -2280,7 +2282,7 @@
         <div id="custom-mood-dialog" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--secondary-bg); padding:20px; border-radius:16px; width:80%; max-width:280px; z-index:2200; box-shadow:0 10px 30px rgba(0,0,0,0.3); text-align:center;">
             <h4 style="margin-bottom:12px; font-size:14px; font-weight:600;">自定义心情</h4>
             <div style="display:flex; gap:8px; margin-bottom:12px; overflow:hidden;">
-                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="表情" style="width:52px; flex-shrink:0; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px 4px; font-size:20px; background:var(--primary-bg); color:var(--text-primary);">
+                <input id="custom-mood-emoji" type="text" maxlength="2" placeholder="表情" style="width:52px; flex-shrink:0; text-align:center; border:1px solid var(--border-color); border-radius:8px; padding:8px 4px; font-size:13px; background:var(--primary-bg); color:var(--text-primary);">
                 <input id="custom-mood-label" type="text" maxlength="6" placeholder="名称（最多6字）" style="flex:1; min-width:0; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:13px; background:var(--primary-bg); color:var(--text-primary); font-family:var(--font-family);">
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;">

@@ -393,13 +393,7 @@ function renderMoodCalendar() {
         dayDiv.appendChild(dotsContainer);
 
         dayDiv.addEventListener('click', () => {
-            const dayEntry = moodData[dateStr];
-            if (dayEntry && (dayEntry.user || dayEntry.partner)) {
-                showDayDetails(dateStr, dayEntry);
-            } else {
-                _moodEditorFromDetail = false;
-                openMoodSelector(dateStr, 'me');
-            }
+            showDayDetails(dateStr, moodData[dateStr] || {});
         });
 
         grid.appendChild(dayDiv);
@@ -998,14 +992,17 @@ function showDayDetails(dateStr, data) {
     const detailView = document.getElementById('mood-detail-view');
 
     const allMoods = getAllMoodOptions();
+    const mName = (typeof settings !== 'undefined' && settings.myName) ? settings.myName : '我';
     const pName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '梦角';
 
     const [y, m, d] = dateStr.split('-');
     document.getElementById('detail-date').textContent = `${m}月${d}日`;
 
-    // 更新梦角的标题
+    // 更新标题（只显示昵称，不加"的"）
+    const myTitle = document.getElementById('detail-my-title');
+    if (myTitle) myTitle.textContent = mName;
     const partnerTitle = document.getElementById('detail-partner-title');
-    if (partnerTitle) partnerTitle.textContent = pName + '的';
+    if (partnerTitle) partnerTitle.textContent = pName;
 
     // ── 我的 ──
     const myMood = allMoods.find(mo => mo.key === data.user);
@@ -1071,10 +1068,9 @@ window.closeMoodOverlay = function() {
     }
 };
 window.viewMoodDetailFromEditor = function() {
-    if (!selectedDateStr || !moodData[selectedDateStr]) return;
-    showDayDetails(selectedDateStr, moodData[selectedDateStr]);
+    if (!selectedDateStr) return;
+    showDayDetails(selectedDateStr, moodData[selectedDateStr] || {});
 };
-document.getElementById('cancel-mood-edit').addEventListener('click', closeMoodOverlay);
 
 window.openCustomMoodDialog = function() {
     const dialog = document.getElementById('custom-mood-dialog');
@@ -1210,11 +1206,7 @@ function initMoodListeners() {
     if (cancelMoodBtn && !cancelMoodBtn.dataset.initialized) {
         cancelMoodBtn.dataset.initialized = 'true';
         cancelMoodBtn.addEventListener('click', () => {
-            if (_moodEditorFromDetail && selectedDateStr && moodData[selectedDateStr]) {
-                showDayDetails(selectedDateStr, moodData[selectedDateStr]);
-            } else {
-                closeMoodOverlay();
-            }
+            showDayDetails(selectedDateStr, moodData[selectedDateStr] || {});
         });
     }
 

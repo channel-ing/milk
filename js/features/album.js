@@ -141,7 +141,7 @@ function _alRenderNoOss() {
             <div class="al-no-oss-icon"><i class="fas fa-images"></i></div>
             <div class="al-no-oss-title">相册需要云端存储</div>
             <div class="al-no-oss-desc">
-                图片如果直接存在本地，大量照片会快速撑满浏览器内存，导致页面崩溃。为了避免这种情况，相册功能需要先配置云端存储才能使用。
+                作为一个网页，我其实扛不住太多照片——图片堆多了浏览器就容易撑不住，轻则变卡，重则直接崩掉，之前存的东西也会跟着没了。所以相册需要借助云端来帮忙保管，配置好了就能用啦。不配置也只是相册功能用不了，其他照旧哈。
             </div>
             <div class="al-no-oss-path">
                 <i class="fas fa-route"></i> 配置路径：右上角 ⚙️ 设置 → 数据管理 → 阿里云 OSS
@@ -230,7 +230,7 @@ function _alRenderGrid(albumId) {
     if (uploadBtn) uploadBtn.style.display = isSys ? 'none' : 'flex';
     // 选择按钮显示
     const selBtn = document.getElementById('al-sel-btn');
-    if (selBtn) selBtn.style.display = 'flex';
+    if (selBtn) { selBtn.style.display = 'flex'; selBtn.textContent = '选择'; }
     // 选择栏隐藏
     const selBar = document.getElementById('al-select-bar');
     if (selBar) selBar.style.display = 'none';
@@ -325,21 +325,24 @@ window._alDeleteSelected = function() {
     if (!_alSelectedIds.size) return;
     const isFav = window._alCurrentAlbumId === _SYS_FAVORITES_ID;
     const action = isFav ? '取消收藏' : '删除';
-    if (!confirm(`确定${action}已选的 ${_alSelectedIds.size} 张照片？`)) return;
-    _alSelectedIds.forEach(id => {
-        const photo = albumData.photos.find(p => p.id === id); if (!photo) return;
-        if (isFav) {
-            // 收藏相册：硬删除 + 原图 isFavorite→false
-            albumData.photos = albumData.photos.filter(p => p.id !== id);
-            albumData.photos.filter(p => p.src === photo.src && !p.deletedAt)
-                .forEach(p => { p.isFavorite = false; });
-        } else {
-            photo.deletedAt = Date.now();
-        }
+    const n = _alSelectedIds.size;
+    const desc = isFav ? `共 ${n} 张，将从收藏中移除。` : `共 ${n} 张，将移入回收站，30 天后自动清除。`;
+    _alShowConfirm(action + '照片', desc, action, true, () => {
+        const ids = [..._alSelectedIds];
+        ids.forEach(id => {
+            const photo = albumData.photos.find(p => p.id === id); if (!photo) return;
+            if (isFav) {
+                albumData.photos = albumData.photos.filter(p => p.id !== id);
+                albumData.photos.filter(p => p.src === photo.src && !p.deletedAt)
+                    .forEach(p => { p.isFavorite = false; });
+            } else {
+                photo.deletedAt = Date.now();
+            }
+        });
+        saveAlbumData();
+        _alSelectMode = false; _alSelectedIds.clear();
+        _alRenderGrid(window._alCurrentAlbumId);
     });
-    saveAlbumData();
-    _alSelectMode = false; _alSelectedIds.clear();
-    _alRenderGrid(window._alCurrentAlbumId);
 };
 
 // ─── 渲染：图片详情（全屏 fixed overlay） ───
@@ -448,11 +451,14 @@ function _alRenderTrash() {
                 </div>
             </div>`;
         });
-        html += `</div><div class="al-trash-tip">照片将在删除后 30 天自动清除</div>`;
+        html += `</div>`;
     }
     const body = document.getElementById('al-trash-body'); if (!body) return;
     body.innerHTML = html;
     _alBindLazy(body);
+    // tip 独立元素，始终在底部
+    const tip = document.getElementById('al-trash-tip-bar');
+    if (tip) tip.style.display = trashed.length ? 'block' : 'none';
 }
 
 // ─── 视图切换 ───
@@ -488,23 +494,31 @@ window._alBackToGrid = function() {
 
 window._alToggleFav = function(photoId) { _alToggleFavorite(photoId); };
 
+// 自定义确认弹窗（替代原生confirm，iOS Safari兼容）
 window._alDeletePhoto = function(photoId) {
     const photo = albumData.photos.find(p=>p.id===photoId); if (!photo) return;
     const isFav = window._alCurrentAlbumId === _SYS_FAVORITES_ID;
-    if (isFav) {
-        if (!confirm('取消收藏这张照片？')) return;
-        albumData.photos = albumData.photos.filter(p=>p.id!==photoId);
-        albumData.photos.filter(p=>p.src===photo.src&&!p.deletedAt).forEach(p=>{p.isFavorite=false;});
-    } else {
-        if (!confirm('删除后可在回收站找回，确定删除吗？')) return;
-        photo.deletedAt = Date.now();
-    }
-    saveAlbumData();
-    window._alBackToGrid();
+    const title = isFav ? '取消收藏' : '删除照片';
+    const desc  = isFav ? '照片将从收藏中移除。' : '照片将移入回收站，30 天后自动清除。';
+    const btnTxt= isFav ? '取消收藏' : '删除';
+    _alShowConfirm(title, desc, btnTxt, true, () => {
+        if (isFav) {
+            albumData.photos = albumData.photos.filter(p=>p.id!==photoId);
+            albumData.photos.filter(p=>p.src===photo.src&&!p.deletedAt).forEach(p=>{p.isFavorite=false;});
+        } else {
+            photo.deletedAt = Date.now();
+        }
+        saveAlbumData();
+        window._alBackToGrid();
+    });
 };
 
 window._alRestore    = function(id) { const p=albumData.photos.find(x=>x.id===id); if(p){p.deletedAt=null;saveAlbumData();_alRenderTrash();} };
-window._alPermDelete = function(id) { if(!confirm('永久删除后无法恢复，确定吗？'))return; albumData.photos=albumData.photos.filter(x=>x.id!==id); saveAlbumData();_alRenderTrash(); };
+window._alPermDelete = function(id) {
+    _alShowConfirm('永久删除', '删除后无法恢复，确定吗？', '永久删除', true, () => {
+        albumData.photos=albumData.photos.filter(x=>x.id!==id); saveAlbumData();_alRenderTrash();
+    });
+};
 
 window._alCreateAlbum = function() {
     const name = prompt('相册名称：'); if (!name||!name.trim()) return;
@@ -655,3 +669,27 @@ window._alOpenTrashDetail = function(photoId) {
 
     _alShowView('detail');
 };
+
+// ─── 通用确认弹窗（替代 confirm()） ───
+function _alShowConfirm(title, desc, confirmText, isDanger, onConfirm) {
+    const old = document.getElementById('al-confirm-sheet'); if (old) old.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'al-confirm-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:8500;';
+    sheet.innerHTML = `
+        <div class="al-action-mask" onclick="document.getElementById('al-confirm-sheet').remove()"></div>
+        <div class="al-action-body">
+            <div class="al-confirm-title">${title}</div>
+            <div class="al-confirm-msg">${desc}</div>
+            <div class="al-action-divider"></div>
+            <button class="al-action-item${isDanger?' al-action-danger':''}" id="al-confirm-ok">
+                ${confirmText}
+            </button>
+            <div class="al-action-cancel" onclick="document.getElementById('al-confirm-sheet').remove()">取消</div>
+        </div>`;
+    document.body.appendChild(sheet);
+    document.getElementById('al-confirm-ok').onclick = () => {
+        document.getElementById('al-confirm-sheet')?.remove();
+        onConfirm();
+    };
+}

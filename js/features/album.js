@@ -396,6 +396,7 @@ function _alRenderDetail(photoId) {
     if (delBtn) {
         delBtn.title = isFav ? '取消收藏' : '删除';
         delBtn.innerHTML = isFav ? '<i class="fas fa-heart-broken"></i>' : '<i class="fas fa-trash-alt"></i>';
+        delBtn.onclick = () => window._alDeletePhoto(window._alCurrentPhotoId); // 每次显式重置，防止trash逻辑残留
     }
 
     // 缩略图条
@@ -550,7 +551,11 @@ window._alOpenTrash = function() {
 // ─── 主入口 ───
 window._alInit = async function() {
     await loadAlbumData();
-    if (!window.CloudSync || !window.CloudSync.isConnected()) {
+    const hasOss = window.CloudSync && window.CloudSync.isConnected();
+    // 没有 OSS 时隐藏 subtab，避免用户切到回收站后再切回相册绕过检测
+    const subtabs = document.querySelector('#cs-panel-album .al-subtabs');
+    if (subtabs) subtabs.style.display = hasOss ? '' : 'none';
+    if (!hasOss) {
         _alRenderNoOss();
         return;
     }

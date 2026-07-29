@@ -11770,7 +11770,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-feed-hd {
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 4px 0 10px;
+    padding: 4px 4px 10px;
 }
 .cs-feed-hd-title {
     font-size: 17px; font-weight: 700;
@@ -12437,7 +12437,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-mood-hd {
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 4px 0 10px;
+    padding: 4px 4px 10px;
 }
 .cs-mood-hd-title {
     font-size: 17px; font-weight: 700;
@@ -12553,7 +12553,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-al-hd {
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 4px 0 10px;
+    padding: 4px 4px 10px;
 }
 .cs-al-hd-title {
     font-size: 17px; font-weight: 700;

@@ -12111,8 +12111,9 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* OSS缺省页 */
 .al-no-oss {
+    grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 40px 28px; text-align: center; gap: 12px;
+    justify-content: center; padding: 40px 20px; text-align: center; gap: 12px;
 }
 .al-no-oss-icon { font-size: 44px; color: var(--text-secondary); opacity: 0.5; }
 .al-no-oss-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
@@ -12353,9 +12354,9 @@ body #user-sticker-picker .empty-sticker-tip {
 .al-empty i { font-size: 36px; }
 
 /* ── OSS缺省页居中修正 ── */
-.al-no-oss { text-align: center; }
-.al-no-oss-desc { text-align: left; }
-.al-no-oss-path { text-align: left; }
+.al-no-oss { text-align: center; } /* grid-column already set above */
+.al-no-oss-desc { text-align: center; }
+.al-no-oss-path { text-align: center; }
 
 /* ── 相册卡 ⋯ 按钮 ── */
 .al-album-more {

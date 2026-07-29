@@ -141,7 +141,7 @@ function _alRenderNoOss() {
             <div class="al-no-oss-icon"><i class="fas fa-images"></i></div>
             <div class="al-no-oss-title">相册需要云端存储</div>
             <div class="al-no-oss-desc">
-                作为一个网页，我其实扛不住太多照片——图片堆多了浏览器就容易撑不住，轻则变卡，重则直接崩掉，之前存的东西也会跟着没了。所以相册需要借助云端来帮忙保管，配置好了就能用啦。不配置也只是相册功能用不了，其他照旧哈。
+                作为一个网页，我其实扛不住太多照片——图片堆多了浏览器就容易撑不住，轻则变卡，重则直接崩掉，之前存的东西也会跟着没了。所以相册需要借助云端来帮忙保管，配置好了就能用啦。不配置也只是相册功能用不了，其他功能都可以正常使用。
             </div>
             <div class="al-no-oss-path">
                 <i class="fas fa-route"></i> 配置路径：右上角 ⚙️ 设置 → 数据管理 → 阿里云 OSS

@@ -481,6 +481,7 @@ function _alOpenDetail(photoId, albumId) {
 
 window._alBackToList = function() { _alRenderList(); };
 window._alBackToGrid = function() {
+    if (window._alCurrentAlbumId === '__trash__') { window._alOpenTrash(); return; }
     if (window._alCurrentAlbumId) _alRenderGrid(window._alCurrentAlbumId);
     else _alRenderList();
 };

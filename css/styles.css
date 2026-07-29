@@ -12544,3 +12544,16 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-mood-card #mood-stats-container {
     padding: 0;
 }
+
+/* ── 相册 tab header（与动态/心情手账保持一致） ── */
+.cs-al-hd {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 10px;
+}
+.cs-al-hd-title {
+    font-size: 17px; font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
+}

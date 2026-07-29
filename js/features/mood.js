@@ -481,11 +481,6 @@ function updateDualMoodStats(stats) {
     const myBarHTML = createMoodBarHTML(stats.me.counts, myTotal);
     const partnerBarHTML = createMoodBarHTML(stats.partner.counts, partnerTotal);
 
-    var todayStr = formatDateStr(new Date());
-    var todayEntry = moodData[todayStr] || {};
-    var myWeatherVal = todayEntry.myWeather || '';
-    var partnerWeatherVal = todayEntry.partnerWeather || '';
-
     container.innerHTML = `
         <div class="mood-circles-wrapper" style="margin-bottom:20px;">
             <div class="mood-circle-item">
@@ -495,9 +490,6 @@ function updateDualMoodStats(stats) {
                 <div class="mood-circle-label">
                     <span class="mood-marker me" style="width:8px;height:8px;"></span> ${mName}
                 </div>
-                <div class="stats-weather-tag" onclick="editStatsWeather(this,'me')" title="点击编辑天气">
-                    ${myWeatherVal ? `<span>${myWeatherVal}</span>` : `<span style="opacity:0.4;">+ 天气</span>`}
-                </div>
             </div>
             <div class="mood-circle-item">
                 <div class="mood-circle" style="--percent: ${partnerPercent}%; --accent-color: #ff6b6b;">
@@ -505,9 +497,6 @@ function updateDualMoodStats(stats) {
                 </div>
                 <div class="mood-circle-label">
                     <span class="mood-marker partner" style="width:8px;height:8px;"></span> ${pName}
-                </div>
-                <div class="stats-weather-tag" onclick="editStatsWeather(this,'partner')" title="点击编辑天气">
-                    ${partnerWeatherVal ? `<span>${partnerWeatherVal}</span>` : `<span style="opacity:0.4;">+ 天气</span>`}
                 </div>
             </div>
         </div>
@@ -1312,4 +1301,33 @@ function initMoodListeners() {
             renderMoodCalendar();
         });
     }
+
+    // 回收站 overlay 开关
+    const trashBtn = document.getElementById('cs-mood-trash-btn');
+    const trashOverlay = document.getElementById('cs-mood-trash-overlay');
+    const trashClose = document.getElementById('cs-mood-trash-close');
+    if (trashBtn && trashOverlay && !trashBtn.dataset.initialized) {
+        trashBtn.dataset.initialized = 'true';
+        trashBtn.addEventListener('click', () => {
+            renderMoodTrashList();
+            trashOverlay.style.display = 'flex';
+        });
+    }
+    if (trashClose && trashOverlay && !trashClose.dataset.initialized) {
+        trashClose.dataset.initialized = 'true';
+        trashClose.addEventListener('click', () => {
+            trashOverlay.style.display = 'none';
+        });
+    }
+    if (trashOverlay && !trashOverlay.dataset.initialized) {
+        trashOverlay.dataset.initialized = 'true';
+        trashOverlay.addEventListener('click', (e) => {
+            if (e.target === trashOverlay) trashOverlay.style.display = 'none';
+        });
+    }
 }
+
+// 供 csSwitchTab 调用：切到心情手账 tab 时初始化
+window._moodInit = function() {
+    renderMoodCalendar();
+};

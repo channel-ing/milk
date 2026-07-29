@@ -11662,7 +11662,7 @@ body #user-sticker-picker .empty-sticker-tip {
 /* ── 顶部操作栏 ── */
 .cs-topbar {
     display: flex; align-items: center;
-    padding: 10px 12px 6px;
+    padding: 10px 16px 6px;
     flex-shrink: 0;
 }
 .cs-icon-btn {
@@ -11712,7 +11712,7 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* ── Tab pills ── */
 .cs-pills-wrap {
-    padding: 0 16px 14px; flex-shrink: 0;
+    padding: 0 24px 14px; flex-shrink: 0;
 }
 .cs-pills {
     display: flex; justify-content: space-around; align-items: center;
@@ -11762,7 +11762,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-content .cs-panel {
     position: absolute; inset: 0;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    display: none; padding: 0 14px;
+    display: none; padding: 0 16px;
 }
 .cs-content .cs-panel.cs-panel-active { display: block; }
 

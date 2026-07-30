@@ -558,89 +558,72 @@ window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;wi
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 
-// ── Feed 滚动行为：折叠头部 + FAB ──
+// ── Feed 滚动行为：topbar 标题 + FAB ──
 function _csExpandFeedHeader() {
-    const headerBody = document.getElementById('cs-header-body');
     const title = document.getElementById('cs-topbar-feed-title');
-    const fab = document.getElementById('cs-feed-fab');
+    const fab   = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
-    const feedPanel = document.getElementById('cs-panel-feed');
-    if (headerBody) headerBody.classList.remove('cs-header-collapsed');
-    if (title) title.classList.remove('cs-title-visible');
-    if (fab) fab.classList.remove('cs-fab-hidden');
+    if (title)  title.classList.remove('cs-title-visible');
+    if (fab)    fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
-    if (feedPanel) { feedPanel._feedHeaderVisible = true; feedPanel._feedLastScrollY = 0; feedPanel._feedUpAccum = 0; }
+    // 重置 FAB 方向追踪
+    const feedPanel = document.getElementById('cs-panel-feed');
+    if (feedPanel) { feedPanel._feedLastScrollY = 0; feedPanel._feedUpAccum = 0; }
 }
 
 function _csSetupFeedScroll() {
     const feedPanel = document.getElementById('cs-panel-feed');
     if (!feedPanel || feedPanel._scrollListenerSet) return;
     feedPanel._scrollListenerSet = true;
-    feedPanel._feedHeaderVisible = true;
     feedPanel._feedLastScrollY = 0;
     feedPanel._feedUpAccum = 0;
-    feedPanel._feedScrollSuppressed = false;
 
-    const headerBody = document.getElementById('cs-header-body');
-    const title = document.getElementById('cs-topbar-feed-title');
-    const fab = document.getElementById('cs-feed-fab');
-    const topbar = document.getElementById('cs-topbar');
+    const sentinel = document.getElementById('cs-feed-sentinel');
+    const title    = document.getElementById('cs-topbar-feed-title');
+    const fab      = document.getElementById('cs-feed-fab');
+    const topbar   = document.getElementById('cs-topbar');
 
-    function afterLayout(cb) {
-        // 等两帧让布局稳定后再更新基准
-        requestAnimationFrame(() => requestAnimationFrame(cb));
+    // ① IntersectionObserver：头像区滚出视窗 → 显示 topbar 标题
+    //    完全不改 layout，零 reflow，零抖动
+    if (sentinel) {
+        if (title) title.textContent = '动态';
+        const obs = new IntersectionObserver((entries) => {
+            const visible = entries[0].isIntersecting;
+            if (title)  title.classList.toggle('cs-title-visible', !visible);
+            if (topbar) topbar.classList.toggle('cs-topbar-scrolled', !visible);
+        }, { root: feedPanel, threshold: 0 });
+        obs.observe(sentinel);
+        feedPanel._sentinelObs = obs;
     }
 
+    // ② scroll 事件：只控制 FAB 显隐（无 layout 改动，安全）
     feedPanel.addEventListener('scroll', () => {
-        // 布局稳定期内只更新基准，不判断方向
-        if (feedPanel._feedScrollSuppressed) return;
-
         const scrollY = feedPanel.scrollTop;
-        const delta = scrollY - feedPanel._feedLastScrollY;
+        const delta   = scrollY - feedPanel._feedLastScrollY;
 
         if (delta > 0) {
-            // 向下滚：重置向上累计
+            // 向下滚：FAB 消失
             feedPanel._feedUpAccum = 0;
-            if (scrollY > 80 && feedPanel._feedHeaderVisible) {
-                feedPanel._feedHeaderVisible = false;
-                feedPanel._feedScrollSuppressed = true;
-                if (headerBody) headerBody.classList.add('cs-header-collapsed');
-                if (title) { title.textContent = '动态'; title.classList.add('cs-title-visible'); }
-                if (fab) fab.classList.add('cs-fab-hidden');
-                if (topbar) topbar.classList.add('cs-topbar-scrolled');
-                afterLayout(() => {
-                    feedPanel._feedScrollSuppressed = false;
-                    feedPanel._feedLastScrollY = feedPanel.scrollTop;
-                });
-                return;
+            if (fab && !fab.classList.contains('cs-fab-hidden')) {
+                fab.classList.add('cs-fab-hidden');
             }
         } else if (delta < 0) {
-            // 向上滚：累计到 30px 才展开，防止微抖
+            // 向上滚：累计 30px 才让 FAB 出现，防微抖
             feedPanel._feedUpAccum += Math.abs(delta);
-            if (feedPanel._feedUpAccum >= 30 && !feedPanel._feedHeaderVisible) {
-                feedPanel._feedHeaderVisible = true;
+            if (feedPanel._feedUpAccum >= 30 && fab) {
+                fab.classList.remove('cs-fab-hidden');
                 feedPanel._feedUpAccum = 0;
-                feedPanel._feedScrollSuppressed = true;
-                if (headerBody) headerBody.classList.remove('cs-header-collapsed');
-                if (title) title.classList.remove('cs-title-visible');
-                if (fab) fab.classList.remove('cs-fab-hidden');
-                if (topbar) topbar.classList.remove('cs-topbar-scrolled');
-                afterLayout(() => {
-                    feedPanel._feedScrollSuppressed = false;
-                    feedPanel._feedLastScrollY = feedPanel.scrollTop;
-                });
-                return;
             }
         }
 
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
-    // topbar 点击回顶（避开左右 icon 按钮）
+    // ③ topbar 点击回顶（排除 icon 按钮）
     if (topbar && !topbar._csTopbarClickSet) {
         topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {
-            if (!e.target.closest('.cs-icon-btn') && !feedPanel._feedHeaderVisible) {
+            if (!e.target.closest('.cs-icon-btn')) {
                 feedPanel.scrollTo({ top: 0, behavior: 'smooth' });
             }
         });

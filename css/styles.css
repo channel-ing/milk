@@ -12624,3 +12624,13 @@ body #user-sticker-picker .empty-sticker-tip {
     transform: scale(0.75);
     pointer-events: none;
 }
+
+/* ── cs-outer-header 两种状态下宽度保持一致 ── */
+#cs-outer-header {
+    padding: 0 16px;
+}
+/* 在 feed panel 内时，用负 margin 抵消 panel 的 16px padding */
+#cs-panel-feed #cs-outer-header {
+    margin: 0 -16px;
+    padding: 0 16px;
+}

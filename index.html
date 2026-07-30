@@ -559,53 +559,13 @@
             <div style="height:20px;"></div>
         </div>
         <div class="cs-panel" id="cs-panel-ann">
-            <!-- 纪念日 panel header -->
             <div class="cs-ann-hd">
                 <span class="cs-ann-hd-title">纪念日</span>
                 <button class="cs-icon-btn" id="cs-ann-add-btn" title="添加纪念日">
                     <i class="fas fa-plus"></i>
                 </button>
             </div>
-            <!-- 纪念日列表 -->
             <div id="ann-list-container"></div>
-            <!-- 添加/编辑 编辑器（从 anniversary-modal 移入，绝对定位覆盖整个 panel） -->
-            <div class="ann-editor-slide" id="ann-editor-slide">
-                <div class="ann-editor-header">
-                    <button class="ann-back-btn" id="close-ann-editor"><i class="fas fa-arrow-left"></i></button>
-                    <span id="ann-editor-title">添加纪念日</span>
-                </div>
-                <div class="ann-editor-content">
-                    <div class="ann-form-group">
-                        <label class="ann-label"><i class="fas fa-tag"></i>标题名称</label>
-                        <input type="text" class="modal-input" id="ann-input-name" placeholder="例如：恋爱纪念日、梦角生日" maxlength="16">
-                    </div>
-                    <div class="ann-form-group">
-                        <label class="ann-label"><i class="fas fa-calendar-alt"></i>选择日期</label>
-                        <input type="date" class="modal-input" id="ann-input-date">
-                    </div>
-                    <div class="ann-form-group">
-                        <label class="ann-label"><i class="fas fa-th-large"></i>类型</label>
-                        <div class="ann-type-selector">
-                            <div class="ann-type-btn active" data-type="anniversary" onclick="switchAnnType('anniversary')">
-                                <i class="fas fa-heart"></i>
-                                <span>纪念日</span>
-                                <span class="ann-type-hint">过去 → 今天</span>
-                            </div>
-                            <div class="ann-type-btn" data-type="countdown" onclick="switchAnnType('countdown')">
-                                <i class="fas fa-hourglass-half"></i>
-                                <span>倒数日</span>
-                                <span class="ann-type-hint">今天 → 未来</span>
-                            </div>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px; opacity: 0.7; padding: 0 2px;">
-                            <span id="ann-type-desc">记录从某一天到今天已经走过了多少天，适合相识日、恋爱纪念日等。</span>
-                        </div>
-                    </div>
-                    <button class="modal-btn modal-btn-primary" id="save-ann-btn" style="width: 100%; margin-top: 10px;">
-                        <i class="fas fa-check"></i> 保存
-                    </button>
-                </div>
-            </div>
         </div>
         <div class="cs-panel" id="cs-panel-period">
             <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>
@@ -640,6 +600,48 @@
     </div>
     <input type="file" id="cs-image-input" multiple accept="image/*" style="display:none;" onchange="onCsImagesSelected(this)">
     <input type="file" id="cs-video-input" accept="video/*" style="display:none;" onchange="onCsVideoSelected(this)">
+</div>
+
+<!-- 纪念日 添加/编辑 bottom sheet -->
+<div id="cs-ann-sheet" class="cs-sheet">
+    <div class="cs-sheet-handle-bar"></div>
+    <div class="cs-sheet-header">
+        <button onclick="window.closeAnnSheet()">取消</button>
+        <span id="cs-ann-sheet-title">添加纪念日</span>
+        <button onclick="window.saveAnnFromSheet()" class="cs-submit-btn">保存</button>
+    </div>
+    <div class="cs-ann-sheet-body">
+        <div class="cs-ann-form-row">
+            <label class="cs-ann-form-label">纪念日名称</label>
+            <input type="text" id="cs-ann-input-name" class="modal-input" placeholder="例如：恋爱纪念日、梦角生日" maxlength="16">
+            <div class="cs-ann-char-hint" id="cs-ann-char-count">0 / 8</div>
+        </div>
+        <div class="cs-ann-form-row">
+            <label class="cs-ann-form-label">选择日期</label>
+            <input type="date" id="cs-ann-input-date" class="modal-input">
+        </div>
+        <div class="cs-ann-form-row">
+            <label class="cs-ann-form-label">类型</label>
+            <div class="ann-type-selector">
+                <div class="ann-type-btn active" data-type="anniversary" onclick="switchAnnType('anniversary')">
+                    <i class="fas fa-heart"></i>
+                    <span>纪念日</span>
+                    <span class="ann-type-hint">过去 → 今天</span>
+                </div>
+                <div class="ann-type-btn" data-type="countdown" onclick="switchAnnType('countdown')">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span>倒数日</span>
+                    <span class="ann-type-hint">今天 → 未来</span>
+                </div>
+            </div>
+            <div class="cs-ann-type-desc-wrap">
+                <span id="ann-type-desc">记录从某一天到今天已经走过了多少天，适合相识日、恋爱纪念日等。</span>
+            </div>
+        </div>
+        <button id="cs-ann-sheet-delete" style="display:none;" onclick="window.deleteCurrentAnn()" class="cs-ann-delete-btn">
+            <i class="fas fa-trash-alt"></i> 删除这条纪念日
+        </button>
+    </div>
 </div>
 
 <!-- 帖子详情 bottom sheet -->
@@ -2018,7 +2020,7 @@
                     <div class="settings-item" id="mood-function" style="display:none;">
                         <i class="fas fa-calendar-day"></i><span>心情手账</span>
                     </div>
-                    <div class="settings-item" id="anniversary-function">
+                    <div class="settings-item" id="anniversary-function" style="display:none;">
                         <i class="fas fa-heart"></i><span>重要日</span>
                     </div>
                     <div class="settings-item" id="fortune-lenormand-function" style="position:relative;">
@@ -2989,6 +2991,7 @@
     <script src="js/features.js"></script> 
     <script src="js/data.js"></script>
     <script src="js/onboarding.js"></script> 
+    <script src="js/features/anniversary.js"></script>
     <script src="js/listeners.js"></script>
     <script src="js/listeners-step2.js"></script>
     <script src="js/listeners-voice.js"></script>

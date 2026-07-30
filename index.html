@@ -459,7 +459,7 @@
                 </div>
                 <div class="cs-big-av" id="cs-bav-me">🙂</div>
             </div>
-            <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+            <div class="cs-days-text" id="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
         </div>
         <div class="cs-pills-wrap">
             <div class="cs-pills">
@@ -559,7 +559,103 @@
             <div style="height:20px;"></div>
         </div>
         <div class="cs-panel" id="cs-panel-ann">
-            <div class="cs-coming-soon"><i class="fas fa-heart"></i><div class="cs-cs-title">纪念日</div><div class="cs-cs-sub">即将上线</div></div>
+
+            <!-- ── 视图A：列表 ── -->
+            <div id="ann-view-list">
+                <div class="ann-hd">
+                    <span class="ann-hd-title">纪念日</span>
+                    <button class="cs-icon-btn" onclick="window._annOpenAdd()" title="添加纪念日">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <!-- 置顶大卡 -->
+                <div id="ann-featured-wrap"></div>
+                <!-- 其余列表 -->
+                <div id="ann-list-rows"></div>
+                <div style="height:20px;"></div>
+            </div>
+
+            <!-- ── 视图B：详情 ── -->
+            <div id="ann-view-detail" style="display:none;">
+                <div class="ann-detail-topbar">
+                    <button class="cs-icon-btn" onclick="window._annBackToList()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="ann-edit-link" onclick="window._annOpenEdit()">编辑</button>
+                </div>
+                <!-- 封面大卡（图片 + 数字 + 日期） -->
+                <div class="ann-detail-cover" id="ann-detail-cover"></div>
+                <!-- 置顶按钮 -->
+                <button class="ann-pin-btn" id="ann-pin-btn" onclick="window._annPinCurrent()">置顶</button>
+                <!-- 备注卡 -->
+                <div class="ann-notes-card">
+                    <div class="ann-notes-label">备注</div>
+                    <textarea id="ann-notes-input" class="ann-notes-textarea"
+                              placeholder="记录一些想说的话……"></textarea>
+                </div>
+                <div style="height:20px;"></div>
+            </div>
+
+            <!-- ── 弹窗：添加 / 编辑（position:fixed，覆盖全屏） ── -->
+            <div id="ann-dialog-overlay">
+                <div class="ann-dialog-mask" onclick="window._annCloseDialog()"></div>
+                <div class="ann-dialog">
+                    <div class="ann-dialog-hd">
+                        <span class="ann-dialog-title" id="ann-dialog-title">添加纪念日</span>
+                        <button class="cs-icon-btn" onclick="window._annCloseDialog()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="ann-dialog-body">
+                        <div class="ann-form-row">
+                            <label class="ann-form-label">纪念日名称</label>
+                            <input type="text" id="ann-inp-name" class="ann-form-inp"
+                                   maxlength="12" placeholder="例如：恋爱纪念日、梦角生日">
+                        </div>
+                        <div class="ann-form-row">
+                            <label class="ann-form-label">选择日期</label>
+                            <input type="date" id="ann-inp-date" class="ann-form-inp">
+                        </div>
+                        <div class="ann-form-row">
+                            <label class="ann-form-label">封面图片</label>
+                            <div id="ann-cover-preview" class="ann-cover-preview"
+                                 onclick="document.getElementById('ann-cover-file').click()">
+                                <i class="fas fa-image"></i>
+                                <span id="ann-cover-hint">点击上传图片</span>
+                            </div>
+                            <input type="file" id="ann-cover-file" accept="image/*"
+                                   style="display:none;" onchange="window._annHandleCover(this)">
+                        </div>
+                        <div class="ann-form-row">
+                            <label class="ann-form-label">类型</label>
+                            <div class="ann-type-row">
+                                <button class="ann-type-btn ann-type-on" id="ann-tbtn-anniversary"
+                                        onclick="window._annSetType('anniversary')">
+                                    <div class="ann-type-name">纪念日</div>
+                                    <div class="ann-type-sub">过去 → 今天</div>
+                                </button>
+                                <button class="ann-type-btn" id="ann-tbtn-countdown"
+                                        onclick="window._annSetType('countdown')">
+                                    <div class="ann-type-name">倒数日</div>
+                                    <div class="ann-type-sub">今天 → 未来</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ann-form-row">
+                            <label class="ann-form-label">类型描述文案</label>
+                            <input type="text" id="ann-inp-desc" class="ann-form-inp"
+                                   placeholder="例如：已经走过了 / 距离还有">
+                        </div>
+                    </div>
+                    <div class="ann-dialog-foot">
+                        <button id="ann-del-btn" class="ann-btn-del" style="display:none;"
+                                onclick="window._annDeleteFromDialog()">删除</button>
+                        <button class="ann-btn-cancel" onclick="window._annCloseDialog()">取消</button>
+                        <button class="ann-btn-save" onclick="window._annSave()">保存</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
         <div class="cs-panel" id="cs-panel-period">
             <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>

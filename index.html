@@ -445,26 +445,7 @@
         <button class="cs-icon-btn"><i class="fas fa-cog"></i></button>
     </div>
 
-    <!-- 可折叠区域：头像 + tab pills -->
-    <div id="cs-header-body">
-
-    <!-- 双头像 + 心电图 + 天数 -->
-    <div class="cs-couple-section">
-        <div class="cs-couple-row">
-            <div class="cs-big-av" id="cs-bav-partner">🌸</div>
-            <div class="cs-hb-wrap">
-                <svg viewBox="0 0 140 44" xmlns="http://www.w3.org/2000/svg" class="cs-hb-svg">
-                    <polyline points="0,22 18,22 26,8 34,36 42,12 50,30 58,22 80,22 88,8 96,36 104,14 112,28 120,22 140,22"
-                        fill="none" stroke="currentColor" stroke-width="1.8"
-                        stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </div>
-            <div class="cs-big-av" id="cs-bav-me">🙂</div>
-        </div>
-        <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
-    </div>
-
-    <!-- Tab 图标 pill -->
+    <!-- Tab 图标 pill（固定在滚动区外，始终可见） -->
     <div class="cs-pills-wrap">
         <div class="cs-pills">
             <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
@@ -475,12 +456,27 @@
         </div>
     </div>
 
-    </div><!-- /cs-header-body -->
-
     <!-- 内容区 -->
     <div class="cs-content">
 
         <div class="cs-panel cs-panel-active" id="cs-panel-feed">
+            <!-- 头像区：随内容自然滚走，不再固定在顶部 -->
+            <div class="cs-couple-section" id="cs-couple-section-inner">
+                <div class="cs-couple-row">
+                    <div class="cs-big-av" id="cs-bav-partner">🌸</div>
+                    <div class="cs-hb-wrap">
+                        <svg viewBox="0 0 140 44" xmlns="http://www.w3.org/2000/svg" class="cs-hb-svg">
+                            <polyline points="0,22 18,22 26,8 34,36 42,12 50,30 58,22 80,22 88,8 96,36 104,14 112,28 120,22 140,22"
+                                fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="cs-big-av" id="cs-bav-me">🙂</div>
+                </div>
+                <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+            </div>
+            <!-- 哨兵：头像区滚出视窗时触发 topbar 标题显示 -->
+            <div id="cs-feed-sentinel" style="height:1px; margin-top:-1px;"></div>
             <!-- 动态 section header -->
             <div class="cs-feed-hd">
                 <span class="cs-feed-hd-title">动态</span>

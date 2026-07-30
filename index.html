@@ -442,17 +442,17 @@
     <div class="cs-topbar" id="cs-topbar" style="position:relative;">
         <button class="cs-icon-btn" onclick="closeCoupleSpace()"><i class="fas fa-chevron-left"></i></button>
         <span class="cs-topbar-feed-title" id="cs-topbar-feed-title"></span>
-        <button class="cs-icon-btn"><i class="fas fa-cog"></i></button>
+        <button class="cs-icon-btn" style="margin-left:auto;"><i class="fas fa-cog"></i></button>
     </div>
 
-    <!-- Tab 图标 pill（固定在滚动区外，始终可见） -->
-    <div class="cs-pills-wrap">
+    <!-- Fixed pills：仅在非动态 tab 时显示 -->
+    <div class="cs-pills-wrap" id="cs-pills-fixed" style="display:none;">
         <div class="cs-pills">
-            <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
-            <button class="cs-pill"             id="csp-album"  onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
-            <button class="cs-pill"             id="csp-mood"   onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
-            <button class="cs-pill"             id="csp-ann"    onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
-            <button class="cs-pill"             id="csp-period" onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
+            <button class="cs-pill" id="cspf-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
+            <button class="cs-pill" id="cspf-album"   onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
+            <button class="cs-pill" id="cspf-mood"    onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
+            <button class="cs-pill" id="cspf-ann"     onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
+            <button class="cs-pill" id="cspf-period"  onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
         </div>
     </div>
 
@@ -460,7 +460,7 @@
     <div class="cs-content">
 
         <div class="cs-panel cs-panel-active" id="cs-panel-feed">
-            <!-- 头像区：随内容自然滚走，不再固定在顶部 -->
+            <!-- 头像区：随内容自然滚走 -->
             <div class="cs-couple-section" id="cs-couple-section-inner">
                 <div class="cs-couple-row">
                     <div class="cs-big-av" id="cs-bav-partner">🌸</div>
@@ -475,7 +475,17 @@
                 </div>
                 <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
             </div>
-            <!-- 哨兵：头像区滚出视窗时触发 topbar 标题显示 -->
+            <!-- Scroll pills：随内容滚走，feed tab 专用 -->
+            <div class="cs-pills-wrap" id="cs-pills-scroll" style="padding-bottom:10px;">
+                <div class="cs-pills">
+                    <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
+                    <button class="cs-pill"             id="csp-album"   onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
+                    <button class="cs-pill"             id="csp-mood"    onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
+                    <button class="cs-pill"             id="csp-ann"     onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
+                    <button class="cs-pill"             id="csp-period"  onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
+                </div>
+            </div>
+            <!-- 哨兵：avatar+pills 全部滚出后触发 topbar 标题 -->
             <div id="cs-feed-sentinel" style="height:1px; margin-top:-1px;"></div>
             <!-- 动态 section header -->
             <div class="cs-feed-hd">

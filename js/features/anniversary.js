@@ -50,10 +50,10 @@ function _annSetupSwipe(wrap) {
     if (!inner || !actions) return;
 
     var startX = 0, startY = 0, dragBaseX = 0;
-    var swipeDir = null;
-    var isOpen = false;
+    var decided = false, isHoriz = false;
+    var isOpen  = false;
 
-    function actW() { return actions.offsetWidth || 140; }
+    function actW() { return actions.offsetWidth || 144; }
 
     function snapTo(x, animate) {
         if (animate) {
@@ -72,25 +72,26 @@ function _annSetupSwipe(wrap) {
         startX    = e.touches[0].clientX;
         startY    = e.touches[0].clientY;
         dragBaseX = isOpen ? -actW() : 0;
-        swipeDir  = null;
+        decided   = false;
+        isHoriz   = false;
     }, { passive: true });
 
+    // touch-action:pan-y 已告知浏览器横向不归它管，这里 passive:true 即可
     inner.addEventListener('touchmove', function(e) {
         var dx = e.touches[0].clientX - startX;
         var dy = e.touches[0].clientY - startY;
-        if (swipeDir === null) {
-            if (Math.abs(dy) > Math.abs(dx) + 3) { swipeDir = false; return; }
-            if (Math.abs(dx) < 5) return;
-            swipeDir = true;
+        if (!decided) {
+            if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+            isHoriz = Math.abs(dx) > Math.abs(dy);
+            decided = true;
         }
-        if (!swipeDir) return;
-        e.preventDefault();
+        if (!isHoriz) return;
         var newX = Math.min(0, Math.max(-actW(), dragBaseX + dx));
-        inner.style.transform = 'translateX(' + newX + 'px)';
-    }, { passive: false });
+        inner.style.transform = newX === 0 ? '' : 'translateX(' + newX + 'px)';
+    }, { passive: true });
 
     inner.addEventListener('touchend', function(e) {
-        if (swipeDir !== true) return;
+        if (!decided || !isHoriz) return;
         var dx     = e.changedTouches[0].clientX - startX;
         var totalX = dragBaseX + dx;
         if (totalX < -(actW() * 0.35)) {
@@ -100,7 +101,6 @@ function _annSetupSwipe(wrap) {
         }
     }, { passive: true });
 
-    // 点击 inner：若已展开则收起，否则触发编辑
     inner.addEventListener('click', function(e) {
         if (e.target.closest('.ann-swipe-actions')) return;
         if (isOpen) { snapTo(0, true); isOpen = false; return; }

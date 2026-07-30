@@ -405,14 +405,7 @@ window._mDeletePost=function(postId){
 };
 
 // ─── 天数 & 头像 ───
-function _updateDaysCounter(){
-    // 优先交给 anniversary 模块（含置顶逻辑 + 全行文字更新）
-    if(typeof window._annUpdateHeader==='function'){window._annUpdateHeader();return;}
-    // fallback：无 anniversary 模块时走旧逻辑
-    const el=document.getElementById('cs-days-num');if(!el)return;
-    try{const list=Array.isArray(anniversaries)?anniversaries:[];const main=list.find(a=>a.type==='anniversary')||list[0];if(main&&main.date){const diff=Math.floor((Date.now()-new Date(main.date))/86400000)+1;if(diff>0){el.textContent=diff;return;}}}catch(e){}
-    el.textContent='---';
-}
+function _updateDaysCounter(){const el=document.getElementById('cs-days-num');if(!el)return;try{const list=Array.isArray(anniversaries)?anniversaries:[];const main=list.find(a=>a.type==='anniversary')||list[0];if(main&&main.date){const diff=Math.floor((Date.now()-new Date(main.date))/86400000)+1;if(diff>0){el.textContent=diff;return;}}}catch(e){}el.textContent='---';}
 function _updateBigAvatars(){const ptEl=document.getElementById('cs-bav-partner'),meEl=document.getElementById('cs-bav-me');if(ptEl){const s=_getAvSrc(true);ptEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🌸';}if(meEl){const s=_getAvSrc(false);meEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🙂';}}
 
 // ─── 主入口 ───

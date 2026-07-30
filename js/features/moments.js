@@ -413,6 +413,12 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        // 页面动画前先把 header 放好（此时整页还在 translateY(100%) 不可见）
+        const outerHeader=document.getElementById('cs-outer-header');
+        const feedPanel=document.getElementById('cs-panel-feed');
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
+        }
         page.classList.add('cs-open');
         _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
         if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
@@ -425,8 +431,29 @@ window.closeCoupleSpace=window.closeMomentsModal=function(){
     setTimeout(()=>{page.style.display='none';},380);
 };
 window.csSwitchTab=function(tab){
+    const feedPanel   = document.getElementById('cs-panel-feed');
+    const outerHeader = document.getElementById('cs-outer-header');
+    const csContent   = document.querySelector('.cs-content');
+
+    if(tab==='feed'){
+        // 先把 header 搬进 feed（此时 feed 还是 display:none，移动不可见）
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
+        }
+        if(feedPanel)feedPanel.scrollTop=0;
+    }
+
+    // 切换面板可见性
     _csSetTab(tab);
     _csExpandFeedHeader();
+
+    if(tab!=='feed'){
+        // feed 已经 display:none，再把 header 搬回去（移动不可见）
+        if(outerHeader&&csContent&&outerHeader.parentElement===feedPanel){
+            csContent.parentElement.insertBefore(outerHeader,csContent);
+        }
+    }
+
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
     if(tab==='feed')_csRenderFeed();
@@ -569,14 +596,12 @@ window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;wi
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 
-// ── Feed 滚动行为：header 淡出 + topbar 标题 + FAB ──
+// ── Feed 滚动行为：header 随内容滚走 + topbar 标题 + FAB ──
 function _csExpandFeedHeader() {
-    const outerHeader = document.getElementById('cs-outer-header');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     const feedPanel = document.getElementById('cs-panel-feed');
-    if (outerHeader) { outerHeader.style.opacity = ''; outerHeader.style.pointerEvents = ''; }
     if (title)  title.classList.remove('cs-title-visible');
     if (fab)    fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
@@ -584,50 +609,35 @@ function _csExpandFeedHeader() {
 }
 
 function _csSetupFeedScroll() {
-    const feedPanel   = document.getElementById('cs-panel-feed');
+    const feedPanel = document.getElementById('cs-panel-feed');
     if (!feedPanel || feedPanel._scrollListenerSet) return;
     feedPanel._scrollListenerSet = true;
     feedPanel._feedLastScrollY  = 0;
     feedPanel._feedUpAccum      = 0;
 
-    const outerHeader = document.getElementById('cs-outer-header');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     if (title) title.textContent = '动态';
 
-    // 淡出阈值：开始淡出的 scrollTop，以及完全消失的 scrollTop
-    const FADE_START = 40;
-    const FADE_END   = 100;
+    // ① IntersectionObserver：outer-header 滚出视窗 → 显示 topbar 标题
+    const outerHeader = document.getElementById('cs-outer-header');
+    if (outerHeader) {
+        if (feedPanel._sentinelObs) feedPanel._sentinelObs.disconnect();
+        const obs = new IntersectionObserver((entries) => {
+            if (!feedPanel.classList.contains('cs-panel-active')) return;
+            const visible = entries[0].isIntersecting;
+            if (title)  title.classList.toggle('cs-title-visible', !visible);
+            if (topbar) topbar.classList.toggle('cs-topbar-scrolled', !visible);
+        }, { root: feedPanel, threshold: 0 });
+        obs.observe(outerHeader);
+        feedPanel._sentinelObs = obs;
+    }
 
+    // ② scroll 事件：FAB 方向控制
     feedPanel.addEventListener('scroll', () => {
-        // 只在 feed tab 激活时处理
-        if (!feedPanel.classList.contains('cs-panel-active')) return;
-
         const scrollY = feedPanel.scrollTop;
         const delta   = scrollY - feedPanel._feedLastScrollY;
-
-        // ① header 淡出淡入（纯 opacity，零 layout 变化）
-        if (outerHeader) {
-            if (scrollY <= FADE_START) {
-                outerHeader.style.opacity = '';
-                outerHeader.style.pointerEvents = '';
-            } else if (scrollY >= FADE_END) {
-                outerHeader.style.opacity = '0';
-                outerHeader.style.pointerEvents = 'none';
-            } else {
-                const progress = (scrollY - FADE_START) / (FADE_END - FADE_START);
-                outerHeader.style.opacity = String(1 - progress);
-                outerHeader.style.pointerEvents = progress > 0.5 ? 'none' : '';
-            }
-        }
-
-        // ② topbar 标题：完全淡出后显示
-        const scrolledAway = scrollY >= FADE_END;
-        if (title)  title.classList.toggle('cs-title-visible', scrolledAway);
-        if (topbar) topbar.classList.toggle('cs-topbar-scrolled', scrolledAway);
-
-        // ③ FAB：向下滚动隐藏，向上累计 30px 显示
         if (delta > 0) {
             feedPanel._feedUpAccum = 0;
             if (fab) fab.classList.add('cs-fab-hidden');
@@ -638,11 +648,10 @@ function _csSetupFeedScroll() {
                 feedPanel._feedUpAccum = 0;
             }
         }
-
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
-    // ④ topbar 点击回顶（排除 icon 按钮）
+    // ③ topbar 点击回顶
     if (topbar && !topbar._csTopbarClickSet) {
         topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {

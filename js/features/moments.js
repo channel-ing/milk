@@ -413,15 +413,13 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        page.classList.add('cs-open');
-        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();
-        // 量 header 高度，给所有面板加 padding-top，内容从 header 底部开始
-        const oh=document.getElementById('cs-outer-header');
-        if(oh){
-            const h=oh.offsetHeight;
-            document.querySelectorAll('.cs-content .cs-panel').forEach(p=>{p.style.paddingTop=h+'px';});
+        const outerHeader=document.getElementById('cs-outer-header');
+        const feedPanel=document.getElementById('cs-panel-feed');
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
         }
-        _csExpandFeedHeader();_csSetupFeedScroll();
+        page.classList.add('cs-open');
+        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
         if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
     }));
 };
@@ -432,8 +430,26 @@ window.closeCoupleSpace=window.closeMomentsModal=function(){
     setTimeout(()=>{page.style.display='none';},380);
 };
 window.csSwitchTab=function(tab){
+    const feedPanel   = document.getElementById('cs-panel-feed');
+    const outerHeader = document.getElementById('cs-outer-header');
+    const csContent   = document.querySelector('.cs-content');
+
+    if(tab==='feed'){
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
+        }
+        if(feedPanel)feedPanel.scrollTop=0;
+    }
+
     _csSetTab(tab);
-    _csExpandFeedHeader(); // 重置 transform，头部回到原位
+    _csExpandFeedHeader();
+
+    if(tab!=='feed'){
+        if(outerHeader&&csContent&&outerHeader.parentElement===feedPanel){
+            csContent.parentElement.insertBefore(outerHeader,csContent);
+        }
+    }
+
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
     if(tab==='feed')_csRenderFeed();
@@ -576,14 +592,12 @@ window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;wi
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 
-// ── Feed 滚动行为：transform 跟手滑走，零 DOM 操作，零闪烁 ──
+// ── Feed 滚动行为 ──
 function _csExpandFeedHeader() {
-    const outerHeader = document.getElementById('cs-outer-header');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     const feedPanel = document.getElementById('cs-panel-feed');
-    if (outerHeader) outerHeader.style.transform = '';
     if (title)  title.classList.remove('cs-title-visible');
     if (fab)    fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
@@ -597,32 +611,27 @@ function _csSetupFeedScroll() {
     feedPanel._feedLastScrollY  = 0;
     feedPanel._feedUpAccum      = 0;
 
-    const outerHeader = document.getElementById('cs-outer-header');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     if (title) title.textContent = '动态';
 
-    // 头部最大可滑动距离（初始化时计算一次）
-    const maxSlide = outerHeader ? outerHeader.offsetHeight : 0;
+    const outerHeader = document.getElementById('cs-outer-header');
+    if (outerHeader) {
+        if (feedPanel._sentinelObs) feedPanel._sentinelObs.disconnect();
+        const obs = new IntersectionObserver((entries) => {
+            if (!feedPanel.classList.contains('cs-panel-active')) return;
+            const visible = entries[0].isIntersecting;
+            if (title)  title.classList.toggle('cs-title-visible', !visible);
+            if (topbar) topbar.classList.toggle('cs-topbar-scrolled', !visible);
+        }, { root: feedPanel, threshold: 0 });
+        obs.observe(outerHeader);
+        feedPanel._sentinelObs = obs;
+    }
 
     feedPanel.addEventListener('scroll', () => {
-        if (!feedPanel.classList.contains('cs-panel-active')) return;
-
         const scrollY = feedPanel.scrollTop;
         const delta   = scrollY - feedPanel._feedLastScrollY;
-
-        // ① 头部上移（仅 outerHeader，cs-content 不动 → 底部永远没空白）
-        const slide = Math.min(scrollY, maxSlide);
-        const tf = slide > 0 ? `translateY(-${slide}px)` : '';
-        if (outerHeader) outerHeader.style.transform = tf;
-
-        // ② topbar 标题：头部完全滑走后显示
-        const hidden = scrollY >= maxSlide;
-        if (title)  title.classList.toggle('cs-title-visible', hidden);
-        if (topbar) topbar.classList.toggle('cs-topbar-scrolled', hidden);
-
-        // ③ FAB 方向控制
         if (delta > 0) {
             feedPanel._feedUpAccum = 0;
             if (fab) fab.classList.add('cs-fab-hidden');
@@ -633,11 +642,9 @@ function _csSetupFeedScroll() {
                 feedPanel._feedUpAccum = 0;
             }
         }
-
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
-    // ④ topbar 点击回顶
     if (topbar && !topbar._csTopbarClickSet) {
         topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {

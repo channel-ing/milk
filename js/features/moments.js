@@ -413,6 +413,7 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        // 页面动画前先把 header 放好（此时整页还在 translateY(100%) 不可见）
         const outerHeader=document.getElementById('cs-outer-header');
         const feedPanel=document.getElementById('cs-panel-feed');
         if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
@@ -435,16 +436,19 @@ window.csSwitchTab=function(tab){
     const csContent   = document.querySelector('.cs-content');
 
     if(tab==='feed'){
+        // 先移 header 进 feed（feed 还是 display:none，不可见）
         if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
             feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
         }
-        if(feedPanel)feedPanel.scrollTop=0;
+        // 注意：不在这里操作 scrollTop，避免强制 reflow 产生中间帧
     }
 
+    // 切换面板可见性（与上面 DOM 移动合并进同一次渲染批次）
     _csSetTab(tab);
     _csExpandFeedHeader();
 
     if(tab!=='feed'){
+        // feed 已经 display:none，再搬 header 出来（不可见）
         if(outerHeader&&csContent&&outerHeader.parentElement===feedPanel){
             csContent.parentElement.insertBefore(outerHeader,csContent);
         }
@@ -452,7 +456,11 @@ window.csSwitchTab=function(tab){
 
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
-    if(tab==='feed')_csRenderFeed();
+
+    if(tab==='feed'){
+        if(feedPanel)feedPanel.scrollTop=0; // 面板已可见再重置，安全
+        _csRenderFeed();
+    }
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
 };
@@ -592,7 +600,7 @@ window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;wi
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 
-// ── Feed 滚动行为 ──
+// ── Feed 滚动行为：header 随内容滚走 + topbar 标题 + FAB ──
 function _csExpandFeedHeader() {
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
@@ -616,6 +624,7 @@ function _csSetupFeedScroll() {
     const topbar = document.getElementById('cs-topbar');
     if (title) title.textContent = '动态';
 
+    // ① IntersectionObserver：outer-header 滚出视窗 → 显示 topbar 标题
     const outerHeader = document.getElementById('cs-outer-header');
     if (outerHeader) {
         if (feedPanel._sentinelObs) feedPanel._sentinelObs.disconnect();
@@ -629,6 +638,7 @@ function _csSetupFeedScroll() {
         feedPanel._sentinelObs = obs;
     }
 
+    // ② scroll 事件：FAB 方向控制
     feedPanel.addEventListener('scroll', () => {
         const scrollY = feedPanel.scrollTop;
         const delta   = scrollY - feedPanel._feedLastScrollY;
@@ -645,6 +655,7 @@ function _csSetupFeedScroll() {
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
+    // ③ topbar 点击回顶
     if (topbar && !topbar._csTopbarClickSet) {
         topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {

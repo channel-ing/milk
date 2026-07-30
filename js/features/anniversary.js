@@ -4,10 +4,10 @@
  */
 
 // ── 模块状态 ──────────────────────────────────────────────
-var _annEditingId = null;   // null=新建；Number=编辑中的 id
+var _annEditingId = null;
 var _annPinnedId  = null;   // null/'meet'=相遇；Number=具体条目
 
-// ── 置顶：持久化 ──────────────────────────────────────────
+// ── 置顶持久化 ────────────────────────────────────────────
 async function _annLoadPinnedId() {
     try {
         var val = await localforage.getItem(getStorageKey('annPinnedId'));
@@ -26,9 +26,8 @@ window._annPinItem = function(annId) {
     if (typeof showNotification === 'function') showNotification('已置顶', 'success');
 };
 
-// ── 获取当前置顶（供 Step 3 使用）────────────────────────
+// ── 获取当前置顶数据（供 Step 3 使用）────────────────────
 window._annGetPinned = function() {
-    // 返回 { type:'meet'|'ann', data:... }
     var isMeet = (_annPinnedId === null || _annPinnedId === 'meet');
     if (isMeet) {
         var msgs = (typeof messages !== 'undefined') ? messages : [];
@@ -38,42 +37,37 @@ window._annGetPinned = function() {
         return { type: 'meet', name: '相遇', days: days, dayLabel: '天', start: start };
     }
     var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === _annPinnedId; });
-    if (!ann) return null; // 被删除了，回退
-    var now = new Date();
-    var target = new Date(ann.date);
-    var isCD = ann.type === 'countdown';
-    var days2 = isCD
-        ? Math.max(0, Math.ceil((target - now) / 86400000))
-        : Math.max(0, Math.floor((now - target) / 86400000));
+    if (!ann) return null;
+    var now = new Date(), target = new Date(ann.date), isCD = ann.type === 'countdown';
+    var days2 = isCD ? Math.max(0, Math.ceil((target - now) / 86400000)) : Math.max(0, Math.floor((now - target) / 86400000));
     return { type: 'ann', name: ann.name, days: days2, dayLabel: isCD ? '天后' : '天', ann: ann };
 };
 
-// ── 左滑手势 ──────────────────────────────────────────────
+// ── 左滑手势（基于 ann-swipe-inner 平移）─────────────────
 function _annSetupSwipe(wrap) {
-    var card    = wrap.querySelector('.ann-item-card');
+    var inner   = wrap.querySelector('.ann-swipe-inner');
     var actions = wrap.querySelector('.ann-swipe-actions');
-    if (!card || !actions) return;
+    if (!inner || !actions) return;
 
     var startX = 0, startY = 0, dragBaseX = 0;
-    var swipeDir = null;  // null=未决, true=横向, false=纵向
+    var swipeDir = null;
     var isOpen = false;
 
     function actW() { return actions.offsetWidth || 140; }
 
     function snapTo(x, animate) {
         if (animate) {
-            card.style.transition = 'transform 0.22s cubic-bezier(0.4,0,0.2,1)';
-            setTimeout(function() { card.style.transition = ''; }, 230);
+            inner.style.transition = 'transform 0.22s cubic-bezier(0.4,0,0.2,1)';
+            setTimeout(function() { inner.style.transition = ''; }, 230);
         }
-        card.style.transform = x === 0 ? '' : 'translateX(' + x + 'px)';
+        inner.style.transform = x === 0 ? '' : 'translateX(' + x + 'px)';
     }
 
-    // 供外部调用关闭
     wrap._closeSwipe = function() {
         if (isOpen) { snapTo(0, true); isOpen = false; }
     };
 
-    card.addEventListener('touchstart', function(e) {
+    inner.addEventListener('touchstart', function(e) {
         _annCloseAllSwipesExcept(wrap);
         startX    = e.touches[0].clientX;
         startY    = e.touches[0].clientY;
@@ -81,7 +75,7 @@ function _annSetupSwipe(wrap) {
         swipeDir  = null;
     }, { passive: true });
 
-    card.addEventListener('touchmove', function(e) {
+    inner.addEventListener('touchmove', function(e) {
         var dx = e.touches[0].clientX - startX;
         var dy = e.touches[0].clientY - startY;
         if (swipeDir === null) {
@@ -92,10 +86,10 @@ function _annSetupSwipe(wrap) {
         if (!swipeDir) return;
         e.preventDefault();
         var newX = Math.min(0, Math.max(-actW(), dragBaseX + dx));
-        card.style.transform = 'translateX(' + newX + 'px)';
+        inner.style.transform = 'translateX(' + newX + 'px)';
     }, { passive: false });
 
-    card.addEventListener('touchend', function(e) {
+    inner.addEventListener('touchend', function(e) {
         if (swipeDir !== true) return;
         var dx     = e.changedTouches[0].clientX - startX;
         var totalX = dragBaseX + dx;
@@ -106,9 +100,11 @@ function _annSetupSwipe(wrap) {
         }
     }, { passive: true });
 
-    // 点已展开的卡片主体 → 收回
-    card.addEventListener('click', function() {
-        if (isOpen) { snapTo(0, true); isOpen = false; }
+    // 点击 inner：若已展开则收起，否则触发编辑
+    inner.addEventListener('click', function(e) {
+        if (e.target.closest('.ann-swipe-actions')) return;
+        if (isOpen) { snapTo(0, true); isOpen = false; return; }
+        if (typeof wrap._onCardClick === 'function') wrap._onCardClick();
     });
 }
 
@@ -120,7 +116,7 @@ function _annCloseAllSwipesExcept(exceptWrap) {
 
 // ── Bottom sheet 开关 ─────────────────────────────────────
 window.openAnnSheet = function(mode, annId) {
-    _annCloseAllSwipesExcept(null); // 关所有已展开的左滑
+    _annCloseAllSwipesExcept(null);
     _annEditingId = (mode === 'edit' && annId) ? annId : null;
 
     var titleEl   = document.getElementById('cs-ann-sheet-title');
@@ -132,8 +128,7 @@ window.openAnnSheet = function(mode, annId) {
     if (deleteBtn) deleteBtn.style.display = _annEditingId ? 'block'      : 'none';
 
     if (_annEditingId) {
-        var ann = (typeof anniversaries !== 'undefined' ? anniversaries : [])
-                    .find(function(a) { return a.id === _annEditingId; });
+        var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === _annEditingId; });
         if (ann) {
             if (nameInput) nameInput.value = ann.name || '';
             if (dateInput) dateInput.value = ann.date || '';
@@ -179,11 +174,7 @@ window.saveAnnFromSheet = function() {
 
     if (_annEditingId !== null) {
         var idx = anniversaries.findIndex(function(a) { return a.id === _annEditingId; });
-        if (idx !== -1) {
-            anniversaries[idx].name = name;
-            anniversaries[idx].date = date;
-            anniversaries[idx].type = type;
-        }
+        if (idx !== -1) { anniversaries[idx].name = name; anniversaries[idx].date = date; anniversaries[idx].type = type; }
     } else {
         anniversaries.push({ id: Date.now(), name: name, date: date, type: type });
     }
@@ -194,12 +185,12 @@ window.saveAnnFromSheet = function() {
     if (typeof showNotification === 'function') showNotification(_annEditingId ? '已更新' : '纪念日已添加', 'success');
 };
 
-// ── 删除当前编辑条目 ───────────────────────────────────────
+// ── 删除（编辑 sheet 里的删除按钮）───────────────────────
 window.deleteCurrentAnn = function() {
     if (_annEditingId === null) return;
     if (!confirm('确定要删除这条纪念日吗？')) return;
     anniversaries = anniversaries.filter(function(a) { return a.id !== _annEditingId; });
-    if (_annPinnedId === _annEditingId) _annSavePinnedId(null); // 删置顶项 → 重置
+    if (_annPinnedId === _annEditingId) _annSavePinnedId(null);
     if (typeof throttledSaveData === 'function') throttledSaveData();
     renderAnniversariesList();
     window.closeAnnSheet();
@@ -240,15 +231,38 @@ function renderAnniversariesList() {
     var now  = new Date();
     var list = (typeof anniversaries !== 'undefined') ? anniversaries : [];
 
-    // 若置顶 id 已被删除，重置
+    // 若置顶 id 已被删除，重置为相遇
     if (typeof _annPinnedId === 'number' && !list.some(function(a) { return a.id === _annPinnedId; })) {
         _annSavePinnedId(null);
     }
-
     var isMeetPinned = (_annPinnedId === null || _annPinnedId === 'meet');
 
-    // ── 用户创建的纪念日（创建时间倒序）──
-    list.slice().sort(function(a, b) { return b.id - a.id; }).forEach(function(ann) {
+    // ── 构造相遇条目（供置顶或末尾使用）──
+    var msgs  = (typeof messages !== 'undefined') ? messages : [];
+    var meetWrap = null;
+    if (msgs.length) {
+        var start = new Date(msgs[0].timestamp);
+        if (!isNaN(start.getTime())) {
+            var meetDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
+            meetWrap = _annMakeWrap(
+                _annMakeCard('相遇', start, meetDays, false, isMeetPinned),
+                isMeetPinned,
+                [{ label: '置顶', cls: 'ann-action-pin', fn: function() { window._annPinItem('meet'); } }],
+                null   // 相遇不可编辑
+            );
+            meetWrap.classList.add('ann-swipe-wrap-meet');
+        }
+    }
+
+    // 若相遇置顶，先渲染它
+    if (isMeetPinned && meetWrap) container.appendChild(meetWrap);
+
+    // ── 用户创建的纪念日：置顶项排首位，其余创建时间倒序 ──
+    list.slice().sort(function(a, b) {
+        if (_annPinnedId === a.id) return -1;
+        if (_annPinnedId === b.id) return 1;
+        return b.id - a.id;
+    }).forEach(function(ann) {
         var isPinned    = (_annPinnedId === ann.id);
         var isCountdown = (ann.type === 'countdown');
         var target      = new Date(ann.date);
@@ -256,8 +270,9 @@ function renderAnniversariesList() {
             ? Math.max(0, Math.ceil((target - now) / 86400000))
             : Math.max(0, Math.floor((now - target) / 86400000));
 
-        var wrap = _annMakeSwipeWrap(
-            _annMakeCard(ann.name, target, diffDays, isCountdown, isPinned, ann.id),
+        var editFn = function() { window.openAnnSheet('edit', ann.id); };
+        var wrap = _annMakeWrap(
+            _annMakeCard(ann.name, target, diffDays, isCountdown, isPinned),
             isPinned,
             [
                 { label: '置顶', cls: 'ann-action-pin',    fn: function() { window._annPinItem(ann.id); } },
@@ -265,37 +280,32 @@ function renderAnniversariesList() {
                     if (typeof window.deleteAnniversaryItem === 'function') window.deleteAnniversaryItem(ann.id);
                 }}
             ],
-            isPinned ? null : function() { window.openAnnSheet('edit', ann.id); }
+            editFn
         );
         container.appendChild(wrap);
-        if (!isPinned) _annSetupSwipe(wrap);
+
+        if (!isPinned) {
+            _annSetupSwipe(wrap);
+        } else {
+            // 置顶项：无滑动，点击直接编辑
+            var inner = wrap.querySelector('.ann-swipe-inner');
+            if (inner) inner.addEventListener('click', editFn);
+        }
     });
 
-    // ── 末尾固定：相遇 ──
-    var msgs  = (typeof messages !== 'undefined') ? messages : [];
-    if (!msgs.length) return;
-    var start = new Date(msgs[0].timestamp);
-    if (isNaN(start.getTime())) return;
-    var meetDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
-
-    var meetWrap = _annMakeSwipeWrap(
-        _annMakeCard('相遇', start, meetDays, false, isMeetPinned, 'meet'),
-        isMeetPinned,
-        [{ label: '置顶', cls: 'ann-action-pin', fn: function() { window._annPinItem('meet'); } }],
-        null  // 相遇不可点击编辑
-    );
-    meetWrap.classList.add('ann-swipe-wrap-meet');
-    container.appendChild(meetWrap);
-    if (!isMeetPinned) _annSetupSwipe(meetWrap);
+    // 若相遇未置顶，末尾渲染
+    if (!isMeetPinned && meetWrap) {
+        container.appendChild(meetWrap);
+        _annSetupSwipe(meetWrap);
+    }
 }
 
-// ── 工厂：卡片元素 ────────────────────────────────────────
-function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned, annId) {
+// ── 工厂：卡片 ────────────────────────────────────────────
+function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
     var card = document.createElement('div');
     card.className = 'ann-item-card '
         + (isCountdown ? 'type-future' : 'type-past')
         + (isPinned ? ' ann-item-pinned' : '');
-    if (annId) card.dataset.annId = annId;
     card.innerHTML = [
         '<div class="ann-item-left">',
         '  <div class="ann-item-name">' + name
@@ -310,13 +320,16 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned, annId) 
     return card;
 }
 
-// ── 工厂：滑动容器 ─────────────────────────────────────────
-function _annMakeSwipeWrap(card, isPinned, actionDefs, onCardClick) {
-    var wrap = document.createElement('div');
+// ── 工厂：滑动容器（card + inner + actions 并排）─────────
+function _annMakeWrap(card, isPinned, actionDefs, onCardClick) {
+    var wrap  = document.createElement('div');
     wrap.className = 'ann-swipe-wrap' + (isPinned ? ' ann-swipe-pinned' : '');
+    wrap._onCardClick = onCardClick;
 
-    // 点击卡片（非滑动状态）
-    if (onCardClick) card.addEventListener('click', onCardClick);
+    // inner = 卡片 + 操作按钮横向排列，整体平移
+    var inner = document.createElement('div');
+    inner.className = 'ann-swipe-inner';
+    inner.appendChild(card);
 
     var actions = document.createElement('div');
     actions.className = 'ann-swipe-actions';
@@ -327,9 +340,9 @@ function _annMakeSwipeWrap(card, isPinned, actionDefs, onCardClick) {
         btn.addEventListener('click', function(e) { e.stopPropagation(); def.fn(); });
         actions.appendChild(btn);
     });
+    inner.appendChild(actions);
 
-    wrap.appendChild(card);
-    wrap.appendChild(actions);
+    wrap.appendChild(inner);
     return wrap;
 }
 

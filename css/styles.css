@@ -12561,3 +12561,66 @@ body #user-sticker-picker .empty-sticker-tip {
     border-bottom: 2px solid var(--accent-color);
     padding-bottom: 2px;
 }
+
+/* ── 动态 feed 滚动行为 ── */
+
+/* 头像+tab 折叠容器 */
+#cs-header-body {
+    overflow: hidden;
+    transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.28s ease;
+    max-height: 300px;
+    opacity: 1;
+}
+#cs-header-body.cs-header-collapsed {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* topbar 中间动态标题 */
+.cs-topbar-feed-title {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, calc(-50% - 4px));
+    font-size: 15px; font-weight: 700;
+    color: var(--text-primary);
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.cs-topbar-feed-title.cs-title-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+}
+
+/* topbar 整体在滚动时可点击（除 icon 按钮之外的区域） */
+#cs-topbar.cs-topbar-scrolled {
+    cursor: pointer;
+}
+
+/* 发帖 FAB */
+#cs-feed-fab {
+    position: absolute;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: #fff; border: none;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+    cursor: pointer;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 200;
+    opacity: 1; transform: scale(1);
+}
+#cs-feed-fab.cs-fab-hidden {
+    opacity: 0;
+    transform: scale(0.75);
+    pointer-events: none;
+}

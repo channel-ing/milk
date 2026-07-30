@@ -413,12 +413,6 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        // 页面动画前先把 header 放好（此时整页还在 translateY(100%) 不可见）
-        const outerHeader=document.getElementById('cs-outer-header');
-        const feedPanel=document.getElementById('cs-panel-feed');
-        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
-            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
-        }
         page.classList.add('cs-open');
         _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
         if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
@@ -431,36 +425,11 @@ window.closeCoupleSpace=window.closeMomentsModal=function(){
     setTimeout(()=>{page.style.display='none';},380);
 };
 window.csSwitchTab=function(tab){
-    const feedPanel   = document.getElementById('cs-panel-feed');
-    const outerHeader = document.getElementById('cs-outer-header');
-    const csContent   = document.querySelector('.cs-content');
-
-    if(tab==='feed'){
-        // 先移 header 进 feed（feed 还是 display:none，不可见）
-        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
-            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
-        }
-        // 注意：不在这里操作 scrollTop，避免强制 reflow 产生中间帧
-    }
-
-    // 切换面板可见性（与上面 DOM 移动合并进同一次渲染批次）
     _csSetTab(tab);
-    _csExpandFeedHeader();
-
-    if(tab!=='feed'){
-        // feed 已经 display:none，再搬 header 出来（不可见）
-        if(outerHeader&&csContent&&outerHeader.parentElement===feedPanel){
-            csContent.parentElement.insertBefore(outerHeader,csContent);
-        }
-    }
-
+    _csExpandFeedHeader(); // 重置 transform，头部回到原位
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
-
-    if(tab==='feed'){
-        if(feedPanel)feedPanel.scrollTop=0; // 面板已可见再重置，安全
-        _csRenderFeed();
-    }
+    if(tab==='feed')_csRenderFeed();
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
 };
@@ -600,12 +569,16 @@ window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;wi
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 
-// ── Feed 滚动行为：header 随内容滚走 + topbar 标题 + FAB ──
+// ── Feed 滚动行为：transform 跟手滑走，零 DOM 操作，零闪烁 ──
 function _csExpandFeedHeader() {
+    const outerHeader = document.getElementById('cs-outer-header');
+    const csContent   = document.querySelector('.cs-content');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     const feedPanel = document.getElementById('cs-panel-feed');
+    if (outerHeader) outerHeader.style.transform = '';
+    if (csContent)   csContent.style.transform   = '';
     if (title)  title.classList.remove('cs-title-visible');
     if (fab)    fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
@@ -619,29 +592,34 @@ function _csSetupFeedScroll() {
     feedPanel._feedLastScrollY  = 0;
     feedPanel._feedUpAccum      = 0;
 
+    const outerHeader = document.getElementById('cs-outer-header');
+    const csContent   = document.querySelector('.cs-content');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     if (title) title.textContent = '动态';
 
-    // ① IntersectionObserver：outer-header 滚出视窗 → 显示 topbar 标题
-    const outerHeader = document.getElementById('cs-outer-header');
-    if (outerHeader) {
-        if (feedPanel._sentinelObs) feedPanel._sentinelObs.disconnect();
-        const obs = new IntersectionObserver((entries) => {
-            if (!feedPanel.classList.contains('cs-panel-active')) return;
-            const visible = entries[0].isIntersecting;
-            if (title)  title.classList.toggle('cs-title-visible', !visible);
-            if (topbar) topbar.classList.toggle('cs-topbar-scrolled', !visible);
-        }, { root: feedPanel, threshold: 0 });
-        obs.observe(outerHeader);
-        feedPanel._sentinelObs = obs;
-    }
+    // 头部最大可滑动距离（初始化时计算一次）
+    const maxSlide = outerHeader ? outerHeader.offsetHeight : 0;
 
-    // ② scroll 事件：FAB 方向控制
     feedPanel.addEventListener('scroll', () => {
+        if (!feedPanel.classList.contains('cs-panel-active')) return;
+
         const scrollY = feedPanel.scrollTop;
         const delta   = scrollY - feedPanel._feedLastScrollY;
+
+        // ① 头部 + 内容区同步上移（translateY，GPU 合成，零 reflow）
+        const slide = Math.min(scrollY, maxSlide);
+        const tf = slide > 0 ? `translateY(-${slide}px)` : '';
+        if (outerHeader) outerHeader.style.transform = tf;
+        if (csContent)   csContent.style.transform   = tf;
+
+        // ② topbar 标题：头部完全滑走后显示
+        const hidden = scrollY >= maxSlide;
+        if (title)  title.classList.toggle('cs-title-visible', hidden);
+        if (topbar) topbar.classList.toggle('cs-topbar-scrolled', hidden);
+
+        // ③ FAB 方向控制
         if (delta > 0) {
             feedPanel._feedUpAccum = 0;
             if (fab) fab.classList.add('cs-fab-hidden');
@@ -652,10 +630,11 @@ function _csSetupFeedScroll() {
                 feedPanel._feedUpAccum = 0;
             }
         }
+
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
-    // ③ topbar 点击回顶
+    // ④ topbar 点击回顶
     if (topbar && !topbar._csTopbarClickSet) {
         topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {

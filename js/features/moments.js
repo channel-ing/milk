@@ -569,7 +569,7 @@ function _csExpandFeedHeader() {
     if (title) title.classList.remove('cs-title-visible');
     if (fab) fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
-    if (feedPanel) { feedPanel._feedHeaderVisible = true; feedPanel._feedLastScrollY = 0; }
+    if (feedPanel) { feedPanel._feedHeaderVisible = true; feedPanel._feedLastScrollY = 0; feedPanel._feedUpAccum = 0; }
 }
 
 function _csSetupFeedScroll() {
@@ -578,35 +578,67 @@ function _csSetupFeedScroll() {
     feedPanel._scrollListenerSet = true;
     feedPanel._feedHeaderVisible = true;
     feedPanel._feedLastScrollY = 0;
+    feedPanel._feedUpAccum = 0;
+    feedPanel._feedScrollSuppressed = false;
 
     const headerBody = document.getElementById('cs-header-body');
     const title = document.getElementById('cs-topbar-feed-title');
     const fab = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
 
-    feedPanel.addEventListener('scroll', () => {
-        const scrollY = feedPanel.scrollTop;
-        const goingDown = scrollY > feedPanel._feedLastScrollY;
+    function afterLayout(cb) {
+        // 等两帧让布局稳定后再更新基准
+        requestAnimationFrame(() => requestAnimationFrame(cb));
+    }
 
-        if (goingDown && scrollY > 60 && feedPanel._feedHeaderVisible) {
-            feedPanel._feedHeaderVisible = false;
-            if (headerBody) headerBody.classList.add('cs-header-collapsed');
-            if (title) { title.textContent = '动态'; title.classList.add('cs-title-visible'); }
-            if (fab) fab.classList.add('cs-fab-hidden');
-            if (topbar) topbar.classList.add('cs-topbar-scrolled');
-        } else if (!goingDown && !feedPanel._feedHeaderVisible) {
-            feedPanel._feedHeaderVisible = true;
-            if (headerBody) headerBody.classList.remove('cs-header-collapsed');
-            if (title) title.classList.remove('cs-title-visible');
-            if (fab) fab.classList.remove('cs-fab-hidden');
-            if (topbar) topbar.classList.remove('cs-topbar-scrolled');
+    feedPanel.addEventListener('scroll', () => {
+        // 布局稳定期内只更新基准，不判断方向
+        if (feedPanel._feedScrollSuppressed) return;
+
+        const scrollY = feedPanel.scrollTop;
+        const delta = scrollY - feedPanel._feedLastScrollY;
+
+        if (delta > 0) {
+            // 向下滚：重置向上累计
+            feedPanel._feedUpAccum = 0;
+            if (scrollY > 80 && feedPanel._feedHeaderVisible) {
+                feedPanel._feedHeaderVisible = false;
+                feedPanel._feedScrollSuppressed = true;
+                if (headerBody) headerBody.classList.add('cs-header-collapsed');
+                if (title) { title.textContent = '动态'; title.classList.add('cs-title-visible'); }
+                if (fab) fab.classList.add('cs-fab-hidden');
+                if (topbar) topbar.classList.add('cs-topbar-scrolled');
+                afterLayout(() => {
+                    feedPanel._feedScrollSuppressed = false;
+                    feedPanel._feedLastScrollY = feedPanel.scrollTop;
+                });
+                return;
+            }
+        } else if (delta < 0) {
+            // 向上滚：累计到 30px 才展开，防止微抖
+            feedPanel._feedUpAccum += Math.abs(delta);
+            if (feedPanel._feedUpAccum >= 30 && !feedPanel._feedHeaderVisible) {
+                feedPanel._feedHeaderVisible = true;
+                feedPanel._feedUpAccum = 0;
+                feedPanel._feedScrollSuppressed = true;
+                if (headerBody) headerBody.classList.remove('cs-header-collapsed');
+                if (title) title.classList.remove('cs-title-visible');
+                if (fab) fab.classList.remove('cs-fab-hidden');
+                if (topbar) topbar.classList.remove('cs-topbar-scrolled');
+                afterLayout(() => {
+                    feedPanel._feedScrollSuppressed = false;
+                    feedPanel._feedLastScrollY = feedPanel.scrollTop;
+                });
+                return;
+            }
         }
 
         feedPanel._feedLastScrollY = scrollY;
     }, { passive: true });
 
-    // topbar 点击回顶
-    if (topbar) {
+    // topbar 点击回顶（避开左右 icon 按钮）
+    if (topbar && !topbar._csTopbarClickSet) {
+        topbar._csTopbarClickSet = true;
         topbar.addEventListener('click', (e) => {
             if (!e.target.closest('.cs-icon-btn') && !feedPanel._feedHeaderVisible) {
                 feedPanel.scrollTo({ top: 0, behavior: 'smooth' });

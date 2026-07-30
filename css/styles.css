@@ -12668,6 +12668,7 @@ body #user-sticker-picker .empty-sticker-tip {
     border: 1px solid var(--border-color);
     margin-bottom: 10px;
     -webkit-tap-highlight-color: transparent;
+    touch-action: pan-y; /* 竖向滚动交浏览器，横向由 JS 处理 */
 }
 .ann-swipe-wrap.ann-swipe-pinned {
     border-color: rgba(var(--accent-color-rgb), 0.45);

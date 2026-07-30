@@ -374,8 +374,8 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
         // 大卡片：名称 + badge + 完整日期 + 大数字
         el.className = 'ann-pinned-card';
         el.innerHTML = [
-            '<div class="ann-pinned-main">',
-            '  <div class="ann-pinned-name">' + name
+            '<div class="ann-item-left">',
+            '  <div class="ann-item-name">' + name
                 + '<span class="ann-tag">' + label + '</span></div>',
             '  <div class="ann-pinned-date">起始于：' + _annFormatDate(targetDate) + '</div>',
             '</div>',
@@ -385,15 +385,16 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
             '</div>'
         ].join('');
     } else {
-        // 紧凑行：名称左，「已过/倒数 X 天 ›」右，不显示日期
+        // 普通行：badge pill + 大数字，不显示日期
         el.className = 'ann-list-row';
         el.innerHTML = [
-            '<div class="ann-row-name">' + name + '</div>',
-            '<div class="ann-row-right">',
-            '  <span class="ann-row-label">' + label + '</span>',
-            '  <span class="ann-row-num">' + diffDays.toLocaleString('zh-CN') + '</span>',
-            '  <span class="ann-row-unit">天</span>',
-            '  <span class="ann-row-arrow">›</span>',
+            '<div class="ann-item-left">',
+            '  <div class="ann-item-name">' + name
+                + '<span class="ann-tag">' + label + '</span></div>',
+            '</div>',
+            '<div class="ann-item-right">',
+            '  <div class="ann-item-days">' + diffDays.toLocaleString('zh-CN') + '</div>',
+            '  <div class="ann-item-days-unit">天</div>',
             '</div>'
         ].join('');
     }

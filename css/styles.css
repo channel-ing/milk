@@ -12634,3 +12634,7 @@ body #user-sticker-picker .empty-sticker-tip {
     margin: 0 -16px;
     padding: 0 16px;
 }
+
+/* ── Feed 滚动 transform 性能优化 ── */
+#cs-outer-header { will-change: transform; }
+.cs-content      { will-change: transform; }

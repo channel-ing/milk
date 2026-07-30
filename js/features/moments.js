@@ -606,6 +606,8 @@ function _csSetupFeedScroll() {
     if (sentinel) {
         if (title) title.textContent = '动态';
         const obs = new IntersectionObserver((entries) => {
+            // 只在 feed tab 激活时才处理，避免切换 tab 时误触发
+            if (!feedPanel.classList.contains('cs-panel-active')) return;
             const visible = entries[0].isIntersecting;
             if (title)  title.classList.toggle('cs-title-visible', !visible);
             if (topbar) topbar.classList.toggle('cs-topbar-scrolled', !visible);

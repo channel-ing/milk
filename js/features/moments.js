@@ -414,7 +414,14 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     page.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
         page.classList.add('cs-open');
-        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
+        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();
+        // 量 header 高度，给所有面板加 padding-top，内容从 header 底部开始
+        const oh=document.getElementById('cs-outer-header');
+        if(oh){
+            const h=oh.offsetHeight;
+            document.querySelectorAll('.cs-content .cs-panel').forEach(p=>{p.style.paddingTop=h+'px';});
+        }
+        _csExpandFeedHeader();_csSetupFeedScroll();
         if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
     }));
 };
@@ -572,13 +579,11 @@ Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 // ── Feed 滚动行为：transform 跟手滑走，零 DOM 操作，零闪烁 ──
 function _csExpandFeedHeader() {
     const outerHeader = document.getElementById('cs-outer-header');
-    const csContent   = document.querySelector('.cs-content');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
     const feedPanel = document.getElementById('cs-panel-feed');
     if (outerHeader) outerHeader.style.transform = '';
-    if (csContent)   csContent.style.transform   = '';
     if (title)  title.classList.remove('cs-title-visible');
     if (fab)    fab.classList.remove('cs-fab-hidden');
     if (topbar) topbar.classList.remove('cs-topbar-scrolled');
@@ -593,7 +598,6 @@ function _csSetupFeedScroll() {
     feedPanel._feedUpAccum      = 0;
 
     const outerHeader = document.getElementById('cs-outer-header');
-    const csContent   = document.querySelector('.cs-content');
     const title  = document.getElementById('cs-topbar-feed-title');
     const fab    = document.getElementById('cs-feed-fab');
     const topbar = document.getElementById('cs-topbar');
@@ -608,11 +612,10 @@ function _csSetupFeedScroll() {
         const scrollY = feedPanel.scrollTop;
         const delta   = scrollY - feedPanel._feedLastScrollY;
 
-        // ① 头部 + 内容区同步上移（translateY，GPU 合成，零 reflow）
+        // ① 头部上移（仅 outerHeader，cs-content 不动 → 底部永远没空白）
         const slide = Math.min(scrollY, maxSlide);
         const tf = slide > 0 ? `translateY(-${slide}px)` : '';
         if (outerHeader) outerHeader.style.transform = tf;
-        if (csContent)   csContent.style.transform   = tf;
 
         // ② topbar 标题：头部完全滑走后显示
         const hidden = scrollY >= maxSlide;

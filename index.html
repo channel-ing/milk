@@ -445,35 +445,35 @@
         <button class="cs-icon-btn" style="margin-left:auto;"><i class="fas fa-cog"></i></button>
     </div>
 
-    <!-- 内容区 -->
-    <div class="cs-content">
-
-        <!-- 头像+pills：绝对定位覆盖在面板顶部，随滚动 transform 滑走，永远在此处不动 DOM -->
-        <div id="cs-outer-header">
-            <div class="cs-couple-section">
-                <div class="cs-couple-row">
-                    <div class="cs-big-av" id="cs-bav-partner">🌸</div>
-                    <div class="cs-hb-wrap">
-                        <svg viewBox="0 0 140 44" xmlns="http://www.w3.org/2000/svg" class="cs-hb-svg">
-                            <polyline points="0,22 18,22 26,8 34,36 42,12 50,30 58,22 80,22 88,8 96,36 104,14 112,28 120,22 140,22"
-                                fill="none" stroke="currentColor" stroke-width="1.8"
-                                stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div class="cs-big-av" id="cs-bav-me">🙂</div>
+    <!-- 头像 + tab pills（切到 feed tab 时搬入滚动区，其他 tab 时固定在此） -->
+    <div id="cs-outer-header">
+        <div class="cs-couple-section">
+            <div class="cs-couple-row">
+                <div class="cs-big-av" id="cs-bav-partner">🌸</div>
+                <div class="cs-hb-wrap">
+                    <svg viewBox="0 0 140 44" xmlns="http://www.w3.org/2000/svg" class="cs-hb-svg">
+                        <polyline points="0,22 18,22 26,8 34,36 42,12 50,30 58,22 80,22 88,8 96,36 104,14 112,28 120,22 140,22"
+                            fill="none" stroke="currentColor" stroke-width="1.8"
+                            stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </div>
-                <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+                <div class="cs-big-av" id="cs-bav-me">🙂</div>
             </div>
-            <div class="cs-pills-wrap">
-                <div class="cs-pills">
-                    <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
-                    <button class="cs-pill"             id="csp-album"   onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
-                    <button class="cs-pill"             id="csp-mood"    onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
-                    <button class="cs-pill"             id="csp-ann"     onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
-                    <button class="cs-pill"             id="csp-period"  onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
-                </div>
+            <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+        </div>
+        <div class="cs-pills-wrap">
+            <div class="cs-pills">
+                <button class="cs-pill cs-pill-on" id="csp-feed"    onclick="csSwitchTab('feed')"   title="动态"><span class="cs-pill-icon"></span></button>
+                <button class="cs-pill"             id="csp-album"   onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
+                <button class="cs-pill"             id="csp-mood"    onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
+                <button class="cs-pill"             id="csp-ann"     onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
+                <button class="cs-pill"             id="csp-period"  onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
             </div>
         </div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="cs-content">
 
         <div class="cs-panel cs-panel-active" id="cs-panel-feed">
             <!-- 动态 section header -->

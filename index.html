@@ -621,6 +621,21 @@
             <input type="date" id="cs-ann-input-date" class="modal-input">
         </div>
         <div class="cs-ann-form-row">
+            <label class="cs-ann-form-label">封面图片</label>
+            <div class="cs-ann-cover-row">
+                <button class="cs-ann-cover-add-btn" id="cs-ann-cover-add-btn" onclick="document.getElementById('cs-ann-cover-input').click()">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <div class="cs-ann-cover-thumb" id="cs-ann-cover-thumb" style="display:none;">
+                    <img id="cs-ann-cover-img" src="" alt="封面">
+                    <button class="cs-ann-cover-remove-btn" onclick="window._annRemoveCover()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <input type="file" id="cs-ann-cover-input" accept="image/*" style="display:none" onchange="window._annOnCoverSelected(this)">
+        </div>
+        <div class="cs-ann-form-row">
             <label class="cs-ann-form-label">类型</label>
             <div class="ann-type-selector">
                 <div class="ann-type-btn active" data-type="anniversary" onclick="switchAnnType('anniversary')">

@@ -12103,3 +12103,250 @@ body #user-sticker-picker .empty-sticker-tip {
     background: rgba(0,0,0,0.3); border-radius: 8px;
 }
 .cs-prev-video-icon i { color: #fff; font-size: 20px; }
+
+
+/* ══════════════════════════════════
+   相册 (album)
+   ══════════════════════════════════ */
+
+/* OSS缺省页 */
+.al-no-oss {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 40px 20px; text-align: center; gap: 12px;
+}
+.al-no-oss-icon { font-size: 44px; color: var(--text-secondary); opacity: 0.5; }
+.al-no-oss-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.al-no-oss-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.al-no-oss-path {
+    font-size: 12px; color: var(--accent-color); background: rgba(var(--accent-color-rgb),.08);
+    border-radius: 10px; padding: 10px 14px; line-height: 1.8;
+}
+.al-no-oss-path i { margin-right: 4px; }
+.al-no-oss-btn {
+    margin-top: 4px; padding: 10px 28px; border-radius: 20px;
+    background: var(--accent-color); color: #fff; border: none;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+}
+
+/* 子tab */
+.al-subtabs {
+    display: flex; padding: 10px 16px 0;
+    border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+}
+.al-subtab {
+    padding: 8px 20px; font-size: 14px; font-weight: 500;
+    color: var(--text-secondary); background: none; border: none;
+    border-bottom: 2px solid transparent; cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+.al-subtab.on { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+
+/* 视图容器 */
+.al-view { flex: 1; flex-direction: column; overflow: hidden; }
+
+/* ── 相册列表 ── */
+.al-albums-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px; padding: 14px;
+}
+.al-album-card {
+    border-radius: 12px; overflow: hidden;
+    background: var(--secondary-bg); cursor: pointer;
+    transition: transform 0.15s;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    border: 1px solid var(--border-color);
+}
+.al-album-card:active { transform: scale(0.97); }
+.al-new-card { border: 1.5px dashed color-mix(in srgb, var(--accent-color) 40%, transparent); background: rgba(var(--accent-color-rgb),.03); }
+.al-cover { width: 100%; aspect-ratio: 1; overflow: hidden; }
+.al-new-cover {
+    width: 100%; aspect-ratio: 1; display: flex;
+    align-items: center; justify-content: center;
+    background: var(--primary-bg);
+}
+.al-new-plus { font-size: 24px; color: var(--text-secondary); }
+.al-cover-empty {
+    width: 100%; height: 100%; display: flex;
+    align-items: center; justify-content: center;
+    background: var(--primary-bg); color: var(--text-secondary); font-size: 28px;
+}
+.al-album-info {
+    display: flex; align-items: center; gap: 4px; padding: 8px 10px 10px;
+}
+.al-sys-lock { font-size: 10px; color: var(--text-secondary); opacity: 0.6; }
+.al-album-name { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-album-cnt  { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+
+/* ── 网格 topbar ── */
+.al-grid-topbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 12px; flex-shrink: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.al-back-btn, .al-upload-btn, .al-del-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-primary); font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.al-back-btn:active, .al-upload-btn:active, .al-del-btn:active { background: var(--border-color); }
+.al-sel-btn {
+    font-size: 13px; color: var(--accent-color); background: none; border: none;
+    cursor: pointer; padding: 4px 8px; flex-shrink: 0;
+}
+.al-grid-title {
+    flex: 1; text-align: center; font-size: 15px;
+    font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── 日期分组 + 图片网格 ── */
+.al-grid-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 10px 16px; }
+.al-date-label { font-size: 12px; color: var(--text-secondary); padding: 8px 4px 5px; font-weight: 500; }
+.al-photo-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; }
+.al-photo-cell {
+    aspect-ratio: 1; overflow: hidden; border-radius: 3px;
+    cursor: pointer; position: relative; background: var(--secondary-bg);
+}
+.al-photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.al-photo-cell:active { opacity: 0.75; }
+.al-photo-cell.selected::after {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(var(--accent-color-rgb),.35);
+}
+.al-photo-cell.selected::before {
+    content: '\f00c'; font-family: "Font Awesome 5 Free"; font-weight: 900;
+    position: absolute; top: 4px; right: 4px; z-index: 2;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent-color); color: #fff;
+    font-size: 10px; display: flex; align-items: center; justify-content: center;
+}
+.al-cell-empty {
+    width: 100%; height: 100%; display: flex;
+    align-items: center; justify-content: center;
+    color: var(--text-secondary); font-size: 20px;
+}
+.al-cell-play {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.25);
+}
+.al-cell-play i { color: #fff; font-size: 14px; }
+
+/* ── 批量选择栏 ── */
+.al-select-bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--secondary-bg); border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+.al-sel-count { flex: 1; font-size: 13px; color: var(--text-secondary); }
+.al-sel-all {
+    font-size: 13px; color: var(--accent-color); background: none;
+    border: 1px solid var(--accent-color); border-radius: 14px;
+    padding: 5px 12px; cursor: pointer;
+}
+.al-sel-del {
+    font-size: 13px; color: #fff; background: #ff5050;
+    border: none; border-radius: 14px; padding: 5px 14px; cursor: pointer;
+}
+.al-sel-del:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── 详情页（fixed overlay） ── */
+.al-detail-topbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; flex-shrink: 0;
+    background: rgba(0,0,0,0.6);
+}
+.al-detail-topbar .al-back-btn,
+.al-detail-topbar .al-del-btn { color: #fff; }
+.al-detail-date {
+    flex: 1; text-align: center; font-size: 14px;
+    color: rgba(255,255,255,0.85); font-weight: 500;
+}
+.al-detail-main {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative;
+}
+.al-detail-img {
+    max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+}
+.al-detail-video-thumb {
+    width: 100%; height: 100%; display: flex;
+    align-items: center; justify-content: center;
+    position: relative; cursor: pointer;
+}
+.al-detail-play {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+}
+.al-detail-play i {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; padding-left: 4px;
+}
+.al-detail-empty {
+    font-size: 48px; opacity: 0.4;
+}
+/* 收藏按钮：fixed在detail overlay上，detail-main外面 */
+.al-detail-fav {
+    position: absolute; bottom: 80px; right: 16px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.8); font-size: 20px;
+    transition: color 0.2s; z-index: 1;
+}
+.al-detail-fav.on { color: #ff6b8a; }
+#al-view-detail { position: fixed; }
+
+/* ── 缩略图条 ── */
+.al-detail-strip {
+    display: flex; gap: 4px; padding: 8px 10px;
+    overflow-x: auto; flex-shrink: 0;
+    background: rgba(0,0,0,0.7);
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.al-detail-strip::-webkit-scrollbar { display: none; }
+.al-strip-thumb {
+    width: 50px; height: 50px; flex-shrink: 0;
+    border-radius: 5px; overflow: hidden; cursor: pointer;
+    opacity: 0.5; transition: opacity 0.2s;
+    border: 2px solid transparent; position: relative;
+}
+.al-strip-thumb.active { opacity: 1; border-color: #fff; }
+.al-strip-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.al-strip-play {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+}
+.al-strip-play i { color: #fff; font-size: 10px; }
+
+/* ── 回收站 ── */
+.al-trash-tip { font-size: 12px; color: var(--text-secondary); padding: 10px 14px 4px; text-align: center; }
+.al-trash-grid { padding-top: 8px; }
+.al-trash-cell { position: relative; }
+.al-trash-cell img { opacity: 0.6; }
+.al-trash-days {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-size: 10px; text-align: center; padding: 2px 0;
+}
+.al-trash-actions {
+    position: absolute; top: 2px; right: 2px; display: flex; gap: 2px;
+}
+.al-trash-actions button {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.6); border: none; color: #fff;
+    font-size: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+
+/* ── 空状态 ── */
+.al-empty {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; color: var(--text-secondary);
+    font-size: 13px; opacity: 0.6; padding: 40px;

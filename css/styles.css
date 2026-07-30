@@ -12652,67 +12652,62 @@ body #user-sticker-picker .empty-sticker-tip {
     padding-bottom: 2px;
 }
 
-/* 覆盖 ann-list-container 在旧 modal 里的 padding，面板里不需要 */
+/* 覆盖旧 modal 里的 padding */
 #cs-panel-ann #ann-list-container {
     padding: 0 0 20px;
     overflow-y: visible;
     flex: none;
     gap: 0;
+    display: block;
 }
 
 /* ── 左滑容器 ── */
 .ann-swipe-wrap {
-    position: relative;
     overflow: hidden;
     border-radius: 14px;
     border: 1px solid var(--border-color);
     margin-bottom: 10px;
-    /* 触摸时不触发浏览器高亮 */
     -webkit-tap-highlight-color: transparent;
 }
-/* 置顶条目：强调边框 */
 .ann-swipe-wrap.ann-swipe-pinned {
     border-color: rgba(var(--accent-color-rgb), 0.45);
     box-shadow: 0 0 0 1px rgba(var(--accent-color-rgb), 0.18);
 }
-/* 嵌入容器后，卡片自身不再需要独立圆角和边框 */
-.ann-swipe-wrap .ann-item-card {
+
+/* inner = 卡片 + 操作按钮横向排列，整体向左平移时按钮才露出 */
+.ann-swipe-inner {
+    display: flex;
+    width: 100%;
+}
+.ann-swipe-inner .ann-item-card {
+    flex: 0 0 100%;
+    min-width: 0;
     border-radius: 0;
     border: none;
     margin-bottom: 0;
-    /* hover lift 在滑动容器内禁用 */
 }
-.ann-swipe-wrap .ann-item-card:hover {
+.ann-swipe-inner .ann-item-card:hover {
     transform: none;
     box-shadow: none;
 }
 
-/* ── 操作按钮区 ── */
+/* 操作按钮区：跟在卡片右侧，inner 平移后才进入可视区 */
 .ann-swipe-actions {
-    position: absolute;
-    right: 0; top: 0; bottom: 0;
     display: flex;
     align-items: stretch;
+    flex-shrink: 0;
 }
 .ann-action-btn {
-    min-width: 68px;
+    min-width: 72px;
     border: none;
     font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    display: flex; align-items: center;
-    justify-content: center;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
     transition: opacity 0.15s;
 }
 .ann-action-btn:active { opacity: 0.8; }
-.ann-action-pin {
-    background: var(--accent-color);
-    color: #fff;
-}
-.ann-action-delete {
-    background: #ff4757;
-    color: #fff;
-}
+.ann-action-pin    { background: var(--accent-color); color: #fff; }
+.ann-action-delete { background: #ff4757; color: #fff; }
 
 /* 置顶卡片左侧标识线改为 accent 色 */
 .ann-item-card.ann-item-pinned::before {
@@ -12734,8 +12729,7 @@ body #user-sticker-picker .empty-sticker-tip {
     font-size: 12px; font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
+    letter-spacing: 0.5px; margin-bottom: 8px;
 }
 .cs-ann-char-hint {
     font-size: 11px; color: var(--text-secondary);

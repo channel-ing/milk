@@ -12639,77 +12639,121 @@ body #user-sticker-picker .empty-sticker-tip {
    纪念日 tab（cs-panel-ann）专用样式
    ══════════════════════════════════════════ */
 
-/* panel header：标题 + 加号按钮 */
+/* panel header */
 .cs-ann-hd {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     justify-content: space-between;
     padding: 20px 4px 12px;
 }
 .cs-ann-hd-title {
-    font-size: 17px;
-    font-weight: 700;
+    font-size: 17px; font-weight: 700;
     color: var(--text-primary);
     border-bottom: 2px solid var(--accent-color);
     padding-bottom: 2px;
 }
 
-/* 相遇条目：末尾固定，无删除按钮，略淡 */
-.ann-item-meet {
-    opacity: 0.72;
+/* 覆盖 ann-list-container 在旧 modal 里的 padding，面板里不需要 */
+#cs-panel-ann #ann-list-container {
+    padding: 0 0 20px;
+    overflow-y: visible;
+    flex: none;
+    gap: 0;
 }
+
+/* ── 左滑容器 ── */
+.ann-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+    /* 触摸时不触发浏览器高亮 */
+    -webkit-tap-highlight-color: transparent;
+}
+/* 置顶条目：强调边框 */
+.ann-swipe-wrap.ann-swipe-pinned {
+    border-color: rgba(var(--accent-color-rgb), 0.45);
+    box-shadow: 0 0 0 1px rgba(var(--accent-color-rgb), 0.18);
+}
+/* 嵌入容器后，卡片自身不再需要独立圆角和边框 */
+.ann-swipe-wrap .ann-item-card {
+    border-radius: 0;
+    border: none;
+    margin-bottom: 0;
+    /* hover lift 在滑动容器内禁用 */
+}
+.ann-swipe-wrap .ann-item-card:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* ── 操作按钮区 ── */
+.ann-swipe-actions {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    display: flex;
+    align-items: stretch;
+}
+.ann-action-btn {
+    min-width: 68px;
+    border: none;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex; align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s;
+}
+.ann-action-btn:active { opacity: 0.8; }
+.ann-action-pin {
+    background: var(--accent-color);
+    color: #fff;
+}
+.ann-action-delete {
+    background: #ff4757;
+    color: #fff;
+}
+
+/* 置顶卡片左侧标识线改为 accent 色 */
+.ann-item-card.ann-item-pinned::before {
+    background: var(--accent-color) !important;
+}
+
+/* 相遇条目：略淡 */
+.ann-item-meet { opacity: 0.75; }
 
 /* ── 纪念日 bottom sheet 内容区 ── */
 .cs-ann-sheet-body {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1; overflow-y: auto;
     padding: 16px 16px 24px;
     -webkit-overflow-scrolling: touch;
 }
-.cs-ann-form-row {
-    margin-bottom: 20px;
-}
+.cs-ann-form-row { margin-bottom: 20px; }
 .cs-ann-form-label {
     display: block;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 12px; font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
 }
 .cs-ann-char-hint {
-    font-size: 11px;
-    color: var(--text-secondary);
-    text-align: right;
-    margin-top: 4px;
-    opacity: 0.7;
+    font-size: 11px; color: var(--text-secondary);
+    text-align: right; margin-top: 4px; opacity: 0.7;
 }
 .cs-ann-type-desc-wrap {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 10px;
-    opacity: 0.7;
-    padding: 0 2px;
-    line-height: 1.5;
+    font-size: 12px; color: var(--text-secondary);
+    margin-top: 10px; opacity: 0.7;
+    padding: 0 2px; line-height: 1.5;
 }
 .cs-ann-delete-btn {
-    width: 100%;
-    margin-top: 4px;
-    padding: 12px;
-    background: rgba(255, 80, 80, 0.08);
-    border: 1px solid rgba(255, 80, 80, 0.2);
-    color: #ff5050;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 14px;
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    width: 100%; margin-top: 4px; padding: 12px;
+    background: rgba(255,80,80,0.08);
+    border: 1px solid rgba(255,80,80,0.2);
+    color: #ff5050; border-radius: 12px;
+    cursor: pointer; font-size: 14px; font-family: inherit;
+    display: flex; align-items: center;
+    justify-content: center; gap: 8px;
     transition: var(--transition);
 }
-.cs-ann-delete-btn:active {
-    background: rgba(255, 80, 80, 0.15);
-}
+.cs-ann-delete-btn:active { background: rgba(255,80,80,0.15); }

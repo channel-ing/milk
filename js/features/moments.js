@@ -438,18 +438,26 @@ window.csSwitchTab=function(tab){
     const outerHeader=document.getElementById('cs-outer-header');
     const feedPanel=document.getElementById('cs-panel-feed');
     const csContent=document.querySelector('.cs-content');
+    function _moveHeader(newParent, insertBefore){
+        if(!outerHeader||!newParent)return;
+        if(outerHeader.parentElement===newParent)return;
+        outerHeader.style.opacity='0';
+        outerHeader.style.transition='';
+        requestAnimationFrame(()=>{
+            newParent.insertBefore(outerHeader, insertBefore||null);
+            requestAnimationFrame(()=>{
+                outerHeader.style.transition='opacity 0.18s ease';
+                outerHeader.style.opacity='';
+                setTimeout(()=>{ outerHeader.style.transition=''; }, 200);
+            });
+        });
+    }
     if(tab==='feed'){
-        // 把头像+pills 搬入滚动容器最前面，随内容滚走
-        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
-            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
-        }
+        _moveHeader(feedPanel, feedPanel.firstChild);
         if(feedPanel)feedPanel.scrollTop=0;
         _csRenderFeed();
     } else {
-        // 把头像+pills 搬回滚动容器外，固定显示
-        if(outerHeader&&csContent&&outerHeader.parentElement!==csContent.parentElement){
-            csContent.parentElement.insertBefore(outerHeader,csContent);
-        }
+        _moveHeader(csContent.parentElement, csContent);
     }
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();

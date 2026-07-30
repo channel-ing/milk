@@ -412,7 +412,17 @@ function _updateBigAvatars(){const ptEl=document.getElementById('cs-bav-partner'
 window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{page.classList.add('cs-open');_csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);}));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        page.classList.add('cs-open');
+        // 确保 outer-header 在 feed panel 里（初始状态）
+        const outerHeader=document.getElementById('cs-outer-header');
+        const feedPanel=document.getElementById('cs-panel-feed');
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
+        }
+        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
+        if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
+    }));
 };
 window.closeCoupleSpace=window.closeMomentsModal=function(){
     const page=document.getElementById('couple-space-page');if(!page)return;
@@ -425,14 +435,21 @@ window.csSwitchTab=function(tab){
     _csExpandFeedHeader();
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
-    const fixedPills=document.getElementById('cs-pills-fixed');
+    const outerHeader=document.getElementById('cs-outer-header');
+    const feedPanel=document.getElementById('cs-panel-feed');
+    const csContent=document.querySelector('.cs-content');
     if(tab==='feed'){
-        if(fixedPills)fixedPills.style.display='none';
-        const feedPanel=document.getElementById('cs-panel-feed');
-        if(feedPanel)feedPanel.scrollTop=0; // 切回动态时回顶，确保 pills 可见
+        // 把头像+pills 搬入滚动容器最前面，随内容滚走
+        if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
+            feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
+        }
+        if(feedPanel)feedPanel.scrollTop=0;
         _csRenderFeed();
     } else {
-        if(fixedPills)fixedPills.style.display='';
+        // 把头像+pills 搬回滚动容器外，固定显示
+        if(outerHeader&&csContent&&outerHeader.parentElement!==csContent.parentElement){
+            csContent.parentElement.insertBefore(outerHeader,csContent);
+        }
     }
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
@@ -441,12 +458,9 @@ function _csSetTab(tab){
     document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));
     const panel=document.getElementById('cs-panel-'+tab);
     if(panel)panel.classList.add('cs-panel-active');
-    // 同时更新 scroll pills 和 fixed pills 两套
     document.querySelectorAll('.cs-pill').forEach(b=>b.classList.remove('cs-pill-on'));
-    ['csp-','cspf-'].forEach(prefix=>{
-        const btn=document.getElementById(prefix+tab);
-        if(btn)btn.classList.add('cs-pill-on');
-    });
+    const btn=document.getElementById('csp-'+tab);
+    if(btn)btn.classList.add('cs-pill-on');
 }
 function _csRenderFeed(){
     const list=document.getElementById('cs-feed-list');if(!list)return;

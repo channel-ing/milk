@@ -436,19 +436,19 @@ window.csSwitchTab=function(tab){
     const csContent   = document.querySelector('.cs-content');
 
     if(tab==='feed'){
-        // 先把 header 搬进 feed（此时 feed 还是 display:none，移动不可见）
+        // 先移 header 进 feed（feed 还是 display:none，不可见）
         if(outerHeader&&feedPanel&&outerHeader.parentElement!==feedPanel){
             feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
         }
-        if(feedPanel)feedPanel.scrollTop=0;
+        // 注意：不在这里操作 scrollTop，避免强制 reflow 产生中间帧
     }
 
-    // 切换面板可见性
+    // 切换面板可见性（与上面 DOM 移动合并进同一次渲染批次）
     _csSetTab(tab);
     _csExpandFeedHeader();
 
     if(tab!=='feed'){
-        // feed 已经 display:none，再把 header 搬回去（移动不可见）
+        // feed 已经 display:none，再搬 header 出来（不可见）
         if(outerHeader&&csContent&&outerHeader.parentElement===feedPanel){
             csContent.parentElement.insertBefore(outerHeader,csContent);
         }
@@ -456,7 +456,11 @@ window.csSwitchTab=function(tab){
 
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
-    if(tab==='feed')_csRenderFeed();
+
+    if(tab==='feed'){
+        if(feedPanel)feedPanel.scrollTop=0; // 面板已可见再重置，安全
+        _csRenderFeed();
+    }
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
 };

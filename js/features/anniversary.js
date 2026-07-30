@@ -4,8 +4,37 @@
  */
 
 // ── 模块状态 ──────────────────────────────────────────────
-var _annEditingId = null;
-var _annPinnedId  = null;   // null/'meet'=相遇；Number=具体条目
+var _annEditingId   = null;
+var _annPinnedId    = null;   // null/'meet'=相遇；Number=具体条目
+var _annCoverDataUrl = null;  // 当前 sheet 内的封面图 data URL
+var _annCoverChanged = false; // 本次打开 sheet 是否修改过封面
+
+// ── 封面图片辅助函数 ──────────────────────────────────────
+function _annShowCoverPreview(url) {
+    var img   = document.getElementById('cs-ann-cover-img');
+    var thumb = document.getElementById('cs-ann-cover-thumb');
+    if (img)   img.src = url || '';
+    if (thumb) thumb.style.display = url ? '' : 'none';
+}
+
+window._annOnCoverSelected = function(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        _annCoverDataUrl = ev.target.result;
+        _annCoverChanged = true;
+        _annShowCoverPreview(_annCoverDataUrl);
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+};
+
+window._annRemoveCover = function() {
+    _annCoverDataUrl = null;
+    _annCoverChanged = true;
+    _annShowCoverPreview(null);
+};
 
 // ── 置顶持久化 ────────────────────────────────────────────
 async function _annLoadPinnedId() {
@@ -127,6 +156,11 @@ window.openAnnSheet = function(mode, annId) {
     if (titleEl)   titleEl.textContent     = _annEditingId ? '编辑纪念日' : '添加纪念日';
     if (deleteBtn) deleteBtn.style.display = _annEditingId ? 'block'      : 'none';
 
+    // 重置封面
+    _annCoverDataUrl = null;
+    _annCoverChanged = false;
+    _annShowCoverPreview(null);
+
     if (_annEditingId) {
         var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === _annEditingId; });
         if (ann) {
@@ -134,6 +168,12 @@ window.openAnnSheet = function(mode, annId) {
             if (dateInput) dateInput.value = ann.date || '';
             window.switchAnnType(ann.type || 'anniversary');
         }
+        // 异步加载已有封面
+        try {
+            localforage.getItem(getStorageKey('annCoverBg_' + _annEditingId)).then(function(url) {
+                if (url) { _annCoverDataUrl = url; _annShowCoverPreview(url); }
+            });
+        } catch(e) {}
     } else {
         if (nameInput) nameInput.value = '';
         if (dateInput) dateInput.value = '';
@@ -172,11 +212,26 @@ window.saveAnnFromSheet = function() {
             || (typeof currentAnniversaryType !== 'undefined' && currentAnniversaryType)
             || 'anniversary';
 
+    var savedId;
     if (_annEditingId !== null) {
+        savedId = _annEditingId;
         var idx = anniversaries.findIndex(function(a) { return a.id === _annEditingId; });
         if (idx !== -1) { anniversaries[idx].name = name; anniversaries[idx].date = date; anniversaries[idx].type = type; }
     } else {
-        anniversaries.push({ id: Date.now(), name: name, date: date, type: type });
+        savedId = Date.now();
+        anniversaries.push({ id: savedId, name: name, date: date, type: type });
+    }
+
+    // 封面图片：有变化才写入
+    if (_annCoverChanged) {
+        try {
+            var coverKey = getStorageKey('annCoverBg_' + savedId);
+            if (_annCoverDataUrl) {
+                localforage.setItem(coverKey, _annCoverDataUrl);
+            } else {
+                localforage.removeItem(coverKey);
+            }
+        } catch(e) {}
     }
 
     if (typeof throttledSaveData === 'function') throttledSaveData();
@@ -191,6 +246,7 @@ window.deleteCurrentAnn = function() {
     if (!confirm('确定要删除这条纪念日吗？')) return;
     anniversaries = anniversaries.filter(function(a) { return a.id !== _annEditingId; });
     if (_annPinnedId === _annEditingId) _annSavePinnedId(null);
+    try { localforage.removeItem(getStorageKey('annCoverBg_' + _annEditingId)); } catch(e) {}
     if (typeof throttledSaveData === 'function') throttledSaveData();
     renderAnniversariesList();
     window.closeAnnSheet();
@@ -309,12 +365,12 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
     card.innerHTML = [
         '<div class="ann-item-left">',
         '  <div class="ann-item-name">' + name
-            + '<span class="ann-tag">' + (isCountdown ? '倒数' : '纪念') + '</span></div>',
+            + '<span class="ann-tag">' + (isCountdown ? '还有' : '已经') + '</span></div>',
         '  <div class="ann-item-date">起始于 ' + targetDate.toLocaleDateString('zh-CN') + '</div>',
         '</div>',
         '<div class="ann-item-right">',
         '  <div class="ann-item-days">' + diffDays.toLocaleString('zh-CN') + '</div>',
-        '  <div class="ann-item-days-unit">' + (isCountdown ? '天后' : '天') + '</div>',
+        '  <div class="ann-item-days-unit">天</div>',
         '</div>'
     ].join('');
     return card;

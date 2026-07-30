@@ -357,23 +357,47 @@ function renderAnniversariesList() {
 }
 
 // ── 工厂：卡片 ────────────────────────────────────────────
+// ── 日期格式化（置顶大卡用）────────────────────────────
+function _annFormatDate(date) {
+    var dow = ['日','一','二','三','四','五','六'][date.getDay()];
+    return date.getFullYear() + '年'
+         + (date.getMonth() + 1) + '月'
+         + date.getDate() + '日 星期' + dow;
+}
+
+// ── 工厂：卡片（置顶/普通两套模板）──────────────────────
 function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
-    var card = document.createElement('div');
-    card.className = 'ann-item-card '
-        + (isCountdown ? 'type-future' : 'type-past')
-        + (isPinned ? ' ann-item-pinned' : '');
-    card.innerHTML = [
-        '<div class="ann-item-left">',
-        '  <div class="ann-item-name">' + name
-            + '<span class="ann-tag">' + (isCountdown ? '还有' : '已经') + '</span></div>',
-        '  <div class="ann-item-date">起始于 ' + targetDate.toLocaleDateString('zh-CN') + '</div>',
-        '</div>',
-        '<div class="ann-item-right">',
-        '  <div class="ann-item-days">' + diffDays.toLocaleString('zh-CN') + '</div>',
-        '  <div class="ann-item-days-unit">天</div>',
-        '</div>'
-    ].join('');
-    return card;
+    var el    = document.createElement('div');
+    var label = isCountdown ? '倒数' : '已过';
+
+    if (isPinned) {
+        // 大卡片：名称 + badge + 完整日期 + 大数字
+        el.className = 'ann-pinned-card';
+        el.innerHTML = [
+            '<div class="ann-pinned-main">',
+            '  <div class="ann-pinned-name">' + name
+                + '<span class="ann-tag">' + label + '</span></div>',
+            '  <div class="ann-pinned-date">起始于：' + _annFormatDate(targetDate) + '</div>',
+            '</div>',
+            '<div class="ann-pinned-count">',
+            '  <div class="ann-pinned-num">' + diffDays.toLocaleString('zh-CN') + '</div>',
+            '  <div class="ann-pinned-unit">天</div>',
+            '</div>'
+        ].join('');
+    } else {
+        // 紧凑行：名称左，「已过/倒数 X 天 ›」右，不显示日期
+        el.className = 'ann-list-row';
+        el.innerHTML = [
+            '<div class="ann-row-name">' + name + '</div>',
+            '<div class="ann-row-right">',
+            '  <span class="ann-row-label">' + label + '</span>',
+            '  <span class="ann-row-num">' + diffDays.toLocaleString('zh-CN') + '</span>',
+            '  <span class="ann-row-unit">天</span>',
+            '  <span class="ann-row-arrow">›</span>',
+            '</div>'
+        ].join('');
+    }
+    return el;
 }
 
 // ── 工厂：滑动容器（card + inner + actions 并排）─────────

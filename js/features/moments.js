@@ -425,11 +425,29 @@ window.csSwitchTab=function(tab){
     _csExpandFeedHeader();
     const fab=document.getElementById('cs-feed-fab');
     if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
-    if(tab==='feed')_csRenderFeed();
+    const fixedPills=document.getElementById('cs-pills-fixed');
+    if(tab==='feed'){
+        if(fixedPills)fixedPills.style.display='none';
+        const feedPanel=document.getElementById('cs-panel-feed');
+        if(feedPanel)feedPanel.scrollTop=0; // 切回动态时回顶，确保 pills 可见
+        _csRenderFeed();
+    } else {
+        if(fixedPills)fixedPills.style.display='';
+    }
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
 };
-function _csSetTab(tab){document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));const panel=document.getElementById('cs-panel-'+tab);if(panel)panel.classList.add('cs-panel-active');document.querySelectorAll('.cs-pill').forEach(b=>b.classList.remove('cs-pill-on'));const btn=document.getElementById('csp-'+tab);if(btn)btn.classList.add('cs-pill-on');}
+function _csSetTab(tab){
+    document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));
+    const panel=document.getElementById('cs-panel-'+tab);
+    if(panel)panel.classList.add('cs-panel-active');
+    // 同时更新 scroll pills 和 fixed pills 两套
+    document.querySelectorAll('.cs-pill').forEach(b=>b.classList.remove('cs-pill-on'));
+    ['csp-','cspf-'].forEach(prefix=>{
+        const btn=document.getElementById(prefix+tab);
+        if(btn)btn.classList.add('cs-pill-on');
+    });
+}
 function _csRenderFeed(){
     const list=document.getElementById('cs-feed-list');if(!list)return;
     if(!momentsData.posts.length){list.innerHTML=`<div class="cs-empty"><i class="fas fa-wind"></i><div class="cs-empty-label">还没有动态<br>来发第一条吧~</div></div>`;return;}

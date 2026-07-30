@@ -412,15 +412,23 @@ function _updateBigAvatars(){const ptEl=document.getElementById('cs-bav-partner'
 window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
     const page=document.getElementById('couple-space-page');if(!page)return;
     page.style.display='flex';
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{page.classList.add('cs-open');_csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);}));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{page.classList.add('cs-open');_csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);}));
 };
 window.closeCoupleSpace=window.closeMomentsModal=function(){
     const page=document.getElementById('couple-space-page');if(!page)return;
-    page.classList.remove('cs-open');window.closeAllCsSheets();
+    page.classList.remove('cs-open');window.closeAllCsSheets();_csExpandFeedHeader();
     [document.getElementById('cs-notif-popup'),document.getElementById('cs-sticker-picker')].forEach(el=>{if(el)el.style.display='none';});
     setTimeout(()=>{page.style.display='none';},380);
 };
-window.csSwitchTab=function(tab){_csSetTab(tab);if(tab==='feed')_csRenderFeed();if(tab==='album'&&typeof window._alInit==='function')window._alInit();if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();};
+window.csSwitchTab=function(tab){
+    _csSetTab(tab);
+    _csExpandFeedHeader();
+    const fab=document.getElementById('cs-feed-fab');
+    if(fab)fab.classList.toggle('cs-fab-hidden',tab!=='feed');
+    if(tab==='feed')_csRenderFeed();
+    if(tab==='album'&&typeof window._alInit==='function')window._alInit();
+    if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
+};
 function _csSetTab(tab){document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));const panel=document.getElementById('cs-panel-'+tab);if(panel)panel.classList.add('cs-panel-active');document.querySelectorAll('.cs-pill').forEach(b=>b.classList.remove('cs-pill-on'));const btn=document.getElementById('csp-'+tab);if(btn)btn.classList.add('cs-pill-on');}
 function _csRenderFeed(){
     const list=document.getElementById('cs-feed-list');if(!list)return;
@@ -549,3 +557,60 @@ window._openMomentsPost=function(postId){window.openCoupleSpace();setTimeout(()=
 window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;window.checkMomentsStatus=checkMomentsStatus;window.generatePartnerMoment=generatePartnerMoment;window.onUserPostCreated=onUserPostCreated;window.onUserCommented=onUserCommented;window.getMomentsUnreadCount=getMomentsUnreadCount;window.markPostRead=markPostRead;window._updateMomentsBadge=_updateBadge;
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
+
+// ── Feed 滚动行为：折叠头部 + FAB ──
+function _csExpandFeedHeader() {
+    const headerBody = document.getElementById('cs-header-body');
+    const title = document.getElementById('cs-topbar-feed-title');
+    const fab = document.getElementById('cs-feed-fab');
+    const topbar = document.getElementById('cs-topbar');
+    const feedPanel = document.getElementById('cs-panel-feed');
+    if (headerBody) headerBody.classList.remove('cs-header-collapsed');
+    if (title) title.classList.remove('cs-title-visible');
+    if (fab) fab.classList.remove('cs-fab-hidden');
+    if (topbar) topbar.classList.remove('cs-topbar-scrolled');
+    if (feedPanel) { feedPanel._feedHeaderVisible = true; feedPanel._feedLastScrollY = 0; }
+}
+
+function _csSetupFeedScroll() {
+    const feedPanel = document.getElementById('cs-panel-feed');
+    if (!feedPanel || feedPanel._scrollListenerSet) return;
+    feedPanel._scrollListenerSet = true;
+    feedPanel._feedHeaderVisible = true;
+    feedPanel._feedLastScrollY = 0;
+
+    const headerBody = document.getElementById('cs-header-body');
+    const title = document.getElementById('cs-topbar-feed-title');
+    const fab = document.getElementById('cs-feed-fab');
+    const topbar = document.getElementById('cs-topbar');
+
+    feedPanel.addEventListener('scroll', () => {
+        const scrollY = feedPanel.scrollTop;
+        const goingDown = scrollY > feedPanel._feedLastScrollY;
+
+        if (goingDown && scrollY > 60 && feedPanel._feedHeaderVisible) {
+            feedPanel._feedHeaderVisible = false;
+            if (headerBody) headerBody.classList.add('cs-header-collapsed');
+            if (title) { title.textContent = '动态'; title.classList.add('cs-title-visible'); }
+            if (fab) fab.classList.add('cs-fab-hidden');
+            if (topbar) topbar.classList.add('cs-topbar-scrolled');
+        } else if (!goingDown && !feedPanel._feedHeaderVisible) {
+            feedPanel._feedHeaderVisible = true;
+            if (headerBody) headerBody.classList.remove('cs-header-collapsed');
+            if (title) title.classList.remove('cs-title-visible');
+            if (fab) fab.classList.remove('cs-fab-hidden');
+            if (topbar) topbar.classList.remove('cs-topbar-scrolled');
+        }
+
+        feedPanel._feedLastScrollY = scrollY;
+    }, { passive: true });
+
+    // topbar 点击回顶
+    if (topbar) {
+        topbar.addEventListener('click', (e) => {
+            if (!e.target.closest('.cs-icon-btn') && !feedPanel._feedHeaderVisible) {
+                feedPanel.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    }
+}

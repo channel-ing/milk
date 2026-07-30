@@ -12814,24 +12814,18 @@ html[data-theme="dark"] #cs-panel-ann .ann-item-card .ann-tag {
 
 /* ── 置顶大卡片 ── */
 .ann-pinned-card {
+    flex: 0 0 100%;   /* 关键：撑满 inner，把操作按钮推到右侧不可见区 */
+    min-width: 0;
     display: flex; align-items: center;
     justify-content: space-between;
     padding: 18px 16px;
     background: var(--secondary-bg);
     min-height: 88px;
 }
-.ann-pinned-main {
-    flex: 1; min-width: 0;
-}
-.ann-pinned-name {
-    font-size: 17px; font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 7px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.ann-pinned-card .ann-item-left { padding-left: 4px; }
 .ann-pinned-date {
     font-size: 12px; color: var(--text-secondary);
-    opacity: 0.8; line-height: 1.4;
+    opacity: 0.8; line-height: 1.4; margin-top: 6px;
 }
 .ann-pinned-count {
     text-align: right; flex-shrink: 0; margin-left: 16px;
@@ -12845,7 +12839,7 @@ html[data-theme="dark"] #cs-panel-ann .ann-item-card .ann-tag {
     font-size: 12px; color: var(--text-secondary);
     text-align: right; margin-top: 3px;
 }
-/* 大卡里的 tag 用 accent 色 */
+/* 大卡里的 tag 和 days 用 accent 色 */
 .ann-pinned-card .ann-tag {
     background: rgba(var(--accent-color-rgb), 0.12);
     color: var(--accent-color);
@@ -12854,34 +12848,25 @@ html[data-theme="dark"] #cs-panel-ann .ann-item-card .ann-tag {
 
 /* ── 普通紧凑行 ── */
 .ann-list-row {
+    flex: 0 0 100%;   /* 关键：撑满 inner */
+    min-width: 0;
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 15px 16px;
+    padding: 14px 16px;
     background: var(--secondary-bg);
-    min-height: 54px;
+    min-height: 60px;
 }
-.ann-row-name {
-    font-size: 15px; font-weight: 500;
-    color: var(--text-primary);
-    flex: 1; min-width: 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ann-row-right {
-    display: flex; align-items: baseline; gap: 4px;
-    flex-shrink: 0; margin-left: 12px;
-}
-.ann-row-label {
-    font-size: 13px; color: var(--text-secondary);
-}
-.ann-row-num {
-    font-size: 20px; font-weight: 700;
+.ann-list-row .ann-item-left { padding-left: 4px; }
+/* 普通行：tag 用 accent 色 */
+.ann-list-row .ann-tag {
+    background: rgba(var(--accent-color-rgb), 0.12);
     color: var(--accent-color);
-    font-family: 'Georgia', serif;
+    border-color: rgba(var(--accent-color-rgb), 0.2);
 }
-.ann-row-unit {
-    font-size: 13px; color: var(--text-secondary);
+/* 普通行：天数也用 accent 色 */
+.ann-list-row .ann-item-days {
+    color: var(--accent-color);
 }
-.ann-row-arrow {
-    font-size: 18px; color: var(--text-secondary);
-    opacity: 0.45; margin-left: 2px;
+html[data-theme="dark"] .ann-list-row .ann-item-days {
+    color: var(--accent-color);
 }

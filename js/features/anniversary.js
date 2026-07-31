@@ -461,9 +461,19 @@ window._annInit = async function() {
     if (nameInput) nameInput.oninput = _annUpdateCharCount;
 };
 
-// ── 让 csSwitchTab('ann') 能触发 _annInit ──
-// moments.js 原版没有调用 _annInit，我们通过 hook csSwitchTab 来注入
+// ── 接管 _updateDaysCounter 和 csSwitchTab ──
 (function() {
+    // 关键：直接覆盖 window._updateDaysCounter
+    // moments.js 里 function _updateDaysCounter() {...} 是顶层函数声明，会挂到 window
+    function hookUpdateCounter() {
+        if (typeof window._updateDaysCounter !== 'function') {
+            setTimeout(hookUpdateCounter, 100);
+            return;
+        }
+        window._updateDaysCounter = function() { _annUpdateHeaderDays(); };
+    }
+    hookUpdateCounter();
+
     function hookCsSwitchTab() {
         if (typeof window.csSwitchTab !== 'function') {
             setTimeout(hookCsSwitchTab, 100);
@@ -473,11 +483,11 @@ window._annInit = async function() {
         window.csSwitchTab = function(tab) {
             orig.call(this, tab);
             if (tab === 'ann' && typeof window._annInit === 'function') window._annInit();
+            _annUpdateHeaderDays();
         };
     }
     hookCsSwitchTab();
 
-    // openCoupleSpace 后也刷新一次 header
     function hookOpen() {
         if (typeof window.openCoupleSpace !== 'function') {
             setTimeout(hookOpen, 100);
@@ -486,22 +496,20 @@ window._annInit = async function() {
         var orig = window.openCoupleSpace;
         window.openCoupleSpace = function() {
             orig.apply(this, arguments);
-            // 轮询重试：等 _annLoadPinned + messages 都就绪再更新 header
             var tries = 0;
             function tryUpdate() {
                 var loadPromise = (typeof window._annLoadPinned === 'function')
-                    ? window._annLoadPinned()
-                    : Promise.resolve();
+                    ? window._annLoadPinned() : Promise.resolve();
                 loadPromise.then(function() {
+                    _annUpdateHeaderDays();
                     var p = window._annGetPinned && window._annGetPinned();
-                    if (p) {
-                        _annUpdateHeaderDays();
-                    } else if (tries++ < 10) {
-                        setTimeout(tryUpdate, 200);
-                    }
+                    if (!p && tries++ < 15) setTimeout(tryUpdate, 200);
                 });
             }
-            setTimeout(tryUpdate, 100);
+            // 多个时间点兜底
+            setTimeout(tryUpdate, 50);
+            setTimeout(tryUpdate, 300);
+            setTimeout(tryUpdate, 800);
         };
     }
     hookOpen();

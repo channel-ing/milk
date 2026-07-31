@@ -412,8 +412,10 @@ function _updateDaysCounter() {
     function render(labelStr, daysStr) {
         textEl.innerHTML =
             '<span class="cs-days-label" id="cs-days-label">' + labelStr + '</span>'
+            + '<div class="cs-days-count">'
             + '<span class="cs-days-num" id="cs-days-num">' + daysStr + '</span>'
-            + '<span class="cs-days-unit">天</span>';
+            + '<span class="cs-days-unit">天</span>'
+            + '</div>';
         var lbl = document.getElementById('cs-days-label');
         if (lbl) {
             var len = Array.from(labelStr).length;

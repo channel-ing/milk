@@ -459,7 +459,11 @@ window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){
             feedPanel.insertBefore(outerHeader,feedPanel.firstChild);
         }
         page.classList.add('cs-open');
-        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();_updateDaysCounter();_updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
+        _csSetTab('feed');_csRenderFeed();_updateBigAvatars();
+        if(typeof window._annLoadPinned==='function'){
+            window._annLoadPinned().then(function(){_updateDaysCounter();});
+        }else{_updateDaysCounter();}
+        _updateBadge();_csExpandFeedHeader();_csSetupFeedScroll();
         if(scrollToPostId)setTimeout(()=>_csScrollTo(scrollToPostId),350);
     }));
 };

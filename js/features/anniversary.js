@@ -369,7 +369,7 @@ function _annFormatDate(date) {
 // ── 工厂：卡片（置顶/普通两套模板）──────────────────────
 function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
     var el    = document.createElement('div');
-    var label = isCountdown ? '还有' : '已经';
+    var label = isCountdown ? '倒数' : '已过';
 
     // 关键布局样式全用内联，不依赖 CSS 缓存
     var cardBaseStyle = 'flex:0 0 100%;min-width:0;display:flex;align-items:center;'

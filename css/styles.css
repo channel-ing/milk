@@ -11703,35 +11703,30 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-hb-svg { width: 100%; height: 100%; }
 .cs-days-text {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    margin-top: 10px;
+    margin-top: 8px;
     color: var(--text-secondary);
-    width: 100%;
+    text-align: center;
 }
 .cs-days-label {
-    flex: 1;
-    text-align: right;
-    padding-right: 6px;
     font-size: 13px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin-bottom: 2px;
     transition: font-size 0.2s ease;
 }
+.cs-days-count {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
 .cs-days-num {
-    flex: 0 0 auto;
-    font-size: 34px; font-weight: 800;
+    font-size: 36px; font-weight: 800;
     color: var(--accent-color);
-    letter-spacing: -1px;
-    line-height: 1;
+    letter-spacing: -1px; line-height: 1;
 }
 .cs-days-unit {
-    flex: 1;
-    text-align: left;
-    padding-left: 6px;
-    font-size: 13px;
+    font-size: 15px;
+    color: var(--text-secondary);
 }
 
 /* ── Tab pills ── */
@@ -12432,3 +12427,45 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* ── 回收站 tip 在底部 ── */
 .al-trash-tip {
+    font-size: 12px; color: var(--text-secondary);
+    padding: 12px 14px 4px; text-align: center;
+}
+
+/* ── 相册面板布局修正（只在激活时override，避免覆盖display:none） ── */
+#cs-panel-album.active,
+#cs-panel-album.cs-panel-active {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+.al-view { display: flex; }
+.al-albums-grid { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* 确认弹窗标题/描述 */
+.al-confirm-title {
+    font-size: 16px; font-weight: 600; color: var(--text-primary);
+    padding: 18px 20px 4px; text-align: center;
+}
+.al-confirm-msg {
+    font-size: 13px; color: var(--text-secondary);
+    padding: 0 20px 14px; text-align: center; line-height: 1.6;
+}
+
+/* ── 情侣空间·心情手账 tab ── */
+.cs-mood-hd {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 10px;
+}
+.cs-mood-hd-title {
+    font-size: 17px; font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
+}
+
+/* 回收站 bottom-sheet overlay */
+.cs-mood-trash-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);

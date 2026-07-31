@@ -12717,3 +12717,22 @@ body #user-sticker-picker .empty-sticker-tip {
     color: #fff; font-size: 9px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
+
+/* ── 顶部计数器竖排：名称在上，数字+天在下 ── */
+.cs-days-title {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    margin-bottom: 2px;
+}
+.cs-days-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+}
+.cs-days-line .cs-days-unit {
+    font-size: 15px;
+    color: var(--text-secondary);
+}

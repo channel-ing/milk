@@ -412,12 +412,12 @@ function _updateDaysCounter() {
     function render(labelStr, daysStr) {
         textEl.innerHTML =
             '<span class="cs-days-label" id="cs-days-label">' + labelStr + '</span>'
-            + ' <span class="cs-days-num" id="cs-days-num">' + daysStr + '</span> 天';
-        // 名称自适应字号：越长字越小
+            + '<span class="cs-days-num" id="cs-days-num">' + daysStr + '</span>'
+            + '<span class="cs-days-unit">天</span>';
         var lbl = document.getElementById('cs-days-label');
         if (lbl) {
             var len = Array.from(labelStr).length;
-            lbl.style.fontSize = (len <= 4 ? 14 : len <= 6 ? 13 : len <= 8 ? 12 : 10) + 'px';
+            lbl.style.fontSize = (len <= 4 ? 13 : len <= 6 ? 12 : len <= 8 ? 11 : 10) + 'px';
         }
     }
 

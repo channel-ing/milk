@@ -459,7 +459,7 @@
                 </div>
                 <div class="cs-big-av" id="cs-bav-me">🙂</div>
             </div>
-            <div class="cs-days-text" id="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
+            <div class="cs-days-text">相识 <span class="cs-days-num" id="cs-days-num">---</span> 天</div>
         </div>
         <div class="cs-pills-wrap">
             <div class="cs-pills">
@@ -2649,10 +2649,56 @@
                 </button>
             </div>
     
-            <!-- list、footer、editor-slide 已迁移到 #cs-panel-ann -->
-            <!-- 保留 ann-footer 的关闭按钮供旧入口使用 -->
+            <div class="ann-list-container" id="ann-list-container">
+            </div>
+    
             <div class="ann-footer">
                 <button class="modal-btn modal-btn-secondary" id="close-anniversary-modal">关闭</button>
+                <button class="modal-btn modal-btn-primary" id="open-ann-add-btn" style="flex: 1;">
+                    <i class="fas fa-plus"></i> 新增纪念日
+                </button>
+            </div>
+    
+            <div class="ann-editor-slide" id="ann-editor-slide">
+                <div class="ann-editor-header">
+                    <button class="ann-back-btn" id="close-ann-editor"><i class="fas fa-arrow-left"></i></button>
+                    <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 5v14M5 12h14"/></svg> 添加纪念日</span>
+                </div>
+                
+                <div class="ann-editor-content">
+                    <div class="ann-form-group">
+                        <label class="ann-label"><i class="fas fa-tag"></i>标题名称</label>
+                        <input type="text" class="modal-input" id="ann-input-name" placeholder="例如：恋爱纪念日、梦角生日">
+                    </div>
+    
+                    <div class="ann-form-group">
+                        <label class="ann-label"><i class="fas fa-calendar-alt"></i>选择日期</label>
+                        <input type="date" class="modal-input" id="ann-input-date">
+                    </div>
+    
+                    <div class="ann-form-group">
+                        <label class="ann-label"><i class="fas fa-th-large"></i>类型</label>
+                        <div class="ann-type-selector">
+                            <div class="ann-type-btn active" data-type="anniversary" onclick="switchAnnType('anniversary')">
+                                <i class="fas fa-heart"></i>
+                                <span>纪念日</span>
+                                <span class="ann-type-hint">过去 → 今天</span>
+                            </div>
+                            <div class="ann-type-btn" data-type="countdown" onclick="switchAnnType('countdown')">
+                                <i class="fas fa-hourglass-half"></i>
+                                <span>倒数日</span>
+                                <span class="ann-type-hint">今天 → 未来</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px; opacity: 0.7; padding: 0 2px;">
+                            <span id="ann-type-desc">计算从过去某一天到现在已经过了多少天</span>
+                        </div>
+                    </div>
+    
+                    <button class="modal-btn modal-btn-primary" id="save-ann-btn" style="width: 100%; margin-top: 10px;">
+                        <i class="fas fa-check"></i> 保存
+                    </button>
+                </div>
             </div>
         </div>
     </div>

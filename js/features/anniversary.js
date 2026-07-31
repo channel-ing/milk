@@ -415,6 +415,8 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
 function _annMakeWrap(card, isPinned, actionDefs, onCardClick) {
     var wrap  = document.createElement('div');
     wrap.className = 'ann-swipe-wrap' + (isPinned ? ' ann-swipe-pinned' : '');
+    wrap.style.cssText = 'overflow:hidden;border-radius:14px;margin-bottom:10px;'
+        + (isPinned ? 'border:1px solid rgba(var(--accent-color-rgb),0.45);' : 'border:1px solid var(--border-color);');
     wrap._onCardClick = onCardClick;
 
     var inner = document.createElement('div');

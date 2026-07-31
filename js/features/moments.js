@@ -507,6 +507,16 @@ window.csSwitchTab=function(tab){
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
     if(tab==='ann'&&typeof window._annInit==='function')window._annInit();
+
+    // 切离 feed 后兜底清除 feed title（IntersectionObserver 可能异步残留）
+    if(tab!=='feed'){
+        setTimeout(function(){
+            var t=document.getElementById('cs-topbar-feed-title');
+            if(t)t.classList.remove('cs-title-visible');
+            var tb=document.getElementById('cs-topbar');
+            if(tb)tb.classList.remove('cs-topbar-scrolled');
+        },80);
+    }
 };
 function _csSetTab(tab){
     document.querySelectorAll('.cs-panel').forEach(p=>p.classList.remove('cs-panel-active'));

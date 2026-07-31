@@ -425,8 +425,8 @@ function _updateDaysCounter() {
     if (typeof window._annGetPinned === 'function') {
         var p = window._annGetPinned();
         if (p) {
-            var verb = (p.dayLabel === '天后') ? '还有' : '已经';
-            render(p.name + ' ' + verb, p.days.toLocaleString('zh-CN'));
+            var verb = (p.dayLabel === '天后') ? ' 还有' : '';
+            render(p.name + verb, p.days.toLocaleString('zh-CN'));
             return;
         }
     }

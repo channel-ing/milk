@@ -52,6 +52,7 @@ function _annSavePinnedId(id) {
 window._annPinItem = function(annId) {
     _annSavePinnedId(annId);
     renderAnniversariesList();
+    if (typeof window._updateDaysCounter === 'function') window._updateDaysCounter();
     if (typeof showNotification === 'function') showNotification('已置顶', 'success');
 };
 
@@ -431,6 +432,7 @@ function _annMakeWrap(card, isPinned, actionDefs, onCardClick) {
 window._annInit = async function() {
     await _annLoadPinnedId();
     renderAnniversariesList();
+    if (typeof window._updateDaysCounter === 'function') window._updateDaysCounter();
 
     var addBtn = document.getElementById('cs-ann-add-btn');
     if (addBtn) addBtn.onclick = function() { window.openAnnSheet('add'); };

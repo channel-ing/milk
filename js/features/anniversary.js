@@ -55,12 +55,15 @@ function _annUpdateHeaderDays() {
 
     var p = window._annGetPinned && window._annGetPinned();
     if (!p) {
-        // 回退到 moments.js 的默认行为：数字更新，"相识 X 天"
         textEl.innerHTML = '相识 <span class="cs-days-num" id="cs-days-num">---</span> 天';
         return;
     }
-    textEl.innerHTML = p.name + ' ' + p.verb + ' <span class="cs-days-num" id="cs-days-num">'
-        + p.days.toLocaleString('zh-CN') + '</span> 天';
+    textEl.innerHTML =
+        '<div class="cs-days-title">' + p.name + ' ' + p.verb + '</div>'
+        + '<div class="cs-days-line">'
+        + '<span class="cs-days-num" id="cs-days-num">' + p.days.toLocaleString('zh-CN') + '</span>'
+        + '<span class="cs-days-unit">天</span>'
+        + '</div>';
 }
 
 // ── 左滑手势 ──────────────────────────────────────────────

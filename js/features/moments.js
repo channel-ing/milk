@@ -405,7 +405,44 @@ window._mDeletePost=function(postId){
 };
 
 // ─── 天数 & 头像 ───
-function _updateDaysCounter(){const el=document.getElementById('cs-days-num');if(!el)return;try{const list=Array.isArray(anniversaries)?anniversaries:[];const main=list.find(a=>a.type==='anniversary')||list[0];if(main&&main.date){const diff=Math.floor((Date.now()-new Date(main.date))/86400000)+1;if(diff>0){el.textContent=diff;return;}}}catch(e){}el.textContent='---';}
+function _updateDaysCounter() {
+    var textEl = document.getElementById('cs-days-text');
+    if (!textEl) return;
+
+    function render(labelStr, daysStr) {
+        textEl.innerHTML =
+            '<span class="cs-days-label" id="cs-days-label">' + labelStr + '</span>'
+            + ' <span class="cs-days-num" id="cs-days-num">' + daysStr + '</span> 天';
+        // 名称自适应字号：越长字越小
+        var lbl = document.getElementById('cs-days-label');
+        if (lbl) {
+            var len = Array.from(labelStr).length;
+            lbl.style.fontSize = (len <= 4 ? 14 : len <= 6 ? 13 : len <= 8 ? 12 : 10) + 'px';
+        }
+    }
+
+    // 优先：置顶纪念日
+    if (typeof window._annGetPinned === 'function') {
+        var p = window._annGetPinned();
+        if (p) {
+            var verb = (p.dayLabel === '天后') ? '还有' : '已经';
+            render(p.name + ' ' + verb, p.days.toLocaleString('zh-CN'));
+            return;
+        }
+    }
+
+    // 回退：旧逻辑（第一条 anniversary 类型）
+    try {
+        var list = Array.isArray(anniversaries) ? anniversaries : [];
+        var main = list.find(function(a) { return a.type === 'anniversary'; }) || list[0];
+        if (main && main.date) {
+            var diff = Math.floor((Date.now() - new Date(main.date)) / 86400000) + 1;
+            if (diff > 0) { render('相识', diff); return; }
+        }
+    } catch(e) {}
+    render('相识', '---');
+}
+window._updateDaysCounter = _updateDaysCounter;
 function _updateBigAvatars(){const ptEl=document.getElementById('cs-bav-partner'),meEl=document.getElementById('cs-bav-me');if(ptEl){const s=_getAvSrc(true);ptEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🌸';}if(meEl){const s=_getAvSrc(false);meEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🙂';}}
 
 // ─── 主入口 ───

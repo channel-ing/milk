@@ -486,14 +486,22 @@ window._annInit = async function() {
         var orig = window.openCoupleSpace;
         window.openCoupleSpace = function() {
             orig.apply(this, arguments);
-            // 等原函数的 rAF 完成 header 就位（用较长延迟兜底）
-            setTimeout(function() {
-                if (typeof window._annLoadPinned === 'function') {
-                    window._annLoadPinned().then(function() { _annUpdateHeaderDays(); });
-                } else {
-                    _annUpdateHeaderDays();
-                }
-            }, 100);
+            // 轮询重试：等 _annLoadPinned + messages 都就绪再更新 header
+            var tries = 0;
+            function tryUpdate() {
+                var loadPromise = (typeof window._annLoadPinned === 'function')
+                    ? window._annLoadPinned()
+                    : Promise.resolve();
+                loadPromise.then(function() {
+                    var p = window._annGetPinned && window._annGetPinned();
+                    if (p) {
+                        _annUpdateHeaderDays();
+                    } else if (tries++ < 10) {
+                        setTimeout(tryUpdate, 200);
+                    }
+                });
+            }
+            setTimeout(tryUpdate, 100);
         };
     }
     hookOpen();

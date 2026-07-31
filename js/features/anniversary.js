@@ -56,7 +56,7 @@ window._annPinItem = function(annId) {
     if (typeof showNotification === 'function') showNotification('已置顶', 'success');
 };
 
-// ── 获取当前置顶数据（供 Step 3 使用）────────────────────
+window._annLoadPinned = _annLoadPinnedId;
 window._annGetPinned = function() {
     var isMeet = (_annPinnedId === null || _annPinnedId === 'meet');
     if (isMeet) {

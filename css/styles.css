@@ -11653,6 +11653,7 @@ body #user-sticker-picker .empty-sticker-tip {
     position: fixed; inset: 0; z-index: 1500;
     display: flex; flex-direction: column;
     background: var(--primary-bg);
+    overflow: hidden;
     transform: translateY(100%);
     transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
     pointer-events: none;
@@ -12531,3 +12532,15 @@ body #user-sticker-picker .empty-sticker-tip {
     line-height: 1.6; white-space: pre-wrap;
     min-height: 16px;
 }
+.mdd-empty-msg {
+    font-size: 13px; color: var(--text-secondary);
+    font-style: italic; text-align: center;
+    padding: 10px 0; opacity: 0.55;
+}
+.mdd-section-acts {
+    display: flex; justify-content: flex-end;
+    gap: 8px; margin-top: 8px;
+}
+.mdd-act-btn {
+    background: none;
+    border: 1px solid var(--border-color);

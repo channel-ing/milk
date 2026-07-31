@@ -486,9 +486,14 @@ window._annInit = async function() {
         var orig = window.openCoupleSpace;
         window.openCoupleSpace = function() {
             orig.apply(this, arguments);
-            if (typeof window._annLoadPinned === 'function') {
-                window._annLoadPinned().then(function() { _annUpdateHeaderDays(); });
-            }
+            // 等原函数的 rAF 完成 header 就位（用较长延迟兜底）
+            setTimeout(function() {
+                if (typeof window._annLoadPinned === 'function') {
+                    window._annLoadPinned().then(function() { _annUpdateHeaderDays(); });
+                } else {
+                    _annUpdateHeaderDays();
+                }
+            }, 100);
         };
     }
     hookOpen();

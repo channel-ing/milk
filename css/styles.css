@@ -11653,7 +11653,6 @@ body #user-sticker-picker .empty-sticker-tip {
     position: fixed; inset: 0; z-index: 1500;
     display: flex; flex-direction: column;
     background: var(--primary-bg);
-    overflow: hidden;
     transform: translateY(100%);
     transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
     pointer-events: none;
@@ -11703,31 +11702,12 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .cs-hb-svg { width: 100%; height: 100%; }
 .cs-days-text {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 8px;
-    color: var(--text-secondary);
-    text-align: center;
-}
-.cs-days-label {
-    font-size: 13px;
-    margin-bottom: 2px;
-    transition: font-size 0.2s ease;
-}
-.cs-days-count {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
+    font-size: 14px; color: var(--text-secondary);
+    margin-top: 10px;
 }
 .cs-days-num {
-    font-size: 36px; font-weight: 800;
-    color: var(--accent-color);
-    letter-spacing: -1px; line-height: 1;
-}
-.cs-days-unit {
-    font-size: 15px;
-    color: var(--text-secondary);
+    font-size: 24px; font-weight: 700;
+    color: var(--accent-color); margin: 0 3px;
 }
 
 /* ── Tab pills ── */
@@ -12544,3 +12524,196 @@ body #user-sticker-picker .empty-sticker-tip {
 .mdd-act-btn {
     background: none;
     border: 1px solid var(--border-color);
+    border-radius: 8px; padding: 5px 11px;
+    font-size: 12px; color: var(--text-secondary);
+    cursor: pointer; transition: all 0.2s;
+}
+.mdd-act-btn:hover { background: var(--message-received-bg); }
+.mdd-act-del { color: #e05c5c !important; border-color: rgba(224,92,92,0.3) !important; }
+.mdd-act-del:hover { background: rgba(224,92,92,0.07) !important; }
+
+/* ── 心情手账 tab 内容卡片 ── */
+.cs-mood-card {
+    background: var(--secondary-bg);
+    border-radius: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+/* 日历卡片背景用 primary-bg，让 secondary-bg 的日期格子可见 */
+#cs-mood-cal-card {
+    background: var(--primary-bg);
+}
+/* 统计容器内直接使用现有 mood-stat-group 样式，不需要外层 card 样式 */
+.cs-mood-card #mood-stats-container {
+    padding: 0;
+}
+
+/* ── 相册 tab header（与动态/心情手账保持一致） ── */
+.cs-al-hd {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 10px;
+}
+.cs-al-hd-title {
+    font-size: 17px; font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
+}
+
+/* ── 动态 feed 滚动行为 ── */
+
+/* 头像+tab 折叠容器 */
+#cs-header-body {
+    overflow: hidden;
+    transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.28s ease;
+    max-height: 300px;
+    opacity: 1;
+}
+#cs-header-body.cs-header-collapsed {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* topbar 中间动态标题 */
+.cs-topbar-feed-title {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, calc(-50% - 4px));
+    font-size: 15px; font-weight: 700;
+    color: var(--text-primary);
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.cs-topbar-feed-title.cs-title-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+}
+
+/* topbar 整体在滚动时可点击（除 icon 按钮之外的区域） */
+#cs-topbar.cs-topbar-scrolled {
+    cursor: pointer;
+}
+
+/* 发帖 FAB */
+#cs-feed-fab {
+    position: absolute;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: #fff; border: none;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+    cursor: pointer;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 200;
+    opacity: 1; transform: scale(1);
+}
+#cs-feed-fab.cs-fab-hidden {
+    opacity: 0;
+    transform: scale(0.75);
+    pointer-events: none;
+}
+
+/* ── cs-outer-header 两种状态下宽度保持一致 ── */
+#cs-outer-header {
+    padding: 0 16px;
+}
+/* 在 feed panel 内时，用负 margin 抵消 panel 的 16px padding */
+#cs-panel-feed #cs-outer-header {
+    margin: 0 -16px;
+    padding: 0 16px;
+}
+
+/* ══════════════════════════════════════════
+   纪念日 tab（cs-panel-ann）专用样式
+   注意：只添加，不修改任何原有元素样式
+   ══════════════════════════════════════════ */
+
+/* panel header */
+.cs-ann-hd {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 20px 4px 12px;
+}
+.cs-ann-hd-title {
+    font-size: 17px; font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
+}
+
+/* ── 纪念日 bottom sheet 内容区 ── */
+.cs-ann-sheet-body {
+    flex: 1; overflow-y: auto;
+    padding: 16px 16px 24px;
+    -webkit-overflow-scrolling: touch;
+}
+.cs-ann-form-row { margin-bottom: 20px; }
+.cs-ann-form-label {
+    display: block;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.cs-ann-char-hint {
+    font-size: 11px; color: var(--text-secondary);
+    text-align: right; margin-top: 4px; opacity: 0.7;
+}
+.cs-ann-type-desc-wrap {
+    font-size: 12px; color: var(--text-secondary);
+    margin-top: 10px; opacity: 0.7;
+    padding: 0 2px; line-height: 1.5;
+}
+.cs-ann-delete-btn {
+    width: 100%; margin-top: 4px; padding: 12px;
+    background: rgba(255,80,80,0.08);
+    border: 1px solid rgba(255,80,80,0.2);
+    color: #ff5050; border-radius: 12px;
+    cursor: pointer; font-size: 14px; font-family: inherit;
+    display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+    transition: var(--transition);
+}
+.cs-ann-delete-btn:active { background: rgba(255,80,80,0.15); }
+
+/* ── 封面图片选择器 ── */
+.cs-ann-cover-row {
+    display: flex; align-items: center; gap: 12px;
+}
+.cs-ann-cover-add-btn {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(var(--accent-color-rgb), 0.07);
+    border: 1.5px dashed rgba(var(--accent-color-rgb), 0.38);
+    color: var(--accent-color); font-size: 22px;
+    cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--transition);
+}
+.cs-ann-cover-add-btn:active { background: rgba(var(--accent-color-rgb), 0.15); }
+.cs-ann-cover-thumb {
+    width: 64px; height: 64px; border-radius: 50%;
+    overflow: hidden; position: relative; flex-shrink: 0;
+    border: 2px solid rgba(var(--accent-color-rgb), 0.3);
+}
+.cs-ann-cover-thumb img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.cs-ann-cover-remove-btn {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); border: none;
+    color: #fff; font-size: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}

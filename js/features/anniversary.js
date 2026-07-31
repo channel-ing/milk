@@ -369,33 +369,42 @@ function _annFormatDate(date) {
 // ── 工厂：卡片（置顶/普通两套模板）──────────────────────
 function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
     var el    = document.createElement('div');
-    var label = isCountdown ? '倒数' : '已过';
+    var label = isCountdown ? '还有' : '已经';
+
+    // 关键布局样式全用内联，不依赖 CSS 缓存
+    var cardBaseStyle = 'flex:0 0 100%;min-width:0;display:flex;align-items:center;'
+        + 'justify-content:space-between;box-sizing:border-box;background:var(--secondary-bg);';
+    var tagStyle = 'background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);'
+        + 'border-color:rgba(var(--accent-color-rgb),0.2);';
 
     if (isPinned) {
-        // 大卡片：名称 + badge + 完整日期 + 大数字
         el.className = 'ann-pinned-card';
+        el.setAttribute('style', cardBaseStyle + 'padding:18px 16px;min-height:88px;border-radius:0;border:none;margin:0;');
         el.innerHTML = [
-            '<div class="ann-item-left">',
+            '<div style="flex:1;min-width:0;padding-left:4px;">',
             '  <div class="ann-item-name">' + name
-                + '<span class="ann-tag">' + label + '</span></div>',
-            '  <div class="ann-pinned-date">起始于：' + _annFormatDate(targetDate) + '</div>',
+                + '<span class="ann-tag" style="' + tagStyle + '">' + label + '</span></div>',
+            '  <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;opacity:0.8;">'
+                + '起始于：' + _annFormatDate(targetDate) + '</div>',
             '</div>',
-            '<div class="ann-pinned-count">',
-            '  <div class="ann-pinned-num">' + diffDays.toLocaleString('zh-CN') + '</div>',
-            '  <div class="ann-pinned-unit">天</div>',
+            '<div style="text-align:right;flex-shrink:0;margin-left:16px;">',
+            '  <div style="font-size:52px;font-weight:800;color:var(--accent-color);line-height:1;letter-spacing:-1px;">'
+                + diffDays.toLocaleString('zh-CN') + '</div>',
+            '  <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">天</div>',
             '</div>'
         ].join('');
     } else {
-        // 普通行：badge pill + 大数字，不显示日期
         el.className = 'ann-list-row';
+        el.setAttribute('style', cardBaseStyle + 'padding:14px 16px;min-height:54px;border-radius:0;border:none;margin:0;');
         el.innerHTML = [
-            '<div class="ann-item-left">',
+            '<div style="flex:1;min-width:0;">',
             '  <div class="ann-item-name">' + name
-                + '<span class="ann-tag">' + label + '</span></div>',
+                + '<span class="ann-tag" style="' + tagStyle + '">' + label + '</span></div>',
             '</div>',
-            '<div class="ann-item-right">',
-            '  <div class="ann-item-days">' + diffDays.toLocaleString('zh-CN') + '</div>',
-            '  <div class="ann-item-days-unit">天</div>',
+            '<div style="text-align:right;flex-shrink:0;margin-left:12px;">',
+            '  <div style="font-size:26px;font-weight:800;color:var(--accent-color);line-height:1;">'
+                + diffDays.toLocaleString('zh-CN') + '</div>',
+            '  <div style="font-size:12px;color:var(--text-secondary);">天</div>',
             '</div>'
         ].join('');
     }
@@ -408,9 +417,9 @@ function _annMakeWrap(card, isPinned, actionDefs, onCardClick) {
     wrap.className = 'ann-swipe-wrap' + (isPinned ? ' ann-swipe-pinned' : '');
     wrap._onCardClick = onCardClick;
 
-    // inner = 卡片 + 操作按钮横向排列，整体平移
     var inner = document.createElement('div');
     inner.className = 'ann-swipe-inner';
+    inner.style.cssText = 'display:flex;width:100%;'; // 内联确保横向排列不被缓存影响
     inner.appendChild(card);
 
     var actions = document.createElement('div');

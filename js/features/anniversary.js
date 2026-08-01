@@ -248,6 +248,7 @@ window.saveAnnFromSheet = function() {
     renderAnniversariesList();
     _annUpdateHeaderDays();
     window.closeAnnSheet();
+    if (typeof window.closeAnnDetail === 'function') window.closeAnnDetail();
     if (typeof showNotification === 'function') showNotification(_annEditingId ? '已更新' : '纪念日已添加', 'success');
 };
 
@@ -261,6 +262,7 @@ window.deleteCurrentAnn = function() {
     renderAnniversariesList();
     _annUpdateHeaderDays();
     window.closeAnnSheet();
+    if (typeof window.closeAnnDetail === 'function') window.closeAnnDetail();
     if (typeof showNotification === 'function') showNotification('已删除', 'success');
 };
 
@@ -341,7 +343,7 @@ function renderAnniversariesList() {
             ? Math.max(0, Math.ceil((target - now) / 86400000))
             : Math.max(0, Math.floor((now - target) / 86400000));
 
-        var editFn = function() { window.openAnnSheet('edit', ann.id); };
+        var editFn = function() { window.openAnnDetail(ann.id); };
         var wrap = _annMakeWrap(
             _annMakeCard(ann.name, target, diffDays, isCountdown, isPinned),
             isPinned,
@@ -447,6 +449,71 @@ function _annMakeWrap(card, isPinned, actionDefs, onCardClick) {
     wrap.appendChild(inner);
     return wrap;
 }
+
+// ── 详情页 ────────────────────────────────────────────────
+var _annDetailCurrentId = null;
+
+window.openAnnDetail = function(annId) {
+    _annCloseAllSwipesExcept(null);
+    _annDetailCurrentId = annId;
+
+    var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === annId; });
+    if (!ann) return;
+
+    var now = new Date();
+    var target = new Date(ann.date);
+    var isCD = ann.type === 'countdown';
+    var days = isCD
+        ? Math.max(0, Math.ceil((target - now) / 86400000))
+        : Math.max(0, Math.floor((now - target) / 86400000));
+    var label = isCD ? '倒数' : '已过';
+    var dateStr = target.getFullYear() + '-' + (target.getMonth()+1) + '-' + target.getDate();
+
+    var body = document.getElementById('ann-detail-body');
+    if (!body) return;
+
+    // 先渲染文字（图片异步加载）
+    body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr, null);
+
+    // 加载封面图
+    try {
+        localforage.getItem(getStorageKey('annCoverBg_' + annId)).then(function(url) {
+            if (url && _annDetailCurrentId === annId) {
+                body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr, url);
+            }
+        });
+    } catch(e) {}
+
+    var page = document.getElementById('ann-detail-page');
+    if (page) page.classList.add('active');
+};
+
+function _annDetailHTML(name, label, days, dateStr, coverUrl) {
+    var bgStyle = coverUrl
+        ? 'background-image:url(' + JSON.stringify(coverUrl) + ');background-size:cover;background-position:center;'
+        : 'background:linear-gradient(135deg, var(--accent-color) 0%, rgba(var(--accent-color-rgb),0.7) 100%);';
+    return [
+        '<div class="ann-detail-card" style="' + bgStyle + '">',
+        '  <div class="ann-detail-card-overlay"></div>',
+        '  <div class="ann-detail-card-content">',
+        '    <div class="ann-detail-name">&ldquo;' + name + '&rdquo;' + label + '</div>',
+        '    <div class="ann-detail-num">' + days.toLocaleString('zh-CN') + '</div>',
+        '    <div class="ann-detail-date">起始日：' + dateStr + '</div>',
+        '  </div>',
+        '</div>'
+    ].join('');
+}
+
+window.closeAnnDetail = function() {
+    var page = document.getElementById('ann-detail-page');
+    if (page) page.classList.remove('active');
+    _annDetailCurrentId = null;
+};
+
+window._annEditFromDetail = function() {
+    if (_annDetailCurrentId === null) return;
+    window.openAnnSheet('edit', _annDetailCurrentId);
+};
 
 // ── 初始化（供 csSwitchTab('ann') 调用）──────────────────
 window._annInit = async function() {

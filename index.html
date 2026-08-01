@@ -566,6 +566,17 @@
                 </button>
             </div>
             <div id="ann-list-container"></div>
+
+            <!-- 纪念日详情页（在 panel 内绝对定位覆盖） -->
+            <div class="ann-detail-page" id="ann-detail-page">
+                <div class="ann-detail-topbar">
+                    <button class="cs-icon-btn" onclick="window.closeAnnDetail()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="ann-detail-edit-btn" onclick="window._annEditFromDetail()">编辑</button>
+                </div>
+                <div class="ann-detail-body" id="ann-detail-body"></div>
+            </div>
         </div>
         <div class="cs-panel" id="cs-panel-period">
             <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>

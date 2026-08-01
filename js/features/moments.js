@@ -32,15 +32,16 @@ function _mPickStickers() {
 }
 
 // 梦角评论内容：纯文字 60% / 文字+贴纸 20% / 纯贴纸 20%
+// 没有字卡也没有贴纸时返回 null，调用方应跳过评论
 function _mCmtContent() {
     const textPool   = [...(window._customReplies || customReplies || [])];
     const stickerPool = [...(stickerLibrary || [])];
     const hasText    = textPool.length > 0;
     const hasSticker = stickerPool.length > 0;
     const randSticker = () => stickerPool[Math.floor(Math.random() * stickerPool.length)];
-    const randText   = () => textPool[Math.floor(Math.random() * textPool.length)] || '嗯嗯~';
+    const randText   = () => textPool[Math.floor(Math.random() * textPool.length)];
 
-    if (!hasText && !hasSticker) return { text: '嗯嗯~', image: null };
+    if (!hasText && !hasSticker) return null;  // 没有可用内容，不回复
     if (!hasSticker) return { text: randText(), image: null };
     if (!hasText)    return { text: '', image: randSticker() };
 
@@ -110,7 +111,7 @@ function _mPostContent() {
 async function generatePartnerMoment() {
     const now=Date.now();
     const c=_mPostContent();const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
-    if(Math.random()<0.10){const c=_mCmtContent();post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
+    if(Math.random()<0.10){const c=_mCmtContent();if(c)post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);
 }
@@ -118,7 +119,7 @@ async function generatePartnerMoment() {
 function onUserPostCreated(postId) {
     const p=momentsData.posts.find(p=>p.id===postId); if(!p||p.type!=='user')return;
     p.pendingLikeTime=Date.now()+_mDly();p.pendingLikeSilent=false;
-    if(Math.random()<0.90){const c=_mCmtContent();p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:null};p.chainProbability=0.45;}
+    if(Math.random()<0.90){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:null};p.chainProbability=0.45;}else{p.chainProbability=null;}}
     else{p.chainProbability=null;}
     saveMomentsData();
 }
@@ -127,7 +128,7 @@ function onUserCommented(postId) {
     const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;
     const prob=p.chainProbability;
     if(prob===null||prob<0.06){p.chainProbability=null;saveMomentsData();return;}
-    if(Math.random()<prob){const c=_mCmtContent();p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};p.chainProbability=prob/2;}
+    if(Math.random()<prob){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};p.chainProbability=prob/2;}else{p.chainProbability=null;}}
     else{p.chainProbability=null;}
     saveMomentsData();
 }

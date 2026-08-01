@@ -397,10 +397,13 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned, annId) 
 
     if (isPinned) {
         el.className = 'ann-pinned-card';
+        console.log('[ann-pinned] making card, annId=', annId, 'type=', typeof annId, 'name=', name);
         // 直接把 onclick 挂到卡片属性上：最简单直接
         if (annId != null) {
             el.setAttribute('onclick', 'window.openAnnDetail(' + annId + ')');
-            el.style.cursor = 'pointer';
+            console.log('[ann-pinned] onclick set to: window.openAnnDetail(' + annId + ')');
+        } else {
+            console.log('[ann-pinned] annId was null/undefined, NO onclick set');
         }
         el.setAttribute('style', baseStyle + 'padding:18px 16px;min-height:88px;cursor:pointer;');
         el.innerHTML = [

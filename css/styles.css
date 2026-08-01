@@ -12738,7 +12738,6 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 
 /* ── 纪念日详情页 ── */
-#cs-panel-ann { position: relative; }
 .ann-detail-page {
     position: absolute;
     left: 0;

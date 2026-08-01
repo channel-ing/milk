@@ -12905,6 +12905,7 @@ body #user-sticker-picker .empty-sticker-tip {
     margin-top: 20px;
     padding: 16px;
     background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
     border-radius: 14px;
     color: var(--text-primary);
     font-size: 14px;

@@ -12644,7 +12644,7 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-ann-hd {
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 20px 4px 12px;
+    padding: 4px 4px 10px;
 }
 .cs-ann-hd-title {
     font-size: 17px; font-weight: 700;
@@ -12775,12 +12775,12 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* 卡片单独留白：左右加大，跟 topbar 无关 */
 .ann-detail-body {
-    padding: 24px 16px 24px;
+    padding: 18px 16px 24px;
 }
 .ann-detail-card {
     position: relative;
     width: 100%;
-    max-width: calc(100% - 96px);
+    max-width: calc(100% - 64px);
     margin: 0 auto;
     aspect-ratio: 1 / 1;
     border-radius: 20px;
@@ -12927,4 +12927,9 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .ann-detail-remark p {
     margin: 6px 0;
+}
+
+/* 相遇计数器向上贴紧头像/心电图 */
+#cs-outer-header .cs-days-text {
+    margin-top: 0;
 }

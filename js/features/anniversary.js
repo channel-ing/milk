@@ -248,9 +248,10 @@ window.saveAnnFromSheet = function() {
     renderAnniversariesList();
     _annUpdateHeaderDays();
     window.closeAnnSheet();
-    // 编辑保存后：若详情页正打开，刷新它（用最新数据 + 最新封面）；不关闭
+    // 编辑保存后：若详情页正打开，延迟刷新（等 sheet 关闭动画完成）
     if (_annDetailCurrentId !== null && typeof window.openAnnDetail === 'function') {
-        window.openAnnDetail(_annDetailCurrentId);
+        var refreshId = _annDetailCurrentId;
+        setTimeout(function() { window.openAnnDetail(refreshId); }, 200);
     }
     if (typeof showNotification === 'function') showNotification(_annEditingId ? '已更新' : '纪念日已添加', 'success');
 };

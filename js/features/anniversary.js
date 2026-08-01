@@ -9,6 +9,32 @@ var _annEditingId    = null;
 var _annPinnedId     = null;   // null/'meet'=相遇；Number=具体条目
 var _annCoverDataUrl = null;
 var _annCoverChanged = false;
+var _annMeetOverride = null;   // 用户编辑相遇后的覆盖数据：{name, date} 或 null
+
+// ── 相遇覆盖数据的读取（供各处使用） ──────────────────────
+async function _annLoadMeetOverride() {
+    try {
+        var val = await localforage.getItem(getStorageKey('annMeetOverride'));
+        _annMeetOverride = val || null;
+    } catch(e) { _annMeetOverride = null; }
+}
+window._annLoadMeetOverride = _annLoadMeetOverride;
+
+// 得到当前相遇的实际数据（有 override 用 override，否则用首条消息）
+function _annGetMeetData() {
+    if (_annMeetOverride && _annMeetOverride.date) {
+        return { name: _annMeetOverride.name || '相遇', date: _annMeetOverride.date, target: new Date(_annMeetOverride.date) };
+    }
+    var msgs = (typeof messages !== 'undefined') ? messages : [];
+    if (!msgs.length) return null;
+    var start = new Date(msgs[0].timestamp);
+    if (isNaN(start.getTime())) return null;
+    // ISO date 字符串（yyyy-mm-dd）方便 date input 用
+    var iso = start.getFullYear() + '-'
+        + String(start.getMonth()+1).padStart(2, '0') + '-'
+        + String(start.getDate()).padStart(2, '0');
+    return { name: '相遇', date: iso, target: start };
+}
 
 // ── 置顶持久化 ────────────────────────────────────────────
 async function _annLoadPinnedId() {
@@ -33,11 +59,10 @@ window._annPinItem = function(annId) {
 window._annGetPinned = function() {
     var isMeet = (_annPinnedId === null || _annPinnedId === 'meet');
     if (isMeet) {
-        var msgs = (typeof messages !== 'undefined') ? messages : [];
-        if (!msgs.length) return null;
-        var start = new Date(msgs[0].timestamp);
-        var days = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
-        return { type: 'meet', name: '相遇', days: days, verb: '已经', start: start };
+        var m = _annGetMeetData();
+        if (!m) return null;
+        var days = Math.max(0, Math.floor((Date.now() - m.target.getTime()) / 86400000));
+        return { type: 'meet', name: m.name, days: days, verb: '已经', start: m.target };
     }
     var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === _annPinnedId; });
     if (!ann) return null;
@@ -162,21 +187,44 @@ window._annRemoveCover = function() {
 // ── Bottom sheet 开关 ────────────────────────────────────
 window.openAnnSheet = function(mode, annId) {
     _annCloseAllSwipesExcept(null);
-    _annEditingId = (mode === 'edit' && annId) ? annId : null;
+    _annEditingId = (mode === 'edit' && annId != null) ? annId : null;
+
+    var isMeetEdit = (_annEditingId === 'meet');
 
     var titleEl   = document.getElementById('cs-ann-sheet-title');
     var deleteBtn = document.getElementById('cs-ann-sheet-delete');
     var nameInput = document.getElementById('cs-ann-input-name');
     var dateInput = document.getElementById('cs-ann-input-date');
+    var typeSelector = document.querySelector('#cs-ann-sheet .ann-type-selector');
+    var typeDesc = document.querySelector('#cs-ann-sheet .cs-ann-type-desc-wrap');
+    var typeLabel = typeSelector ? typeSelector.parentElement.querySelector('.cs-ann-form-label') : null;
 
     if (titleEl)   titleEl.textContent     = _annEditingId ? '编辑纪念日' : '添加纪念日';
-    if (deleteBtn) deleteBtn.style.display = _annEditingId ? 'block'      : 'none';
+    // 相遇不能删除，普通编辑显示删除按钮，新建不显示
+    if (deleteBtn) deleteBtn.style.display = (_annEditingId && !isMeetEdit) ? 'block' : 'none';
+
+    // 相遇不需要选类型（相遇天然是"已经"类型）
+    if (typeSelector) typeSelector.style.display = isMeetEdit ? 'none' : '';
+    if (typeDesc)     typeDesc.style.display     = isMeetEdit ? 'none' : '';
+    if (typeLabel)    typeLabel.style.display    = isMeetEdit ? 'none' : '';
 
     _annCoverDataUrl = null;
     _annCoverChanged = false;
     _annShowCoverPreview(null);
 
-    if (_annEditingId) {
+    if (isMeetEdit) {
+        // 编辑相遇：读 override 或默认（首条消息）
+        var m = _annGetMeetData();
+        if (nameInput) nameInput.value = (m && m.name) || '';
+        if (dateInput) dateInput.value = (m && m.date) || '';
+        window.switchAnnType('anniversary');
+        // 加载相遇的封面
+        try {
+            localforage.getItem(getStorageKey('annCoverBg_meet')).then(function(url) {
+                if (url) { _annCoverDataUrl = url; _annShowCoverPreview(url); }
+            });
+        } catch(e) {}
+    } else if (_annEditingId) {
         var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === _annEditingId; });
         if (ann) {
             if (nameInput) nameInput.value = ann.name || '';
@@ -226,8 +274,15 @@ window.saveAnnFromSheet = function() {
             || (typeof currentAnniversaryType !== 'undefined' && currentAnniversaryType)
             || 'anniversary';
 
+    var isMeetSave = (_annEditingId === 'meet');
     var savedId;
-    if (_annEditingId !== null) {
+
+    if (isMeetSave) {
+        // 保存相遇 override
+        savedId = 'meet';
+        _annMeetOverride = { name: name, date: date };
+        try { localforage.setItem(getStorageKey('annMeetOverride'), _annMeetOverride); } catch(e) {}
+    } else if (_annEditingId !== null) {
         savedId = _annEditingId;
         var idx = anniversaries.findIndex(function(a) { return a.id === _annEditingId; });
         if (idx !== -1) { anniversaries[idx].name = name; anniversaries[idx].date = date; anniversaries[idx].type = type; }
@@ -317,21 +372,18 @@ function renderAnniversariesList() {
     }
     var isMeetPinned = (_annPinnedId === null || _annPinnedId === 'meet');
 
-    // 相遇条目
-    var msgs  = (typeof messages !== 'undefined') ? messages : [];
+    // 相遇条目（有 override 用 override，否则用首条消息时间）
+    var meetData = _annGetMeetData();
     var meetWrap = null;
-    if (msgs.length) {
-        var start = new Date(msgs[0].timestamp);
-        if (!isNaN(start.getTime())) {
-            var meetDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
-            meetWrap = _annMakeWrap(
-                _annMakeCard('相遇', start, meetDays, false, isMeetPinned, null),
-                isMeetPinned,
-                [{ label: '置顶', cls: 'ann-action-pin', fn: function() { window._annPinItem('meet'); } }],
-                null
-            );
-            meetWrap.classList.add('ann-swipe-wrap-meet');
-        }
+    if (meetData) {
+        var meetDays = Math.max(0, Math.floor((Date.now() - meetData.target.getTime()) / 86400000));
+        meetWrap = _annMakeWrap(
+            _annMakeCard(meetData.name, meetData.target, meetDays, false, isMeetPinned, 'meet'),
+            isMeetPinned,
+            [{ label: '置顶', cls: 'ann-action-pin', fn: function() { window._annPinItem('meet'); } }],
+            function() { window.openAnnDetail('meet'); }
+        );
+        meetWrap.classList.add('ann-swipe-wrap-meet');
     }
 
     if (isMeetPinned && meetWrap) container.appendChild(meetWrap);
@@ -398,10 +450,10 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned, annId) 
     if (isPinned) {
         el.className = 'ann-pinned-card';
         console.log('[ann-pinned] making card, annId=', annId, 'type=', typeof annId, 'name=', name);
-        // 直接把 onclick 挂到卡片属性上：最简单直接
         if (annId != null) {
-            el.setAttribute('onclick', 'window.openAnnDetail(' + annId + ')');
-            console.log('[ann-pinned] onclick set to: window.openAnnDetail(' + annId + ')');
+            var idInJs = (typeof annId === 'number') ? annId : "'" + annId + "'";
+            el.setAttribute('onclick', 'window.openAnnDetail(' + idInJs + ')');
+            console.log('[ann-pinned] onclick set to: window.openAnnDetail(' + idInJs + ')');
         } else {
             console.log('[ann-pinned] annId was null/undefined, NO onclick set');
         }
@@ -478,12 +530,23 @@ window.openAnnDetail = function(annId) {
     _annCloseAllSwipesExcept(null);
     _annDetailCurrentId = annId;
 
-    var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === annId; });
-    if (!ann) return;
+    var name, target, isCD, isMeet = (annId === 'meet');
+
+    if (isMeet) {
+        var m = _annGetMeetData();
+        if (!m) return;
+        name = m.name;
+        target = m.target;
+        isCD = false;
+    } else {
+        var ann = (typeof anniversaries !== 'undefined' ? anniversaries : []).find(function(a) { return a.id === annId; });
+        if (!ann) return;
+        target = new Date(ann.date);
+        name = ann.name;
+        isCD = ann.type === 'countdown';
+    }
 
     var now = new Date();
-    var target = new Date(ann.date);
-    var isCD = ann.type === 'countdown';
     var days = isCD
         ? Math.max(0, Math.ceil((target - now) / 86400000))
         : Math.max(0, Math.floor((now - target) / 86400000));
@@ -493,18 +556,17 @@ window.openAnnDetail = function(annId) {
     var body = document.getElementById('ann-detail-body');
     if (!body) return;
 
-    // 渲染文字（不含背景 style）
-    body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr);
+    body.innerHTML = _annDetailHTML(name, label, days, dateStr);
 
-    // 单独设置封面背景（先纯色兜底）
     var cardEl = body.querySelector('.ann-detail-card');
     if (cardEl) {
         cardEl.style.background = 'linear-gradient(135deg, var(--accent-color) 0%, rgba(var(--accent-color-rgb),0.7) 100%)';
     }
 
-    // 异步加载封面
+    // 加载封面（相遇和普通条目都可能有封面）
     try {
-        localforage.getItem(getStorageKey('annCoverBg_' + annId)).then(function(url) {
+        var coverKey = isMeet ? 'annCoverBg_meet' : ('annCoverBg_' + annId);
+        localforage.getItem(getStorageKey(coverKey)).then(function(url) {
             console.log('[ann-detail] cover loaded, id=', annId, 'has url:', !!url);
             if (url && _annDetailCurrentId === annId) {
                 var el = document.querySelector('#ann-detail-body .ann-detail-card');
@@ -516,6 +578,10 @@ window.openAnnDetail = function(annId) {
             }
         }).catch(function(e) { console.warn('[ann-detail] cover load failed:', e); });
     } catch(e) { console.warn('[ann-detail] cover load exception:', e); }
+
+    // 相遇也显示编辑按钮
+    var editBtn = document.querySelector('.ann-detail-edit-btn');
+    if (editBtn) editBtn.style.display = '';
 
     var page = document.getElementById('ann-detail-page');
     if (page) page.classList.add('active');
@@ -548,6 +614,7 @@ window._annEditFromDetail = function() {
 // ── 初始化（供 csSwitchTab('ann') 调用）──────────────────
 window._annInit = async function() {
     await _annLoadPinnedId();
+    await _annLoadMeetOverride();
     renderAnniversariesList();
     _annUpdateHeaderDays();
 
@@ -595,9 +662,10 @@ window._annInit = async function() {
             orig.apply(this, arguments);
             var tries = 0;
             function tryUpdate() {
-                var loadPromise = (typeof window._annLoadPinned === 'function')
-                    ? window._annLoadPinned() : Promise.resolve();
-                loadPromise.then(function() {
+                var loads = [];
+                if (typeof window._annLoadPinned === 'function') loads.push(window._annLoadPinned());
+                if (typeof window._annLoadMeetOverride === 'function') loads.push(window._annLoadMeetOverride());
+                Promise.all(loads).then(function() {
                     _annUpdateHeaderDays();
                     var p = window._annGetPinned && window._annGetPinned();
                     if (!p && tries++ < 15) setTimeout(tryUpdate, 200);

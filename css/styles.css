@@ -12759,7 +12759,7 @@ body #user-sticker-picker .empty-sticker-tip {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 20px 6px;
+    padding: 4px 4px 6px;
 }
 .ann-detail-edit-btn {
     background: none;

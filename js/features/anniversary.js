@@ -248,7 +248,10 @@ window.saveAnnFromSheet = function() {
     renderAnniversariesList();
     _annUpdateHeaderDays();
     window.closeAnnSheet();
-    if (typeof window.closeAnnDetail === 'function') window.closeAnnDetail();
+    // 编辑保存后：若详情页正打开，刷新它（用最新数据 + 最新封面）；不关闭
+    if (_annDetailCurrentId !== null && typeof window.openAnnDetail === 'function') {
+        window.openAnnDetail(_annDetailCurrentId);
+    }
     if (typeof showNotification === 'function') showNotification(_annEditingId ? '已更新' : '纪念日已添加', 'success');
 };
 
@@ -262,6 +265,7 @@ window.deleteCurrentAnn = function() {
     renderAnniversariesList();
     _annUpdateHeaderDays();
     window.closeAnnSheet();
+    // 删除时才关闭详情页（否则详情页里的条目已不存在）
     if (typeof window.closeAnnDetail === 'function') window.closeAnnDetail();
     if (typeof showNotification === 'function') showNotification('已删除', 'success');
 };
@@ -472,28 +476,37 @@ window.openAnnDetail = function(annId) {
     var body = document.getElementById('ann-detail-body');
     if (!body) return;
 
-    // 先渲染文字（图片异步加载）
-    body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr, null);
+    // 渲染文字（不含背景 style）
+    body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr);
 
-    // 加载封面图
+    // 单独设置封面背景（先纯色兜底）
+    var cardEl = body.querySelector('.ann-detail-card');
+    if (cardEl) {
+        cardEl.style.background = 'linear-gradient(135deg, var(--accent-color) 0%, rgba(var(--accent-color-rgb),0.7) 100%)';
+    }
+
+    // 异步加载封面
     try {
         localforage.getItem(getStorageKey('annCoverBg_' + annId)).then(function(url) {
+            console.log('[ann-detail] cover loaded, id=', annId, 'has url:', !!url);
             if (url && _annDetailCurrentId === annId) {
-                body.innerHTML = _annDetailHTML(ann.name, label, days, dateStr, url);
+                var el = document.querySelector('#ann-detail-body .ann-detail-card');
+                if (el) {
+                    el.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")';
+                    el.style.backgroundSize = 'cover';
+                    el.style.backgroundPosition = 'center';
+                }
             }
-        });
-    } catch(e) {}
+        }).catch(function(e) { console.warn('[ann-detail] cover load failed:', e); });
+    } catch(e) { console.warn('[ann-detail] cover load exception:', e); }
 
     var page = document.getElementById('ann-detail-page');
     if (page) page.classList.add('active');
 };
 
-function _annDetailHTML(name, label, days, dateStr, coverUrl) {
-    var bgStyle = coverUrl
-        ? 'background-image:url(' + JSON.stringify(coverUrl) + ');background-size:cover;background-position:center;'
-        : 'background:linear-gradient(135deg, var(--accent-color) 0%, rgba(var(--accent-color-rgb),0.7) 100%);';
+function _annDetailHTML(name, label, days, dateStr) {
     return [
-        '<div class="ann-detail-card" style="' + bgStyle + '">',
+        '<div class="ann-detail-card">',
         '  <div class="ann-detail-card-overlay"></div>',
         '  <div class="ann-detail-card-content">',
         '    <div class="ann-detail-name">&ldquo;' + name + '&rdquo;' + label + '</div>',

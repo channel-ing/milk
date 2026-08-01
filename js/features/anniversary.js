@@ -365,13 +365,16 @@ function renderAnniversariesList() {
         if (!isPinned) {
             _annSetupSwipe(wrap);
         } else {
-            // 置顶条目：无左滑，直接点击进详情。绑到 wrap 更保险
+            // 置顶：把点击绑到卡片本身（.ann-pinned-card），最内层元素
             wrap.style.cursor = 'pointer';
-            wrap.addEventListener('click', function(e) {
+            var pinCard = wrap.querySelector('.ann-pinned-card');
+            var clickHandler = function(e) {
                 if (e.target.closest('.ann-swipe-actions')) return;
                 console.log('[ann-pinned-click] entering detail for id=', ann.id);
                 editFn();
-            });
+            };
+            if (pinCard) pinCard.addEventListener('click', clickHandler);
+            wrap.addEventListener('click', clickHandler);
         }
     });
 

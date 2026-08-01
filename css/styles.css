@@ -12736,3 +12736,90 @@ body #user-sticker-picker .empty-sticker-tip {
     font-size: 15px;
     color: var(--text-secondary);
 }
+
+/* ── 纪念日详情页 ── */
+#cs-panel-ann { position: relative; }
+.ann-detail-page {
+    position: absolute;
+    inset: 0;
+    background: var(--primary-bg);
+    z-index: 10;
+    padding: 0 16px 24px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+.ann-detail-page.active {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+.ann-detail-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px;
+    margin-bottom: 12px;
+}
+.ann-detail-edit-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 8px 4px;
+}
+.ann-detail-edit-btn:active { opacity: 0.6; }
+
+.ann-detail-body {
+    padding: 4px 0;
+}
+.ann-detail-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 20px;
+    overflow: hidden;
+    background-color: var(--accent-color);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+.ann-detail-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.25) 100%);
+}
+.ann-detail-card-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 20px;
+    color: #fff;
+    text-align: center;
+}
+.ann-detail-name {
+    font-size: 20px;
+    font-weight: 700;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    letter-spacing: 1px;
+}
+.ann-detail-num {
+    font-size: 120px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -4px;
+    color: rgba(255,255,255,0.95);
+    text-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    font-family: 'Georgia', 'Times New Roman', serif;
+}
+.ann-detail-date {
+    font-size: 14px;
+    font-weight: 500;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    letter-spacing: 0.5px;
+}

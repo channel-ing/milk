@@ -12823,3 +12823,105 @@ body #user-sticker-picker .empty-sticker-tip {
     text-shadow: 0 2px 6px rgba(0,0,0,0.5);
     letter-spacing: 0.5px;
 }
+
+/* ── 备注编辑器工具栏 ── */
+.cs-ann-remark-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    flex-wrap: wrap;
+}
+.cs-ann-tb-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    min-width: 32px;
+    transition: background 0.15s;
+}
+.cs-ann-tb-btn:hover { background: rgba(var(--accent-color-rgb), 0.1); }
+.cs-ann-tb-btn:active { background: rgba(var(--accent-color-rgb), 0.2); }
+.cs-ann-tb-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* 备注编辑区 */
+.cs-ann-remark-editor {
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 14px;
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 10px 10px;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.6;
+    outline: none;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.cs-ann-remark-editor:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-secondary);
+    opacity: 0.5;
+    pointer-events: none;
+}
+.cs-ann-remark-editor h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 8px 0 4px;
+    color: var(--text-primary);
+}
+.cs-ann-remark-editor h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 6px 0 3px;
+    color: var(--text-primary);
+}
+.cs-ann-remark-editor p {
+    margin: 4px 0;
+}
+.cs-ann-remark-editor:focus {
+    border-color: rgba(var(--accent-color-rgb), 0.4);
+}
+
+/* 详情页备注展示 */
+.ann-detail-remark {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--secondary-bg);
+    border-radius: 14px;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.7;
+    word-wrap: break-word;
+}
+.ann-detail-remark h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 10px 0 6px;
+    color: var(--text-primary);
+}
+.ann-detail-remark h3:first-child { margin-top: 0; }
+.ann-detail-remark h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 8px 0 4px;
+    color: var(--text-primary);
+}
+.ann-detail-remark p {
+    margin: 6px 0;
+}

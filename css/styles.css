@@ -12775,11 +12775,13 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* 卡片单独留白：左右加大，跟 topbar 无关 */
 .ann-detail-body {
-    padding: 24px 64px 24px;
+    padding: 24px 16px 24px;
 }
 .ann-detail-card {
     position: relative;
     width: 100%;
+    max-width: calc(100% - 96px);
+    margin: 0 auto;
     aspect-ratio: 1 / 1;
     border-radius: 20px;
     overflow: hidden;

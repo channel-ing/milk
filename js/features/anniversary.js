@@ -325,7 +325,7 @@ function renderAnniversariesList() {
         if (!isNaN(start.getTime())) {
             var meetDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
             meetWrap = _annMakeWrap(
-                _annMakeCard('相遇', start, meetDays, false, isMeetPinned),
+                _annMakeCard('相遇', start, meetDays, false, isMeetPinned, null),
                 isMeetPinned,
                 [{ label: '置顶', cls: 'ann-action-pin', fn: function() { window._annPinItem('meet'); } }],
                 null
@@ -350,7 +350,7 @@ function renderAnniversariesList() {
 
         var editFn = function() { window.openAnnDetail(ann.id); };
         var wrap = _annMakeWrap(
-            _annMakeCard(ann.name, target, diffDays, isCountdown, isPinned),
+            _annMakeCard(ann.name, target, diffDays, isCountdown, isPinned, ann.id),
             isPinned,
             [
                 { label: '置顶', cls: 'ann-action-pin',    fn: function() { window._annPinItem(ann.id); } },
@@ -385,7 +385,7 @@ function renderAnniversariesList() {
 }
 
 // ── 工厂：卡片 ────────────────────────────────────────────
-function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
+function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned, annId) {
     var el    = document.createElement('div');
     var label = isCountdown ? '倒数' : '已过';
 
@@ -397,7 +397,12 @@ function _annMakeCard(name, targetDate, diffDays, isCountdown, isPinned) {
 
     if (isPinned) {
         el.className = 'ann-pinned-card';
-        el.setAttribute('style', baseStyle + 'padding:18px 16px;min-height:88px;');
+        // 直接把 onclick 挂到卡片属性上：最简单直接
+        if (annId != null) {
+            el.setAttribute('onclick', 'window.openAnnDetail(' + annId + ')');
+            el.style.cursor = 'pointer';
+        }
+        el.setAttribute('style', baseStyle + 'padding:18px 16px;min-height:88px;cursor:pointer;');
         el.innerHTML = [
             '<div style="flex:1;min-width:0;padding-left:4px;">',
             '  <div class="ann-item-name">' + name

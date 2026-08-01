@@ -664,6 +664,18 @@
                 <span id="ann-type-desc">记录从某一天到今天已经走过了多少天，适合相识日、恋爱纪念日等。</span>
             </div>
         </div>
+        <div class="cs-ann-form-row">
+            <label class="cs-ann-form-label">备注</label>
+            <div class="cs-ann-remark-toolbar">
+                <button type="button" class="cs-ann-tb-btn" onclick="window._annExec('bold')" title="加粗"><b>B</b></button>
+                <button type="button" class="cs-ann-tb-btn" onclick="window._annExec('italic')" title="斜体"><i>I</i></button>
+                <div class="cs-ann-tb-sep"></div>
+                <button type="button" class="cs-ann-tb-btn" onclick="window._annExec('formatBlock', 'H3')" title="标题">标题</button>
+                <button type="button" class="cs-ann-tb-btn" onclick="window._annExec('formatBlock', 'H4')" title="小标题">小标题</button>
+                <button type="button" class="cs-ann-tb-btn" onclick="window._annExec('formatBlock', 'P')" title="正文">正文</button>
+            </div>
+            <div id="cs-ann-remark-editor" class="cs-ann-remark-editor" contenteditable="true" data-placeholder="写点什么…（可选）"></div>
+        </div>
         <button id="cs-ann-sheet-delete" style="display:none;" onclick="window.deleteCurrentAnn()" class="cs-ann-delete-btn">
             <i class="fas fa-trash-alt"></i> 删除这条纪念日
         </button>

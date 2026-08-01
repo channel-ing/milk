@@ -365,8 +365,13 @@ function renderAnniversariesList() {
         if (!isPinned) {
             _annSetupSwipe(wrap);
         } else {
-            var inner = wrap.querySelector('.ann-swipe-inner');
-            if (inner) inner.addEventListener('click', editFn);
+            // 置顶条目：无左滑，直接点击进详情。绑到 wrap 更保险
+            wrap.style.cursor = 'pointer';
+            wrap.addEventListener('click', function(e) {
+                if (e.target.closest('.ann-swipe-actions')) return;
+                console.log('[ann-pinned-click] entering detail for id=', ann.id);
+                editFn();
+            });
         }
     });
 
@@ -471,7 +476,7 @@ window.openAnnDetail = function(annId) {
     var days = isCD
         ? Math.max(0, Math.ceil((target - now) / 86400000))
         : Math.max(0, Math.floor((now - target) / 86400000));
-    var label = isCD ? '倒数' : '已过';
+    var label = isCD ? '还有' : '已经';
     var dateStr = target.getFullYear() + '-' + (target.getMonth()+1) + '-' + target.getDate();
 
     var body = document.getElementById('ann-detail-body');

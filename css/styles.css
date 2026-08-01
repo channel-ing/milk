@@ -12744,7 +12744,6 @@ body #user-sticker-picker .empty-sticker-tip {
     inset: 0;
     background: var(--primary-bg);
     z-index: 10;
-    padding: 0 64px 24px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     transform: translateX(100%);
@@ -12755,12 +12754,12 @@ body #user-sticker-picker .empty-sticker-tip {
     transform: translateX(0);
     pointer-events: auto;
 }
+/* topbar 靠上：小 padding，跟 panel header 视觉对齐 */
 .ann-detail-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 4px;
-    margin-bottom: 6px;
+    padding: 20px 4px 6px;
 }
 .ann-detail-edit-btn {
     background: none;
@@ -12774,8 +12773,9 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .ann-detail-edit-btn:active { opacity: 0.6; }
 
+/* 卡片单独留白：左右加大，跟 topbar 无关 */
 .ann-detail-body {
-    padding: 4px 0;
+    padding: 24px 64px 24px;
 }
 .ann-detail-card {
     position: relative;

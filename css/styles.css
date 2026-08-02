@@ -12989,7 +12989,6 @@ body #user-sticker-picker .empty-sticker-tip {
     padding: 14px 12px 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     margin-bottom: 12px;
-    position: relative;
 }
 .pd-cal-header {
     display: flex; align-items: center;
@@ -13049,11 +13048,15 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .pd-cal-cell.pd-today.pd-period { outline-color: rgba(255,255,255,0.6); }
 
-/* 图例 */
+/* 图例 + 按钮同行 */
+.pd-cal-footer {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+}
 .pd-cal-legend {
-    display: flex; align-items: center; gap: 16px;
-    justify-content: center;
-    margin-top: 10px; font-size: 12px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 12px; color: var(--text-secondary);
 }
 .pd-legend-dot {
     width: 8px; height: 8px; border-radius: 50%; display: inline-block;
@@ -13063,8 +13066,6 @@ body #user-sticker-picker .empty-sticker-tip {
 
 /* ── 常驻经期开关按钮 ── */
 .pd-toggle-btn {
-    position: absolute;
-    bottom: 14px; right: 12px;
     display: flex; align-items: center; gap: 6px;
     padding: 7px 14px;
     border-radius: 20px;
@@ -13075,6 +13076,7 @@ body #user-sticker-picker .empty-sticker-tip {
     font-family: inherit; cursor: pointer;
     transition: all 0.2s;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    flex-shrink: 0;
 }
 .pd-toggle-btn.pd-toggle-on {
     background: var(--accent-color);

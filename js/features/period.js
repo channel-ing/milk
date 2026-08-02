@@ -64,12 +64,9 @@
         var dateStr = (now.getMonth() + 1) + '月' + now.getDate() + '日';
         var el = document.getElementById('pd-status-date');
         if (el) el.textContent = dateStr;
-
-        // Step1：默认显示缺省状态（不在经期）
-        var empty = document.getElementById('pd-status-empty');
-        var body = document.getElementById('pd-status-body');
-        if (empty) empty.style.display = '';
-        if (body) body.style.display = 'none';
+        // 经期第几天标签：Step1默认隐藏，Step2根据数据控制
+        var dayTag = document.getElementById('pd-status-day-tag');
+        if (dayTag) dayTag.style.display = 'none';
     }
 
     // ── 初始化梦角留言区 ──

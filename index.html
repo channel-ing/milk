@@ -614,16 +614,17 @@
                 </div>
                 <!-- 日历格子 -->
                 <div class="pd-cal-grid" id="pd-cal-grid"></div>
-                <!-- 图例 -->
-                <div class="pd-cal-legend">
-                    <span class="pd-legend-dot pd-dot-period"></span><span>经期</span>
-                    <span class="pd-legend-dot pd-dot-predict"></span><span>预测经期</span>
+                <!-- 图例 + 常驻开关按钮（同一行） -->
+                <div class="pd-cal-footer">
+                    <div class="pd-cal-legend">
+                        <span class="pd-legend-dot pd-dot-period"></span><span>经期</span>
+                        <span class="pd-legend-dot pd-dot-predict"></span><span>预测经期</span>
+                    </div>
+                    <button class="pd-toggle-btn" id="pd-toggle-btn" onclick="window._pdToggleToday()">
+                        <i class="fas fa-circle-dot"></i>
+                        <span id="pd-toggle-label">标记经期</span>
+                    </button>
                 </div>
-                <!-- 常驻经期开关按钮 -->
-                <button class="pd-toggle-btn" id="pd-toggle-btn" onclick="window._pdToggleToday()">
-                    <i class="fas fa-circle-dot"></i>
-                    <span id="pd-toggle-label">标记经期</span>
-                </button>
             </div>
 
             <!-- 今日状态记录 -->
@@ -633,15 +634,9 @@
                     <span class="pd-status-date" id="pd-status-date"></span>
                 </div>
 
-                <!-- 不在经期时的缺省 -->
-                <div class="pd-status-empty" id="pd-status-empty">
-                    <i class="fas fa-moon pd-empty-icon"></i>
-                    <div class="pd-empty-text">经期开始后可以在这里记录每日状态</div>
-                </div>
-
-                <!-- 在经期时的记录区 -->
-                <div class="pd-status-body" id="pd-status-body" style="display:none;">
-                    <div class="pd-status-day-tag" id="pd-status-day-tag">经期第1天</div>
+                <!-- 始终显示记录区，经期第几天标签按状态显示/隐藏 -->
+                <div class="pd-status-body" id="pd-status-body">
+                    <div class="pd-status-day-tag" id="pd-status-day-tag" style="display:none;">经期第1天</div>
 
                     <!-- 出血量 -->
                     <div class="pd-section">

@@ -508,6 +508,7 @@ window.csSwitchTab=function(tab){
     if(tab==='album'&&typeof window._alInit==='function')window._alInit();
     if(tab==='mood'&&typeof window._moodInit==='function')window._moodInit();
     if(tab==='ann'&&typeof window._annInit==='function')window._annInit();
+    if(tab==='period'&&typeof window._pdInit==='function')window._pdInit();
 
     // 切离 feed 后兜底清除 feed title（IntersectionObserver 可能异步残留）
     if(tab!=='feed'){

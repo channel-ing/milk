@@ -614,16 +614,18 @@
                 </div>
                 <!-- 日历格子 -->
                 <div class="pd-cal-grid" id="pd-cal-grid"></div>
-                <!-- 图例 + 常驻开关按钮（同一行） -->
+                <!-- 图例 + 常驻拨动开关（同一行） -->
                 <div class="pd-cal-footer">
                     <div class="pd-cal-legend">
                         <span class="pd-legend-dot pd-dot-period"></span><span>经期</span>
                         <span class="pd-legend-dot pd-dot-predict"></span><span>预测经期</span>
                     </div>
-                    <button class="pd-toggle-btn" id="pd-toggle-btn" onclick="window._pdToggleToday()">
-                        <i class="fas fa-circle-dot"></i>
-                        <span id="pd-toggle-label">标记经期</span>
-                    </button>
+                    <div class="pd-toggle-wrap" onclick="window._pdToggleToday()">
+                        <span class="pd-toggle-label" id="pd-toggle-label">标记经期</span>
+                        <div class="pd-toggle-track" id="pd-toggle-btn">
+                            <div class="pd-toggle-thumb"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -725,15 +727,20 @@
     </div>
 </div>
 
-<!-- 经期：历史记录列表弹窗 -->
-<div class="cs-sheet" id="pd-history-sheet">
-    <div class="cs-sheet-handle-bar"></div>
-    <div class="cs-sheet-header">
-        <span>经期历史</span>
-        <button onclick="window._pdCloseHistory()">关闭</button>
+<!-- 经期：历史记录全屏页面（陪伴日记风格） -->
+<div id="pd-history-page" class="pd-history-page">
+    <div class="pd-history-page-hd">
+        <button class="pd-hist-back" onclick="window._pdCloseHistory()">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <span class="pd-history-page-title"><i class="fas fa-moon"></i> 经期历史</span>
+        <div style="width:40px;"></div>
     </div>
-    <div class="pd-history-body" id="pd-history-body">
+    <div class="pd-history-page-body" id="pd-history-body">
         <!-- 由JS渲染 -->
+    </div>
+    <div class="pd-history-page-footer">
+        <button class="modal-btn modal-btn-secondary" onclick="window._pdCloseHistory()">关闭</button>
     </div>
 </div>
 

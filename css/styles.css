@@ -13053,10 +13053,12 @@ body #user-sticker-picker .empty-sticker-tip {
     display: flex; align-items: center;
     justify-content: space-between;
     margin-top: 10px;
+    padding: 0 2px;
 }
 .pd-cal-legend {
     display: flex; align-items: center; gap: 12px;
     font-size: 12px; color: var(--text-secondary);
+    padding-left: 6px;
 }
 .pd-legend-dot {
     width: 8px; height: 8px; border-radius: 50%; display: inline-block;
@@ -13323,4 +13325,14 @@ body #user-sticker-picker .empty-sticker-tip {
 .pd-hist-icon {
     font-size: 20px; flex-shrink: 0; align-self: center;
     opacity: 0.6;
+}
+
+/* 日历格子：有记录的小圆点（非经期日） */
+.pd-cal-cell { position: relative; }
+.pd-cal-dot {
+    position: absolute; bottom: 3px; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--accent-color); opacity: 0.5;
+    pointer-events: none;
 }

@@ -256,12 +256,12 @@
     }
 
     function _updateToggleBtn() {
-        var btn   = document.getElementById('pd-toggle-btn');
+        var track = document.getElementById('pd-toggle-btn');   // pd-toggle-track
         var label = document.getElementById('pd-toggle-label');
-        if (!btn || !label) return;
+        if (!track || !label) return;
         var inP = _isInPeriod(_today());
-        btn.classList.toggle('pd-toggle-on', inP);
-        label.textContent = inP ? '经期结束' : '标记经期';
+        track.classList.toggle('pd-toggle-on', inP);
+        label.textContent = inP ? '经期中' : '标记经期';
     }
 
     function _updateStatusCard() {
@@ -599,17 +599,13 @@
 
     window._pdOpenHistory = function () {
         _renderHistory();
-        var sheet   = document.getElementById('pd-history-sheet');
-        var overlay = document.getElementById('cs-overlay');
-        if (sheet)   sheet.classList.add('cs-sheet-open');
-        if (overlay) overlay.style.display = 'block';
+        var page = document.getElementById('pd-history-page');
+        if (page) page.classList.add('pd-history-open');
     };
 
     window._pdCloseHistory = function () {
-        var sheet   = document.getElementById('pd-history-sheet');
-        var overlay = document.getElementById('cs-overlay');
-        if (sheet)   sheet.classList.remove('cs-sheet-open');
-        if (overlay) overlay.style.display = 'none';
+        var page = document.getElementById('pd-history-page');
+        if (page) page.classList.remove('pd-history-open');
     };
 
     window._pdCloseDaySheet = function () {

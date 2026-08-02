@@ -579,121 +579,7 @@
             </div>
         </div>
         <div class="cs-panel" id="cs-panel-period">
-
-            <!-- 顶部标题栏 -->
-            <div class="pd-hd">
-                <span class="pd-hd-title">经期记录</span>
-                <button class="cs-icon-btn" id="pd-history-btn" title="历史记录" onclick="window._pdOpenHistory()">
-                    <i class="fas fa-clock-rotate-left"></i>
-                </button>
-            </div>
-
-            <!-- 统计卡片 -->
-            <div class="pd-stats-row">
-                <div class="pd-stat-card">
-                    <div class="pd-stat-label">下次经期预测</div>
-                    <div class="pd-stat-value" id="pd-next-date">暂无预测</div>
-                </div>
-                <div class="pd-stat-card">
-                    <div class="pd-stat-label">平均经期天数</div>
-                    <div class="pd-stat-value" id="pd-avg-days">--</div>
-                </div>
-            </div>
-
-            <!-- 日历卡片 -->
-            <div class="pd-cal-card">
-                <!-- 日历头部 -->
-                <div class="pd-cal-header">
-                    <button class="pd-cal-nav" id="pd-prev-month"><i class="fas fa-chevron-left"></i></button>
-                    <span class="pd-cal-month-label" id="pd-month-label">2026年8月</span>
-                    <button class="pd-cal-nav" id="pd-next-month"><i class="fas fa-chevron-right"></i></button>
-                </div>
-                <!-- 星期标题 -->
-                <div class="pd-cal-weekdays">
-                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-                </div>
-                <!-- 日历格子 -->
-                <div class="pd-cal-grid" id="pd-cal-grid"></div>
-                <!-- 图例 + 常驻拨动开关（同一行） -->
-                <div class="pd-cal-footer">
-                    <div class="pd-cal-legend">
-                        <span class="pd-legend-dot pd-dot-period"></span><span>经期</span>
-                        <span class="pd-legend-dot pd-dot-predict"></span><span>预测经期</span>
-                    </div>
-                    <div class="pd-toggle-wrap" onclick="window._pdToggleToday()">
-                        <span class="pd-toggle-label" id="pd-toggle-label">标记经期</span>
-                        <div class="pd-toggle-track" id="pd-toggle-btn">
-                            <div class="pd-toggle-thumb"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 今日状态记录 -->
-            <div class="pd-status-card" id="pd-status-card">
-                <div class="pd-status-hd">
-                    <span class="pd-status-title">今日记录</span>
-                    <span class="pd-status-date" id="pd-status-date"></span>
-                </div>
-
-                <!-- 始终显示记录区，经期第几天标签按状态显示/隐藏 -->
-                <div class="pd-status-body" id="pd-status-body">
-                    <div class="pd-status-day-tag" id="pd-status-day-tag" style="display:none;">经期第1天</div>
-
-                    <!-- 出血量 -->
-                    <div class="pd-section">
-                        <div class="pd-section-label">出血量</div>
-                        <div class="pd-flow-track">
-                            <button class="pd-flow-btn" data-val="1" onclick="window._pdSetFlow(1)">
-                                <div class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.25);"></div>
-                                <span>极少</span>
-                            </button>
-                            <button class="pd-flow-btn" data-val="2" onclick="window._pdSetFlow(2)">
-                                <div class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.45);"></div>
-                                <span>少</span>
-                            </button>
-                            <button class="pd-flow-btn" data-val="3" onclick="window._pdSetFlow(3)">
-                                <div class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.65);"></div>
-                                <span>正常</span>
-                            </button>
-                            <button class="pd-flow-btn" data-val="4" onclick="window._pdSetFlow(4)">
-                                <div class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.82);"></div>
-                                <span>多</span>
-                            </button>
-                            <button class="pd-flow-btn" data-val="5" onclick="window._pdSetFlow(5)">
-                                <div class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),1);"></div>
-                                <span>极多</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 症状 -->
-                    <div class="pd-section">
-                        <div class="pd-section-label">症状</div>
-                        <div class="pd-symptoms-wrap" id="pd-symptoms-wrap">
-                            <!-- 由JS渲染 -->
-                        </div>
-                    </div>
-
-                    <!-- 保存按钮 -->
-                    <button class="pd-save-btn" id="pd-save-btn" onclick="window._pdSaveRecord()">保存记录</button>
-                    <div class="pd-saved-hint" id="pd-saved-hint"></div>
-                </div>
-            </div>
-
-            <!-- 梦角留言 -->
-            <div class="pd-letter-card">
-                <div class="pd-letter-hd">
-                    <span id="pd-partner-av" class="pd-partner-av">🌸</span>
-                    <span class="pd-letter-name" id="pd-letter-name">梦角</span>
-                </div>
-                <div class="pd-letter-body" id="pd-letter-body">
-                    <span class="pd-letter-empty" id="pd-letter-empty">还没有收到<span id="pd-letter-pname">梦角</span>的留言</span>
-                    <div class="pd-letter-lines" id="pd-letter-lines" style="display:none;"></div>
-                </div>
-            </div>
-
-            <div style="height:24px;"></div>
+            <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>
         </div>
 
     </div>
@@ -708,41 +594,6 @@
 <!-- 遮罩 -->
 <div id="cs-overlay" onclick="closeAllCsSheets()"></div>
 
-<!-- 经期：历史日期只读弹窗 -->
-<div class="cs-sheet" id="pd-day-sheet">
-    <div class="cs-sheet-handle-bar"></div>
-    <div class="cs-sheet-header">
-        <span id="pd-day-sheet-title">11月6日 周一</span>
-        <button onclick="window._pdCloseDaySheet()">关闭</button>
-    </div>
-    <div class="pd-day-sheet-body">
-        <div class="pd-day-info-row">
-            <span class="pd-day-tag" id="pd-day-period-tag">经期第1天</span>
-            <span class="pd-day-readonly-label">只读</span>
-        </div>
-        <div class="pd-section-label">出血量</div>
-        <div class="pd-day-flow-display" id="pd-day-flow-display">暂无记录</div>
-        <div class="pd-section-label" style="margin-top:10px;">症状</div>
-        <div class="pd-day-symptom-tags" id="pd-day-symptom-tags"></div>
-    </div>
-</div>
-
-<!-- 经期：历史记录全屏页面（陪伴日记风格） -->
-<div id="pd-history-page" class="pd-history-page">
-    <div class="pd-history-page-hd">
-        <button class="pd-hist-back" onclick="window._pdCloseHistory()">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <span class="pd-history-page-title"><i class="fas fa-moon"></i> 经期历史</span>
-        <div style="width:40px;"></div>
-    </div>
-    <div class="pd-history-page-body" id="pd-history-body">
-        <!-- 由JS渲染 -->
-    </div>
-    <div class="pd-history-page-footer">
-        <button class="modal-btn modal-btn-secondary" onclick="window._pdCloseHistory()">关闭</button>
-    </div>
-</div>
 
 <!-- 发帖 bottom sheet -->
 <div id="cs-compose-sheet" class="cs-sheet">
@@ -3238,7 +3089,6 @@
     <script src="js/cloud-media.js"></script>
     <script src="js/cloud-media-migration.js"></script>
     <script src="js/cloud-sync-ui.js"></script>
-    <script src="js/features/period.js"></script>
     <script src="js/app.js"></script>
 <!-- 相册图片详情（全屏） -->
 <div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">

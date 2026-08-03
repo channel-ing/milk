@@ -814,3 +814,125 @@
     justify-content: center;
 }
 .cinema-wl-delete:active { opacity: 0.9; color: #c04040; }
+
+/* ── 观看历史 ───────────────────────────────────────── */
+.cinema-hist-list { display: flex; flex-direction: column; }
+.cinema-hist-entry {
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--border-color, #ececec);
+    cursor: pointer;
+}
+.cinema-hist-entry:last-child { border-bottom: none; }
+.cinema-hist-entry:active { background: rgba(var(--accent-color-rgb, 123,200,164), 0.06); }
+.cinema-hist-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+.cinema-hist-meta {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    opacity: 0.75;
+    margin-bottom: 8px;
+}
+.cinema-hist-reviews { display: flex; flex-direction: column; gap: 4px; }
+.cinema-hist-review-row {
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: flex;
+    gap: 4px;
+    align-items: flex-start;
+}
+.cinema-hist-review-who {
+    font-weight: 600;
+    color: var(--accent-color, #7BC8A4);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cinema-hist-review-text { color: var(--text-primary); word-break: break-word; }
+.cinema-hist-review-empty { color: var(--text-secondary); opacity: 0.55; font-style: italic; }
+
+/* ── 观看历史：编辑弹层 ─────────────────────────────── */
+.cinema-hist-edit-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+}
+.cinema-hist-edit-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+}
+.cinema-hist-edit-body {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--secondary-bg, #fff);
+    border-radius: 18px 18px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+}
+.cinema-hist-edit-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+.cinema-hist-edit-body .cinema-hist-edit-label:not(:first-child) { margin-top: 14px; }
+.cinema-hist-edit-input {
+    width: 100%;
+    height: 38px;
+    background: var(--primary-bg, #f5f5f5);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+}
+.cinema-hist-edit-readonly {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--primary-bg, #f5f5f5);
+    border-radius: 10px;
+    padding: 10px 12px;
+    opacity: 0.85;
+}
+.cinema-hist-edit-textarea {
+    width: 100%;
+    min-height: 70px;
+    background: var(--primary-bg, #f5f5f5);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+    resize: none;
+}
+.cinema-hist-edit-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+.cinema-hist-edit-cancel, .cinema-hist-edit-save {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 50px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.cinema-hist-edit-cancel {
+    background: var(--primary-bg, #f0f0f0);
+    color: var(--text-secondary);
+}
+.cinema-hist-edit-save {
+    background: var(--accent-color, #7BC8A4);
+    color: #fff;
+    font-weight: 500;
+}
+.cinema-hist-edit-cancel:active, .cinema-hist-edit-save:active { opacity: 0.8; transform: scale(0.97); }

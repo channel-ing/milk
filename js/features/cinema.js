@@ -170,9 +170,10 @@
         d.textContent = s == null ? '' : String(s);
         return d.innerHTML;
     }
-    function _avatarHTML(isPartner) {
-        if (typeof _avEl === 'function') return _avEl(isPartner, 30);
-        return '<span style="font-size:20px;">' + (isPartner ? '🌸' : '🙂') + '</span>';
+    function _avatarHTML(isPartner, size) {
+        var s = size || 30;
+        if (typeof _avEl === 'function') return _avEl(isPartner, s);
+        return '<span style="font-size:' + Math.round(s * 0.65) + 'px;">' + (isPartner ? '🌸' : '🙂') + '</span>';
     }
     function _msgHTML(msg) {
         var isPartner = msg.sender === 'partner';
@@ -820,26 +821,27 @@
         html += '</span>';
         return html;
     }
+    // 头像 + 星星一行 + 影评一行（读卡展示用，梦角/用户共用同一个模板）
+    function _histPersonBlockHTML(isPartner, name, stars, review, emptyPlaceholder) {
+        var reviewHtml = review
+            ? '<div class="cinema-hist-review-text">' + _escapeHtml(review) + '</div>'
+            : '<div class="cinema-hist-review-empty">' + _escapeHtml(emptyPlaceholder) + '</div>';
+        return '<div class="cinema-hist-person">' +
+            '<div class="cinema-hist-person-row">' +
+                '<div class="cinema-hist-person-avatar">' + _avatarHTML(isPartner, 44) + '</div>' +
+                _histStarsHTML(stars, false) +
+            '</div>' +
+            reviewHtml +
+        '</div>';
+    }
     function _histEntryHTML(e) {
         var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
-        var partnerHasContent = e.partnerReview || (e.partnerStars > 0);
-        var partnerRowHtml = partnerHasContent
-            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">' + _escapeHtml(partnerName) + '：</span>' +
-                _histStarsHTML(e.partnerStars, false) +
-                (e.partnerReview ? '<span class="cinema-hist-review-text">' + _escapeHtml(e.partnerReview) + '</span>' : '') +
-              '</div>'
-            : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">' + _escapeHtml(partnerName) + '没有留下评价</span></div>';
-        var userHasContent = e.userReview || (e.userStars > 0);
-        var userRowHtml = userHasContent
-            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">我：</span>' +
-                _histStarsHTML(e.userStars, false) +
-                (e.userReview ? '<span class="cinema-hist-review-text">' + _escapeHtml(e.userReview) + '</span>' : '') +
-              '</div>'
-            : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">点击此处添加我的评价…</span></div>';
+        var partnerBlock = _histPersonBlockHTML(true, partnerName, e.partnerStars, e.partnerReview, partnerName + '还没有写影评');
+        var userBlock = _histPersonBlockHTML(false, '我', e.userStars, e.userReview, '点击此处添加影评…');
         return '<div class="cinema-hist-entry" data-id="' + e.id + '">' +
             '<div class="cinema-hist-title">' + _escapeHtml(e.title) + '</div>' +
             '<div class="cinema-hist-meta">' + _histFormatDateTime(e.ts) + '</div>' +
-            '<div class="cinema-hist-reviews">' + partnerRowHtml + userRowHtml + '</div>' +
+            '<div class="cinema-hist-reviews">' + partnerBlock + userBlock + '</div>' +
         '</div>';
     }
     function _renderHistoryContent() {

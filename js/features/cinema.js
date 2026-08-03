@@ -767,11 +767,138 @@
             if (delEl) delEl.addEventListener('click', function (e) { e.stopPropagation(); _wlDelete(id); });
         });
     }
+    // ── 观看历史：独立持久化（跟待看清单一样的 keys() 扫描方式）──
+    var _history = [];
+    var _histLoaded = false;
+    var _histStorageKey = null;
+    var _histEditingId = null;
+
+    async function _histGetKey() {
+        if (_histStorageKey) return _histStorageKey;
+        try {
+            var allKeys = await localforage.keys();
+            var found = allKeys.find(function (k) { return k.indexOf('_cinemaHistory') !== -1; });
+            if (found) { _histStorageKey = found; return found; }
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            _histStorageKey = prefix + '_cinemaHistory';
+        } catch (e) {
+            _histStorageKey = 'CHAT_APP_V3__cinemaHistory';
+        }
+        return _histStorageKey;
+    }
+    async function _histLoad() {
+        if (_histLoaded) return;
+        try {
+            var key = await _histGetKey();
+            var saved = await localforage.getItem(key);
+            if (Array.isArray(saved)) _history = saved;
+        } catch (e) { console.warn('[cinema] 观看历史加载失败:', e); }
+        _histLoaded = true;
+    }
+    async function _histSave() {
+        try {
+            var key = await _histGetKey();
+            await localforage.setItem(key, _history);
+        } catch (e) { console.warn('[cinema] 观看历史保存失败:', e); }
+    }
+
+    function _histFormatDateTime(ts) {
+        var d = new Date(ts);
+        var h = d.getHours(), m = d.getMinutes();
+        return (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' +
+            (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+    }
+    function _histEntryHTML(e) {
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
+        var partnerRowHtml = e.partnerReview
+            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">' + _escapeHtml(partnerName) + '：</span><span class="cinema-hist-review-text">' + _escapeHtml(e.partnerReview) + '</span></div>'
+            : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">' + _escapeHtml(partnerName) + '没有留下评价</span></div>';
+        var userRowHtml = e.userReview
+            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">我：</span><span class="cinema-hist-review-text">' + _escapeHtml(e.userReview) + '</span></div>'
+            : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">点击此处添加我的评价…</span></div>';
+        return '<div class="cinema-hist-entry" data-id="' + e.id + '">' +
+            '<div class="cinema-hist-title">' + _escapeHtml(e.title) + '</div>' +
+            '<div class="cinema-hist-meta">' + _histFormatDateTime(e.ts) + '</div>' +
+            '<div class="cinema-hist-reviews">' + partnerRowHtml + userRowHtml + '</div>' +
+        '</div>';
+    }
     function _renderHistoryContent() {
         var content = document.getElementById('cinema-archive-content');
         if (!content) return;
-        content.innerHTML = '<div class="cinema-archive-empty">暂无记录</div>';
+        if (!_history.length) {
+            content.innerHTML = '<div class="cinema-archive-empty">暂无观影记录</div>';
+            return;
+        }
+        var sorted = _history.slice().sort(function (a, b) { return b.ts - a.ts; });
+        content.innerHTML = '<div class="cinema-hist-list">' + sorted.map(_histEntryHTML).join('') + '</div>';
+        content.querySelectorAll('.cinema-hist-entry').forEach(function (el) {
+            el.addEventListener('click', function () { _histOpenEditor(el.dataset.id); });
+        });
     }
+
+    // ── 观看历史：编辑弹层（片名 + 我的评价可改，梦角评价只读）──
+    function _histOpenEditor(id) {
+        var entry = _history.find(function (e) { return String(e.id) === String(id); });
+        if (!entry) return;
+        _histEditingId = id;
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
+        var old = document.getElementById('cinema-hist-edit-sheet');
+        if (old) old.remove();
+        var sheet = document.createElement('div');
+        sheet.id = 'cinema-hist-edit-sheet';
+        sheet.className = 'cinema-hist-edit-sheet';
+        sheet.innerHTML =
+            '<div class="cinema-hist-edit-mask" id="cinema-hist-edit-mask"></div>' +
+            '<div class="cinema-hist-edit-body">' +
+                '<div class="cinema-hist-edit-label">片名</div>' +
+                '<input type="text" class="cinema-hist-edit-input" id="cinema-hist-edit-title" maxlength="60" value="' + _escapeHtml(entry.title) + '">' +
+                (entry.partnerReview
+                    ? '<div class="cinema-hist-edit-label">' + _escapeHtml(partnerName) + '的评价</div><div class="cinema-hist-edit-readonly">' + _escapeHtml(entry.partnerReview) + '</div>'
+                    : '') +
+                '<div class="cinema-hist-edit-label">我的评价</div>' +
+                '<textarea class="cinema-hist-edit-textarea" id="cinema-hist-edit-review" maxlength="200" placeholder="写点什么吧…">' + _escapeHtml(entry.userReview || '') + '</textarea>' +
+                '<div class="cinema-hist-edit-actions">' +
+                    '<button class="cinema-hist-edit-cancel" id="cinema-hist-edit-cancel">取消</button>' +
+                    '<button class="cinema-hist-edit-save" id="cinema-hist-edit-save">保存</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(sheet);
+        function close() { sheet.remove(); _histEditingId = null; }
+        document.getElementById('cinema-hist-edit-mask').addEventListener('click', close);
+        document.getElementById('cinema-hist-edit-cancel').addEventListener('click', close);
+        document.getElementById('cinema-hist-edit-save').addEventListener('click', function () {
+            var titleVal = document.getElementById('cinema-hist-edit-title').value.trim();
+            var reviewVal = document.getElementById('cinema-hist-edit-review').value.trim();
+            if (titleVal) entry.title = titleVal;
+            entry.userReview = reviewVal;
+            _histSave();
+            close();
+            _renderHistoryContent();
+        });
+    }
+
+    // ── 调试专用：注入假观看历史数据，方便预览设计 ──────────
+    window._cinemaDebugSeedHistory = function () {
+        var now = Date.now();
+        var day = 86400000;
+        _history = _history.concat([
+            { id: now + 1, title: '阿嫚的情书', ts: now - day * 1,  partnerReview: '这段太戳心了，我看哭了', userReview: '结局猜到了但还是很感动' },
+            { id: now + 2, title: '深夜食堂 S01E03', ts: now - day * 3,  partnerReview: '', userReview: '适合睡前看，很治愈' },
+            { id: now + 3, title: 'error.mp4',        ts: now - day * 5,  partnerReview: '这个我们下次再看一遍吧', userReview: '' },
+            { id: now + 4, title: '风起',              ts: now - day * 9,  partnerReview: '摄影很好看', userReview: '剧情有点拖' }
+        ]);
+        _histSave();
+        if (_archiveTab === 'history') _renderHistoryContent();
+        console.log('[cinema] 已注入 4 条假观看历史，当前共', _history.length, '条');
+    };
+    window._cinemaDebugClearHistory = function () {
+        _history = [];
+        _histSave();
+        if (_archiveTab === 'history') _renderHistoryContent();
+        console.log('[cinema] 观看历史已清空');
+    };
+
     function _renderArchiveContent() {
         if (_archiveTab === 'watchlist') _renderWatchlistContent();
         else _renderHistoryContent();
@@ -798,7 +925,7 @@
         var page = document.getElementById('cinema-archive-page');
         if (page) page.classList.add('cinema-archive-open');
         _bindArchiveTabsOnce();
-        _wlLoad().then(function () {
+        Promise.all([_wlLoad(), _histLoad()]).then(function () {
             _renderArchiveContent();
         });
     }

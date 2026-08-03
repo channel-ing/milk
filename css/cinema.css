@@ -836,33 +836,40 @@
     opacity: 0.75;
     margin-bottom: 8px;
 }
-.cinema-hist-reviews { display: flex; flex-direction: column; gap: 4px; }
-.cinema-hist-review-row {
-    font-size: 12.5px;
-    line-height: 1.5;
+.cinema-hist-reviews { display: flex; flex-direction: column; gap: 14px; }
+.cinema-hist-person { display: flex; flex-direction: column; gap: 6px; }
+.cinema-hist-person-row {
     display: flex;
-    gap: 4px;
-    align-items: flex-start;
+    align-items: center;
+    gap: 10px;
 }
-.cinema-hist-review-who {
-    font-weight: 600;
-    color: var(--accent-color, #7BC8A4);
-    white-space: nowrap;
+.cinema-hist-person-avatar {
     flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    line-height: 0;
 }
-.cinema-hist-review-text { color: var(--text-primary); word-break: break-word; }
-.cinema-hist-review-empty { color: var(--text-secondary); opacity: 0.55; font-style: italic; }
+.cinema-hist-review-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+.cinema-hist-review-empty {
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    font-style: italic;
+}
 
-/* 卡片里只读的小星星，跟在称呼后面 */
+/* 卡片里只读的星星，跟在头像后面 */
 .cinema-hist-stars {
     display: inline-flex;
-    gap: 1px;
-    margin-right: 5px;
+    gap: 4px;
     flex-shrink: 0;
-    vertical-align: middle;
 }
 .cinema-hist-stars .cinema-hist-star {
-    font-size: 10px;
+    font-size: 16px;
     color: var(--border-color, #ddd);
 }
 .cinema-hist-stars .cinema-hist-star.filled { color: #f5b942; }

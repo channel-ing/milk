@@ -22,6 +22,7 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/companion.css">
+    <link rel="stylesheet" href="css/cinema.css">
 
     <style id="css-live-preview-style"></style>
     <style>
@@ -467,7 +468,7 @@
                 <button class="cs-pill"             id="csp-album"   onclick="csSwitchTab('album')"  title="相册"><span class="cs-pill-icon"></span></button>
                 <button class="cs-pill"             id="csp-mood"    onclick="csSwitchTab('mood')"   title="心情手账"><span class="cs-pill-icon"></span></button>
                 <button class="cs-pill"             id="csp-ann"     onclick="csSwitchTab('ann')"    title="纪念日"><span class="cs-pill-icon"></span></button>
-                <button class="cs-pill"             id="csp-period"  onclick="csSwitchTab('period')" title="经期记录"><span class="cs-pill-icon"></span></button>
+                <button class="cs-pill"             id="csp-cinema"  onclick="csSwitchTab('cinema')" title="电影院"><span class="cs-pill-icon"></span></button>
             </div>
         </div>
     </div>
@@ -578,8 +579,25 @@
                 <div class="ann-detail-body" id="ann-detail-body"></div>
             </div>
         </div>
-        <div class="cs-panel" id="cs-panel-period">
-            <div class="cs-coming-soon"><i class="fas fa-moon"></i><div class="cs-cs-title">经期记录</div><div class="cs-cs-sub">即将上线</div></div>
+        <div class="cs-panel" id="cs-panel-cinema">
+            <!-- 内容由 cinema.js 动态填充 -->
+
+            <!-- 档案页（全屏覆盖，陪伴日记风格） -->
+            <div class="cinema-archive-page" id="cinema-archive-page">
+                <div class="cinema-archive-topbar">
+                    <button class="cs-icon-btn" onclick="window._cinemaCloseArchive()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <span class="cinema-archive-topbar-title">影日志</span>
+                </div>
+                <div class="cinema-archive-tabs">
+                    <button class="cinema-archive-tab active" id="cinema-tab-history">观看历史</button>
+                    <button class="cinema-archive-tab" id="cinema-tab-watchlist">待看清单</button>
+                </div>
+                <div class="cinema-archive-content" id="cinema-archive-content">
+                    <div class="cinema-archive-empty">暂无记录</div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -3090,6 +3108,7 @@
     <script src="js/cloud-media-migration.js"></script>
     <script src="js/cloud-sync-ui.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/features/cinema.js"></script>
 <!-- 相册图片详情（全屏） -->
 <div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">
     <div class="al-detail-topbar">

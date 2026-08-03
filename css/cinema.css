@@ -409,7 +409,6 @@
 /* ── 观影聊天："正在输入"固定槎位（不随消息列表滚动，永远贴在输入栏上方）── */
 .cinema-typing-fixed {
     flex-shrink: 0;
-    background: var(--input-area-bg, #ffffff);
     padding: 4px 0 6px;
 }
 .cinema-typing-fixed .cinema-msg-row {

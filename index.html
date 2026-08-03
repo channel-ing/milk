@@ -588,15 +588,12 @@
              因为 cinema.js 每次渲染都会用 panel.innerHTML 整体重写面板内容，
              如果这个档案页节点放在里面会被连带清空，导致按钮点了没反应 -->
         <div class="cinema-archive-page" id="cinema-archive-page">
-            <div class="cinema-archive-topbar">
-                <button class="cs-icon-btn" onclick="window._cinemaCloseArchive()">
+            <div class="cinema-archive-tabs">
+                <button class="cs-icon-btn cinema-archive-back-btn" onclick="window._cinemaCloseArchive()">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <span class="cinema-archive-topbar-title">影日志</span>
-            </div>
-            <div class="cinema-archive-tabs">
-                <button class="cinema-archive-tab active" id="cinema-tab-history">观看历史</button>
-                <button class="cinema-archive-tab" id="cinema-tab-watchlist">待看清单</button>
+                <button class="cinema-archive-tab active" id="cinema-tab-history">影评</button>
+                <button class="cinema-archive-tab" id="cinema-tab-watchlist">心愿单</button>
             </div>
             <div class="cinema-archive-content" id="cinema-archive-content">
                 <div class="cinema-archive-empty">暂无记录</div>

@@ -138,6 +138,8 @@
         if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
         _currentVideo = { src: '', title: '' };
         _cinemaMessages = [];
+        if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); _cinemaPendingReplyTimer = null; }
+        _cinemaTypingRowEl = null;
     }
 
     // ── 渲染：选片后的假加载过渡（纯视觉，全屏进度条，真实读取几乎不耗时）──
@@ -211,6 +213,111 @@
         msg.sender = msg.sender || 'user';
         _cinemaMessages.push(msg);
         _appendMsgToDOM(msg);
+        if (msg.sender === 'user') _cinemaScheduleReply();
+    }
+
+    // ── 梦角自动回复：复用主聊天"字卡"回复库(customReplies)的选取/过滤逻辑 ──
+    var _cinemaPendingReplyTimer = null;
+    var _cinemaTypingRowEl = null;
+
+    function _cinemaShowTyping() {
+        var area = document.getElementById('cinema-chat-area');
+        if (!area) return;
+        _cinemaHideTyping();
+        var emptyEl = area.querySelector('.cinema-chat-empty');
+        if (emptyEl) emptyEl.remove();
+        var row = document.createElement('div');
+        row.className = 'cinema-msg-row cinema-msg-partner';
+        row.innerHTML = '<div class="cinema-msg-avatar">' + _avatarHTML(true) + '</div>' +
+            '<div class="cinema-msg-bubble cinema-msg-typing"><span></span><span></span><span></span></div>';
+        area.appendChild(row);
+        area.scrollTop = area.scrollHeight;
+        _cinemaTypingRowEl = row;
+    }
+    function _cinemaHideTyping() {
+        if (_cinemaTypingRowEl && _cinemaTypingRowEl.parentNode) {
+            _cinemaTypingRowEl.parentNode.removeChild(_cinemaTypingRowEl);
+        }
+        _cinemaTypingRowEl = null;
+    }
+    // 跟主聊天 simulateReply() 里一样：按 disabledReplyItems / 禁用分组 过滤 customReplies
+    function _cinemaBuildReplyPool() {
+        var replies = (typeof customReplies !== 'undefined' && customReplies) ? customReplies : [];
+        if (!replies.length) return [];
+        var disabledItems = (function () {
+            try {
+                var raw = localStorage.getItem('disabledReplyItems');
+                return raw ? new Set(JSON.parse(raw)) : new Set();
+            } catch (e) { return new Set(); }
+        })();
+        var disabledGroupItems = new Set();
+        (window.customReplyGroups || []).forEach(function (g) {
+            if (g.disabled && Array.isArray(g.items)) {
+                g.items.forEach(function (it) { disabledGroupItems.add(it); });
+            }
+        });
+        return replies
+            .filter(function (r) { return !disabledItems.has(r) && !disabledGroupItems.has(r); })
+            .map(function (r) { return String(r || '').trim(); })
+            .filter(Boolean);
+    }
+    function _cinemaScheduleReply() {
+        if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); }
+        // 短暂 debounce：用户连续快速发几条消息时，只在最后一条之后触发一次回复
+        _cinemaPendingReplyTimer = setTimeout(function () {
+            _cinemaPendingReplyTimer = null;
+            _cinemaSimulateReply();
+        }, 300);
+    }
+    function _cinemaSimulateReply() {
+        var pool = _cinemaBuildReplyPool();
+        if (!pool.length) return; // 字卡回复库为空/被禁用完，静默跳过
+
+        if (typeof settings !== 'undefined' && settings.typingIndicatorEnabled === false) {
+            // 关闭了"正在输入"提示，直接跳过 typing 展示
+        } else {
+            _cinemaShowTyping();
+        }
+
+        var delayMin = (typeof settings !== 'undefined' && settings.replyDelayMin) || 800;
+        var delayMax = (typeof settings !== 'undefined' && settings.replyDelayMax) || 2200;
+        var delay = delayMin + Math.random() * Math.max(0, delayMax - delayMin);
+
+        setTimeout(function () {
+            _cinemaHideTyping();
+
+            var replyText = '';
+            for (var t = 0; t < 6; t++) {
+                var picked = pool[Math.floor(Math.random() * pool.length)];
+                if (picked && String(picked).trim()) { replyText = String(picked).trim(); break; }
+            }
+            if (!replyText) return;
+
+            var customs = (typeof customEmojis !== 'undefined' && customEmojis) ? customEmojis : [];
+            var finalText = replyText;
+            if (customs.length && Math.random() < 0.2) {
+                var emoji = customs[Math.floor(Math.random() * customs.length)];
+                finalText = Math.random() < 0.5 ? (emoji + ' ' + replyText) : (replyText + ' ' + emoji);
+            }
+            _pushMessage({ type: 'text', content: finalText, sender: 'partner' });
+            if (typeof playSound === 'function') { try { playSound('message'); } catch (e) {} }
+
+            // 小概率附带梦角的表情包（跟主聊天一样用 stickerLibrary，不是用户自己的 myStickerLibrary）
+            var disabledStickers = (function () {
+                try {
+                    var raw = localStorage.getItem('disabledStickerItems');
+                    return raw ? new Set(JSON.parse(raw)) : new Set();
+                } catch (e) { return new Set(); }
+            })();
+            var stickerPool = ((typeof stickerLibrary !== 'undefined' && stickerLibrary) ? stickerLibrary : [])
+                .filter(function (s) { return !disabledStickers.has(s); });
+            if (stickerPool.length && Math.random() < 0.2) {
+                setTimeout(function () {
+                    var src = stickerPool[Math.floor(Math.random() * stickerPool.length)];
+                    _pushMessage({ type: 'image', content: src, sender: 'partner' });
+                }, 400 + Math.random() * 500);
+            }
+        }, delay);
     }
 
     // ── 输入栏（只在 watching 状态渲染）───────────────────
@@ -456,6 +563,11 @@
                     '<video id="cinema-video" class="cinema-video" controls>' +
                         '<source src="' + _currentVideo.src + '" type="video/mp4">' +
                     '</video>' +
+                    (_immersive ? '' :
+                        '<button class="cinema-immersive-btn" id="cinema-immersive-btn" title="进入沉浸模式">' +
+                            '<i class="fas fa-expand"></i>' +
+                        '</button>'
+                    ) +
                 '</div>' +
             '</div>' +
             '<div class="cinema-watch-toolbar">' +
@@ -474,7 +586,15 @@
         } else {
             var archiveBtn = document.getElementById('cinema-archive-btn');
             if (archiveBtn) archiveBtn.addEventListener('click', _openArchive);
-            // 嵌入视图下，点视频区域重新进入沉浸模式
+            // 嵌入视图下：点右下角按钮，或直接点视频区域，都能重新进入沉浸模式
+            var immersiveBtn = document.getElementById('cinema-immersive-btn');
+            if (immersiveBtn) {
+                immersiveBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    _immersive = true;
+                    _renderWatching();
+                });
+            }
             var wrap = document.getElementById('cinema-player-wrap');
             if (wrap) {
                 wrap.addEventListener('click', function () {

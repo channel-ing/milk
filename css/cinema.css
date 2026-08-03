@@ -286,6 +286,11 @@
     display: flex;
     flex-direction: column;
 }
+/* 观影页视频+工具栏已经占掉大半高度，聊天区不能再强制最小80px，
+   否则会把下面固定的"正在输入"槎位和输入栏挤出面板可视区（面板 overflow:hidden 会直接裁掉）*/
+.cinema-body-watch .cinema-chat-area {
+    min-height: 0;
+}
 .cinema-chat-empty {
     flex: 1;
     display: flex;
@@ -403,10 +408,11 @@
 /* ── 观影聊天："正在输入"固定槎位（不随消息列表滚动，永远贴在输入栏上方）── */
 .cinema-typing-fixed {
     flex-shrink: 0;
-    padding: 0 0 2px;
+    background: var(--main-bg, #fff);
+    padding: 4px 0 6px;
 }
 .cinema-typing-fixed .cinema-msg-row {
-    padding: 3px 0;
+    padding: 0;
 }
 
 /* ── 观影聊天：表情面板（独立样式，不复用主聊天那套全局类，避免样式冲突）── */

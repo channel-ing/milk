@@ -660,26 +660,17 @@
 .cinema-archive-page.cinema-archive-open {
     transform: translateX(0);
 }
-.cinema-archive-topbar {
-    display: flex;
-    align-items: center;
-    padding: 4px 16px 10px;
-    flex-shrink: 0;
-}
-.cinema-archive-topbar .cs-icon-btn {
-    margin-right: 8px;
-}
-.cinema-archive-topbar-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text-primary);
-    border-bottom: 2px solid var(--accent-color);
-    padding-bottom: 2px;
-}
 .cinema-archive-tabs {
     display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px 0;
     border-bottom: 1px solid var(--border-color, #e8e8e8);
     flex-shrink: 0;
+}
+.cinema-archive-back-btn {
+    flex-shrink: 0;
+    margin-bottom: 8px;
 }
 .cinema-archive-tab {
     flex: 1;
@@ -704,7 +695,7 @@
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 16px;
+    padding: 22px 20px;
 }
 .cinema-archive-empty {
     text-align: center;
@@ -837,11 +828,11 @@
     margin-bottom: 8px;
 }
 .cinema-hist-reviews { display: flex; flex-direction: column; gap: 14px; }
-.cinema-hist-person { display: flex; flex-direction: column; gap: 6px; }
+.cinema-hist-person { display: flex; flex-direction: column; gap: 12px; }
 .cinema-hist-person-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
 }
 .cinema-hist-person-avatar {
     flex-shrink: 0;

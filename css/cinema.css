@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════
-   cinema.css — 电影院功能 Step 1
+   cinema.css — 电影院 Step 1 v2
    ════════════════════════════════════════════════════ */
 
 /* ── Tab 图标 ────────────────────────────────────────── */
@@ -8,10 +8,7 @@
     mask-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjYiIGhlaWdodD0iNjYiIHZpZXdCb3g9IjAgMCA2NiA2NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTYxLjcxODggNjAuODk1OEg1MC4xNjk5QzU5LjU1MTIgNTUuMDg5MyA2NS44MzMzIDQ0LjczNTQgNjUuODMzMyAzMi45MTY3QzY1LjgzMzMgMTQuNzY2NCA1MS4wNjY5IDAgMzIuOTE2NyAwQzE0Ljc2NjQgMCAwIDE0Ljc2NjQgMCAzMi45MTY3QzAgNTAuNTk5NSAxNC4wMjU4IDY1LjAyODUgMzEuNTMwOSA2NS43NjI2QzMxLjcxMzYgNjUuODA1NCAzMS44OTk1IDY1LjgzMzMgMzIuMDkzOCA2NS44MzMzSDYxLjcxODhDNjIuMzczNSA2NS44MzMzIDYzLjAwMTQgNjUuNTczMiA2My40NjQ0IDY1LjExMDNDNjMuOTI3NCA2NC42NDczIDY0LjE4NzUgNjQuMDE5MyA2NC4xODc1IDYzLjM2NDZDNjQuMTg3NSA2Mi43MDk4IDYzLjkyNzQgNjIuMDgxOSA2My40NjQ0IDYxLjYxODlDNjMuMDAxNCA2MS4xNTU5IDYyLjM3MzUgNjAuODk1OCA2MS43MTg4IDYwLjg5NThaTTQuOTM3NSAzMi45MTY3QzQuOTM3NSAxNy40ODg2IDE3LjQ4ODYgNC45Mzc1IDMyLjkxNjcgNC45Mzc1QzQ4LjM0NDcgNC45Mzc1IDYwLjg5NTggMTcuNDg4NiA2MC44OTU4IDMyLjkxNjdDNjAuODk1OCA0OC4zNDQ3IDQ4LjM0NDcgNjAuODk1OCAzMi45MTY3IDYwLjg5NThDMTcuNDg4NiA2MC44OTU4IDQuOTM3NSA0OC4zNDQ3IDQuOTM3NSAzMi45MTY3WiIgZmlsbD0iIzJGMzQzNyIvPgo8cGF0aCBkPSJNMjUuMzUxNCAyNi41MTQ4QzIzLjY1MjUgMjQuODE5NyAyMS4zNTA2IDIzLjg2NzcgMTguOTUwNyAyMy44Njc3QzE2LjU1MDggMjMuODY3NyAxNC4yNDkgMjQuODE5NyAxMi41NTAxIDI2LjUxNDhDMTAuODU0NiAyOC4yMTM0IDkuOTAyMzQgMzAuNTE1NCA5LjkwMjM0IDMyLjkxNTRDOS45MDIzNCAzNS4zMTU0IDEwLjg1NDYgMzcuNjE3NCAxMi41NTAxIDM5LjMxNjFDMTMuMzkwMSA0MC4xNTcxIDE0LjM4NzkgNDAuODIzOCAxNS40ODYzIDQxLjI3OEMxNi41ODQ4IDQxLjczMjEgMTcuNzYyMSA0MS45NjQ4IDE4Ljk1MDcgNDEuOTYyNkMyMC4xMzk2IDQxLjk2NDYgMjEuMzE3MSA0MS43MzE5IDIyLjQxNTggNDEuMjc3OEMyMy41MTQ1IDQwLjgyMzYgMjQuNTEyNiA0MC4xNTcgMjUuMzUzIDM5LjMxNjFDMjcuMDQ3MSAzNy42MTY2IDI3Ljk5ODIgMzUuMzE0NyAyNy45OTc5IDMyLjkxNTFDMjcuOTk3NiAzMC41MTU1IDI3LjA0NTkgMjguMjEzOCAyNS4zNTE0IDI2LjUxNDhaTTIxLjg2MDYgMzUuODI1M0MyMS4wODgzIDM2LjU5NTkgMjAuMDQxOCAzNy4wMjg3IDE4Ljk1MDcgMzcuMDI4N0MxNy44NTk3IDM3LjAyODcgMTYuODEzMiAzNi41OTU5IDE2LjA0MDkgMzUuODI1M0MxNS4yNzAyIDM1LjA1MjkgMTQuODM3NCAzNC4wMDY1IDE0LjgzNzQgMzIuOTE1NEMxNC44Mzc0IDMxLjgyNDQgMTUuMjcwMiAzMC43Nzc5IDE2LjA0MDkgMzAuMDA1NkMxNi40MjI4IDI5LjYyMzIgMTYuODc2NCAyOS4zMjAxIDE3LjM3NTggMjkuMTEzN0MxNy44NzUxIDI4LjkwNzIgMTguNDEwNCAyOC44MDE0IDE4Ljk1MDcgMjguODAyNUMyMC4wMDQxIDI4LjgwMjUgMjEuMDU3NCAyOS4yMDQxIDIxLjg2MDYgMzAuMDA1NkMyMi42MzA0IDMwLjc3ODMgMjMuMDYyNyAzMS44MjQ2IDIzLjA2MjcgMzIuOTE1NEMyMy4wNjI3IDM0LjAwNjIgMjIuNjMwNCAzNS4wNTI1IDIxLjg2MDYgMzUuODI1M1pNMzIuOTE1NiAyOC4wMDI2QzM1LjMzNSAyOC4wMDI2IDM3LjYwNzkgMjcuMDYxMiAzOS4zMTYzIDI1LjM1MjhDNDAuMTU5NyAyNC41MTQgNDAuODI4MyAyMy41MTYzIDQxLjI4MzQgMjIuNDE3M0M0MS43Mzg2IDIxLjMxODMgNDEuOTcxMSAyMC4xNCA0MS45Njc3IDE4Ljk1MDVDNDEuOTY3NyAxNi41MzI4IDQxLjAyNjMgMTQuMjU5OSAzOS4zMTYzIDEyLjU0OTlDMzcuNjA3OSAxMC44Mzk5IDM1LjMzMzQgOS44OTg0NCAzMi45MTU2IDkuODk4NDRDMzAuNDk3OSA5Ljg5ODQ0IDI4LjIyNSAxMC44Mzk5IDI2LjUxNSAxMi41NDk5QzI0LjgxOTUgMTQuMjQ4NSAyMy44NjcyIDE2LjU1MDUgMjMuODY3MiAxOC45NTA1QzIzLjg2NzIgMjEuMzUwNSAyNC44MTk1IDIzLjY1MjUgMjYuNTE1IDI1LjM1MTJDMjcuMzUzNiAyNi4xOTQ0IDI4LjM1MTEgMjYuODYyOSAyOS40NDk3IDI3LjMxOEMzMC41NDg0IDI3Ljc3MzEgMzEuNzI2NCAyOC4wMDU4IDMyLjkxNTYgMjguMDAyNlpNMzAuMDA1OCAxNi4wNDA3QzMwLjc4NDMgMTUuMjYzOSAzMS44MTc5IDE0LjgzNTkgMzIuOTE1NiAxNC44MzU5QzM0LjAxMzQgMTQuODM1OSAzNS4wNDcgMTUuMjYzOSAzNS44MjU1IDE2LjA0MDdDMzYuNjAzOSAxNi44MTc1IDM3LjAzMDIgMTcuODUxMSAzNy4wMzAyIDE4Ljk0ODlDMzcuMDMwMiAyMC4wNDgzIDM2LjYwMjMgMjEuMDgxOSAzNS44MjU1IDIxLjg1ODdDMzQuMjcwMiAyMy40MTI0IDMxLjU2MTEgMjMuNDEyNCAzMC4wMDU4IDIxLjg1ODdDMjkuMjM1MiAyMS4wODY3IDI4LjgwMjUgMjAuMDQwNSAyOC44MDI1IDE4Ljk0OTdDMjguODAyNSAxNy44NTg5IDI5LjIzNTIgMTYuODEyNyAzMC4wMDU4IDE2LjA0MDdaTTM5LjMxNjMgNTMuMjgyNkM0MC4xNTk1IDUyLjQ0NCA0MC44MjggNTEuNDQ2NSA0MS4yODMxIDUwLjM0NzlDNDEuNzM4MiA0OS4yNDkyIDQxLjk3MDkgNDguMDcxMiA0MS45Njc3IDQ2Ljg4MkM0MS45NzExIDQ1LjY5MjcgNDEuNzM4NSA0NC41MTQ2IDQxLjI4MzQgNDMuNDE2QzQwLjgyODIgNDIuMzE3MyA0MC4xNTk2IDQxLjMxOTggMzkuMzE2MyA0MC40ODEzQzM3LjYwNzkgMzguNzcxMyAzNS4zMzM0IDM3LjgzMTUgMzIuOTE1NiAzNy44MzE1QzMwLjQ5NzkgMzcuODMxNSAyOC4yMjUgMzguNzcyOSAyNi41MTUgNDAuNDgzQzI0LjgxOTUgNDIuMTgxNiAyMy44NjcyIDQ0LjQ4MzYgMjMuODY3MiA0Ni44ODM2QzIzLjg2NzIgNDkuMjgzNiAyNC44MTk1IDUxLjU4NTYgMjYuNTE1IDUzLjI4NDNDMjcuMzUzNiA1NC4xMjc1IDI4LjM1MTEgNTQuNzk2IDI5LjQ0OTcgNTUuMjUxMUMzMC41NDg0IDU1LjcwNjIgMzEuNzI2NCA1NS45Mzg5IDMyLjkxNTYgNTUuOTM1N0MzNC4xMDQ4IDU1LjkzNzggMzUuMjgyNiA1NS43MDQ0IDM2LjM4MTIgNTUuMjQ5MUMzNy40Nzk4IDU0Ljc5MzcgMzguNDc3MyA1NC4xMjU0IDM5LjMxNjMgNTMuMjgyNlpNMzAuMDA1OCA0OS43OTAxQzI5LjQzMjQgNDkuMjE0IDI5LjA0MjMgNDguNDgxMSAyOC44ODQ3IDQ3LjY4MzZDMjguNzI3MSA0Ni44ODYyIDI4LjgwOSA0Ni4wNTk5IDI5LjEyMDIgNDUuMzA5QzI5LjQzMTMgNDQuNTU4IDI5Ljk1NzggNDMuOTE2IDMwLjYzMzIgNDMuNDYzN0MzMS4zMDg2IDQzLjAxMTQgMzIuMTAyOCA0Mi43NjkxIDMyLjkxNTYgNDIuNzY3NEMzNC4wMTUgNDIuNzY3NCAzNS4wNDcgNDMuMTk1MyAzNS44MjU1IDQzLjk3MjFDMzYuNjAzOSA0NC43NDkgMzcuMDMwMiA0NS43ODI1IDM3LjAzMDIgNDYuODgyQzM3LjAzMDIgNDcuOTc5NyAzNi42MDIzIDQ5LjAxMzMgMzUuODI1NSA0OS43OTE4QzM0LjI2ODUgNTEuMzQzOCAzMS41NjExIDUxLjM0MzggMzAuMDA1OCA0OS43OTAxWk00MC40ODE1IDM5LjMxNjFDNDEuMzE5OSA0MC4xNTk2IDQyLjMxNzMgNDAuODI4MyA0My40MTYxIDQxLjI4MzRDNDQuNTE0OCA0MS43Mzg2IDQ1LjY5MjkgNDEuOTcxMSA0Ni44ODIyIDQxLjk2NzVDNDguMDcxNCA0MS45NzExIDQ5LjI0OTYgNDEuNzM4NiA1MC4zNDgzIDQxLjI4MzRDNTEuNDQ3IDQwLjgyODMgNTIuNDQ0NSA0MC4xNTk2IDUzLjI4MjggMzkuMzE2MUM1NC45NzgzIDM3LjYxNzQgNTUuOTMwNiAzNS4zMTU0IDU1LjkzMDYgMzIuOTE1NEM1NS45MzA2IDMwLjUxNTQgNTQuOTc4MyAyOC4yMTM0IDUzLjI4MjggMjYuNTE0OEM1Mi40NDQ0IDI1LjY3MTQgNTEuNDQ2OSAyNS4wMDI4IDUwLjM0ODIgMjQuNTQ3N0M0OS4yNDk1IDI0LjA5MjUgNDguMDcxNCAyMy44NTk5IDQ2Ljg4MjIgMjMuODYzM0M0NS42OTI5IDIzLjg1OTggNDQuNTE0OCAyNC4wOTIzIDQzLjQxNjEgMjQuNTQ3NEM0Mi4zMTczIDI1LjAwMjYgNDEuMzE5OSAyNS42NzEzIDQwLjQ4MTUgMjYuNTE0OEMzOC43ODYgMjguMjEzNCAzNy44MzM4IDMwLjUxNTQgMzcuODMzOCAzMi45MTU0QzM3LjgzMzggMzUuMzE1NCAzOC43ODYgMzcuNjE3NCA0MC40ODE1IDM5LjMxNjFaTTQzLjk3MjMgMzAuMDA1NkM0NC43NTA4IDI5LjIyODggNDUuNzgyOCAyOC44MDA4IDQ2Ljg4MjIgMjguODAwOEM0Ny45ODE2IDI4LjgwMDggNDkuMDEzNSAyOS4yMjg4IDQ5Ljc5MiAzMC4wMDU2QzUwLjU2MjcgMzAuNzc3OSA1MC45OTU1IDMxLjgyNDQgNTAuOTk1NSAzMi45MTU0QzUwLjk5NTUgMzQuMDA2NSA1MC41NjI3IDM1LjA1MjkgNDkuNzkyIDM1LjgyNTNDNDguMjM2NyAzNy4zNzg5IDQ1LjUyOTMgMzcuMzc4OSA0My45NzQgMzUuODI1M0M0My4yMDI3IDM1LjA1MzQgNDIuNzY5MyAzNC4wMDY5IDQyLjc2OSAzMi45MTU4QzQyLjc2ODcgMzEuODI0NiA0My4yMDE1IDMwLjc3NzkgNDMuOTcyMyAzMC4wMDU2WiIgZmlsbD0iIzJGMzQzNyIvPgo8L3N2Zz4K');
 }
 
-/* ── 面板布局 ─────────────────────────────────────────
-   注意：不覆盖 display，让 .cs-panel { display:none } 正常工作
-   只在激活时用 flex 替代默认的 block
-   ────────────────────────────────────────────────── */
+/* ── 面板布局（不覆盖 display:none，激活时用 flex）── */
 #cs-panel-cinema {
     flex-direction: column;
     padding: 0 !important;
@@ -21,18 +18,37 @@
     display: flex !important;
 }
 
-/* ── 顶部标题栏 ─────────────────────────────────────── */
+/* ── Header：对齐纪念日/心情手账风格 ─────────────────── */
 .cinema-hd {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px 10px;
+    padding: 4px 4px 10px;
     flex-shrink: 0;
 }
 .cinema-hd-title {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 17px;
+    font-weight: 700;
     color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
+}
+
+/* ── 档案按钮图标（Vector.svg mask）──────────────────── */
+.cinema-archive-icon {
+    display: block;
+    width: 22px;
+    height: 20px;
+    background-color: var(--text-primary);
+    -webkit-mask-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzEiIGhlaWdodD0iNjIiIHZpZXdCb3g9IjAgMCA3MSA2MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQ2LjA0MTcgMjEuMjVDNDYuNzQ2MiAyMS4yNSA0Ny40MjE4IDIxLjUyOTkgNDcuOTE5OSAyMi4wMjhDNDguNDE4MSAyMi41MjYxIDQ4LjY5NzkgMjMuMjAxOCA0OC42OTc5IDIzLjkwNjJDNDguNjk3OSAyNC42MTA3IDQ4LjQxODEgMjUuMjg2NCA0Ny45MTk5IDI1Ljc4NDVDNDcuNDIxOCAyNi4yODI2IDQ2Ljc0NjIgMjYuNTYyNSA0Ni4wNDE3IDI2LjU2MjVIMjQuNzkxN0MyNC4wODcyIDI2LjU2MjUgMjMuNDExNiAyNi4yODI2IDIyLjkxMzQgMjUuNzg0NUMyMi40MTUzIDI1LjI4NjQgMjIuMTM1NCAyNC42MTA3IDIyLjEzNTQgMjMuOTA2MkMyMi4xMzU0IDIzLjIwMTggMjIuNDE1MyAyMi41MjYxIDIyLjkxMzQgMjIuMDI4QzIzLjQxMTYgMjEuNTI5OSAyNC4wODcyIDIxLjI1IDI0Ljc5MTcgMjEuMjVINDYuMDQxN1pNNDYuMDQxNyAzNS40MTY3QzQ2Ljc0NjIgMzUuNDE2NyA0Ny40MjE4IDM1LjY5NjUgNDcuOTE5OSAzNi4xOTQ3QzQ4LjQxODEgMzYuNjkyOCA0OC42OTc5IDM3LjM2ODQgNDguNjk3OSAzOC4wNzI5QzQ4LjY5NzkgMzguNzc3NCA0OC40MTgxIDM5LjQ1MyA0Ny45MTk5IDM5Ljk1MTJDNDcuNDIxOCA0MC40NDkzIDQ2Ljc0NjIgNDAuNzI5MiA0Ni4wNDE3IDQwLjcyOTJIMjQuNzkxN0MyNC4wODcyIDQwLjcyOTIgMjMuNDExNiA0MC40NDkzIDIyLjkxMzQgMzkuOTUxMkMyMi40MTUzIDM5LjQ1MyAyMi4xMzU0IDM4Ljc3NzQgMjIuMTM1NCAzOC4wNzI5QzIyLjEzNTQgMzcuMzY4NCAyMi40MTUzIDM2LjY5MjggMjIuOTEzNCAzNi4xOTQ3QzIzLjQxMTYgMzUuNjk2NSAyNC4wODcyIDM1LjQxNjcgMjQuNzkxNyAzNS40MTY3SDQ2LjA0MTdaTTIuNjU2MjUgMjQuNzkxN0MxLjk1MTc3IDI0Ljc5MTcgMS4yNzYxNCAyNC41MTE4IDAuNzc3OTk3IDI0LjAxMzdDMC4yNzk4NTQgMjMuNTE1NSAwIDIyLjgzOTkgMCAyMi4xMzU0VjkuNzM5NThDMCA0LjM2MDY4IDQuMzYwNjggMCA5LjczOTU4IDBINjEuMDkzOEM2Ni40NzI3IDAgNzAuODMzMyA0LjM2MDY4IDcwLjgzMzMgOS43Mzk1OFYyMi4xMzU0QzcwLjgzMzMgMjIuODM5OSA3MC41NTM1IDIzLjUxNTUgNzAuMDU1MyAyNC4wMTM3QzY5LjU1NzIgMjQuNTExOCA2OC44ODE2IDI0Ljc5MTcgNjguMTc3MSAyNC43OTE3QzY2LjUzMzMgMjQuNzkxNyA2NC45NTY4IDI1LjQ0NDcgNjMuNzk0NSAyNi42MDdDNjIuNjMyMiAyNy43NjkzIDYxLjk3OTIgMjkuMzQ1OCA2MS45NzkyIDMwLjk4OTZDNjEuOTc5MiAzMi42MzM0IDYyLjYzMjIgMzQuMjA5OCA2My43OTQ1IDM1LjM3MjJDNjQuOTU2OCAzNi41MzQ1IDY2LjUzMzMgMzcuMTg3NSA2OC4xNzcxIDM3LjE4NzVDNjguODgxNiAzNy4xODc1IDY5LjU1NzIgMzcuNDY3NCA3MC4wNTUzIDM3Ljk2NTVDNzAuNTUzNSAzOC40NjM2IDcwLjgzMzMgMzkuMTM5MyA3MC44MzMzIDM5Ljg0MzhWNTIuMjM5NkM3MC44MzMzIDU3LjYxODUgNjYuNDcyNyA2MS45NzkyIDYxLjA5MzggNjEuOTc5Mkg5LjczOTU4QzQuMzYwNjggNjEuOTc5MiA4LjMwMDc4ZS0wOCA1Ny42MTg1IDAgNTIuMjM5NlYzOS44NDM4QzAgMzkuMTM5MyAwLjI3OTg1NCAzOC40NjM2IDAuNzc3OTk3IDM3Ljk2NTVDMS4yNzYxNCAzNy40Njc0IDEuOTUxNzcgMzcuMTg3NSAyLjY1NjI1IDM3LjE4NzVDNC4zMDAwNCAzNy4xODc1IDUuODc2NSAzNi41MzQ1IDcuMDM4ODQgMzUuMzcyMkM4LjIwMTE3IDM0LjIwOTggOC44NTQxNyAzMi42MzM0IDguODU0MTcgMzAuOTg5NkM4Ljg1NDE3IDI5LjM0NTggOC4yMDExNyAyNy43NjkzIDcuMDM4ODQgMjYuNjA3QzUuODc2NSAyNS40NDQ3IDQuMzAwMDQgMjQuNzkxNyAyLjY1NjI1IDI0Ljc5MTdaTTE0LjE2NjcgMzAuOTg5NkMxNC4xNjY3IDM2LjQzMjIgMTAuMzg4NiA0MC45OTMgNS4zMTI1IDQyLjE5MTlWNTIuMjM5NkM1LjMxMjUgNTIuODIxIDUuNDI3MDEgNTMuMzk2NiA1LjY0OTQ5IDUzLjkzMzhDNS44NzE5NyA1NC40NzA5IDYuMTk4MDcgNTQuOTU4OSA2LjYwOTE2IDU1LjM3QzcuMDIwMjUgNTUuNzgxMSA3LjUwODI5IDU2LjEwNzIgOC4wNDU0MSA1Ni4zMjk3QzguNTgyNTMgNTYuNTUyMiA5LjE1ODIxIDU2LjY2NjcgOS43Mzk1OCA1Ni42NjY3SDYxLjA5MzhDNjEuNjc1MSA1Ni42NjY3IDYyLjI1MDggNTYuNTUyMiA2Mi43ODc5IDU2LjMyOTdDNjMuMzI1IDU2LjEwNzIgNjMuODEzMSA1NS43ODExIDY0LjIyNDIgNTUuMzdDNjQuNjM1MyA1NC45NTg5IDY0Ljk2MTQgNTQuNDcwOSA2NS4xODM4IDUzLjkzMzhDNjUuNDA2MyA1My4zOTY2IDY1LjUyMDggNTIuODIxIDY1LjUyMDggNTIuMjM5NlY0Mi4xOTE5QzYwLjQ0NDcgNDAuOTkzIDU2LjY2NjcgMzYuNDMyMiA1Ni42NjY3IDMwLjk4OTZDNTYuNjY2NyAyNS41NDY5IDYwLjQ0NDcgMjAuOTg2MSA2NS41MjA4IDE5Ljc4NzNWOS43Mzk1OEM2NS41MjA4IDkuMTU4MjEgNjUuNDA2MyA4LjU4MjUzIDY1LjE4MzggOC4wNDU0MUM2NC45NjE0IDcuNTA4MjkgNjQuNjM1MyA3LjAyMDI2IDY0LjIyNDIgNi42MDkxNkM2My44MTMxIDYuMTk4MDcgNjMuMzI1IDUuODcxOTcgNjIuNzg3OSA1LjY0OTQ5QzYyLjI1MDggNS40MjcwMSA2MS42NzUxIDUuMzEyNSA2MS4wOTM4IDUuMzEyNUg5LjczOTU4QzkuMTU4MjEgNS4zMTI1IDguNTgyNTMgNS40MjcwMSA4LjA0NTQxIDUuNjQ5NDlDNy41MDgyOSA1Ljg3MTk3IDcuMDIwMjUgNi4xOTgwNyA2LjYwOTE2IDYuNjA5MTZDNi4xOTgwNyA3LjAyMDI2IDUuODcxOTcgNy41MDgyOSA1LjY0OTQ5IDguMDQ1NDFDNS40MjcwMSA4LjU4MjUzIDUuMzEyNSA5LjE1ODIxIDUuMzEyNSA5LjczOTU4VjE5Ljc4NzNDMTAuMzg4NiAyMC45ODYxIDE0LjE2NjcgMjUuNTQ2OSAxNC4xNjY3IDMwLjk4OTZaIiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K');
+    mask-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzEiIGhlaWdodD0iNjIiIHZpZXdCb3g9IjAgMCA3MSA2MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQ2LjA0MTcgMjEuMjVDNDYuNzQ2MiAyMS4yNSA0Ny40MjE4IDIxLjUyOTkgNDcuOTE5OSAyMi4wMjhDNDguNDE4MSAyMi41MjYxIDQ4LjY5NzkgMjMuMjAxOCA0OC42OTc5IDIzLjkwNjJDNDguNjk3OSAyNC42MTA3IDQ4LjQxODEgMjUuMjg2NCA0Ny45MTk5IDI1Ljc4NDVDNDcuNDIxOCAyNi4yODI2IDQ2Ljc0NjIgMjYuNTYyNSA0Ni4wNDE3IDI2LjU2MjVIMjQuNzkxN0MyNC4wODcyIDI2LjU2MjUgMjMuNDExNiAyNi4yODI2IDIyLjkxMzQgMjUuNzg0NUMyMi40MTUzIDI1LjI4NjQgMjIuMTM1NCAyNC42MTA3IDIyLjEzNTQgMjMuOTA2MkMyMi4xMzU0IDIzLjIwMTggMjIuNDE1MyAyMi41MjYxIDIyLjkxMzQgMjIuMDI4QzIzLjQxMTYgMjEuNTI5OSAyNC4wODcyIDIxLjI1IDI0Ljc5MTcgMjEuMjVINDYuMDQxN1pNNDYuMDQxNyAzNS40MTY3QzQ2Ljc0NjIgMzUuNDE2NyA0Ny40MjE4IDM1LjY5NjUgNDcuOTE5OSAzNi4xOTQ3QzQ4LjQxODEgMzYuNjkyOCA0OC42OTc5IDM3LjM2ODQgNDguNjk3OSAzOC4wNzI5QzQ4LjY5NzkgMzguNzc3NCA0OC40MTgxIDM5LjQ1MyA0Ny45MTk5IDM5Ljk1MTJDNDcuNDIxOCA0MC40NDkzIDQ2Ljc0NjIgNDAuNzI5MiA0Ni4wNDE3IDQwLjcyOTJIMjQuNzkxN0MyNC4wODcyIDQwLjcyOTIgMjMuNDExNiA0MC40NDkzIDIyLjkxMzQgMzkuOTUxMkMyMi40MTUzIDM5LjQ1MyAyMi4xMzU0IDM4Ljc3NzQgMjIuMTM1NCAzOC4wNzI5QzIyLjEzNTQgMzcuMzY4NCAyMi40MTUzIDM2LjY5MjggMjIuOTEzNCAzNi4xOTQ3QzIzLjQxMTYgMzUuNjk2NSAyNC4wODcyIDM1LjQxNjcgMjQuNzkxNyAzNS40MTY3SDQ2LjA0MTdaTTIuNjU2MjUgMjQuNzkxN0MxLjk1MTc3IDI0Ljc5MTcgMS4yNzYxNCAyNC41MTE4IDAuNzc3OTk3IDI0LjAxMzdDMC4yNzk4NTQgMjMuNTE1NSAwIDIyLjgzOTkgMCAyMi4xMzU0VjkuNzM5NThDMCA0LjM2MDY4IDQuMzYwNjggMCA5LjczOTU4IDBINjEuMDkzOEM2Ni40NzI3IDAgNzAuODMzMyA0LjM2MDY4IDcwLjgzMzMgOS43Mzk1OFYyMi4xMzU0QzcwLjgzMzMgMjIuODM5OSA3MC41NTM1IDIzLjUxNTUgNzAuMDU1MyAyNC4wMTM3QzY5LjU1NzIgMjQuNTExOCA2OC44ODE2IDI0Ljc5MTcgNjguMTc3MSAyNC43OTE3QzY2LjUzMzMgMjQuNzkxNyA2NC45NTY4IDI1LjQ0NDcgNjMuNzk0NSAyNi42MDdDNjIuNjMyMiAyNy43NjkzIDYxLjk3OTIgMjkuMzQ1OCA2MS45NzkyIDMwLjk4OTZDNjEuOTc5MiAzMi42MzM0IDYyLjYzMjIgMzQuMjA5OCA2My43OTQ1IDM1LjM3MjJDNjQuOTU2OCAzNi41MzQ1IDY2LjUzMzMgMzcuMTg3NSA2OC4xNzcxIDM3LjE4NzVDNjguODgxNiAzNy4xODc1IDY5LjU1NzIgMzcuNDY3NCA3MC4wNTUzIDM3Ljk2NTVDNzAuNTUzNSAzOC40NjM2IDcwLjgzMzMgMzkuMTM5MyA3MC44MzMzIDM5Ljg0MzhWNTIuMjM5NkM3MC44MzMzIDU3LjYxODUgNjYuNDcyNyA2MS45NzkyIDYxLjA5MzggNjEuOTc5Mkg5LjczOTU4QzQuMzYwNjggNjEuOTc5MiA4LjMwMDc4ZS0wOCA1Ny42MTg1IDAgNTIuMjM5NlYzOS44NDM4QzAgMzkuMTM5MyAwLjI3OTg1NCAzOC40NjM2IDAuNzc3OTk3IDM3Ljk2NTVDMS4yNzYxNCAzNy40Njc0IDEuOTUxNzcgMzcuMTg3NSAyLjY1NjI1IDM3LjE4NzVDNC4zMDAwNCAzNy4xODc1IDUuODc2NSAzNi41MzQ1IDcuMDM4ODQgMzUuMzcyMkM4LjIwMTE3IDM0LjIwOTggOC44NTQxNyAzMi42MzM0IDguODU0MTcgMzAuOTg5NkM4Ljg1NDE3IDI5LjM0NTggOC4yMDExNyAyNy43NjkzIDcuMDM4ODQgMjYuNjA3QzUuODc2NSAyNS40NDQ3IDQuMzAwMDQgMjQuNzkxNyAyLjY1NjI1IDI0Ljc5MTdaTTE0LjE2NjcgMzAuOTg5NkMxNC4xNjY3IDM2LjQzMjIgMTAuMzg4NiA0MC45OTMgNS4zMTI1IDQyLjE5MTlWNTIuMjM5NkM1LjMxMjUgNTIuODIxIDUuNDI3MDEgNTMuMzk2NiA1LjY0OTQ5IDUzLjkzMzhDNS44NzE5NyA1NC40NzA5IDYuMTk4MDcgNTQuOTU4OSA2LjYwOTE2IDU1LjM3QzcuMDIwMjUgNTUuNzgxMSA3LjUwODI5IDU2LjEwNzIgOC4wNDU0MSA1Ni4zMjk3QzguNTgyNTMgNTYuNTUyMiA5LjE1ODIxIDU2LjY2NjcgOS43Mzk1OCA1Ni42NjY3SDYxLjA5MzhDNjEuNjc1MSA1Ni42NjY3IDYyLjI1MDggNTYuNTUyMiA2Mi43ODc5IDU2LjMyOTdDNjMuMzI1IDU2LjEwNzIgNjMuODEzMSA1NS43ODExIDY0LjIyNDIgNTUuMzdDNjQuNjM1MyA1NC45NTg5IDY0Ljk2MTQgNTQuNDcwOSA2NS4xODM4IDUzLjkzMzhDNjUuNDA2MyA1My4zOTY2IDY1LjUyMDggNTIuODIxIDY1LjUyMDggNTIuMjM5NlY0Mi4xOTE5QzYwLjQ0NDcgNDAuOTkzIDU2LjY2NjcgMzYuNDMyMiA1Ni42NjY3IDMwLjk4OTZDNTYuNjY2NyAyNS41NDY5IDYwLjQ0NDcgMjAuOTg2MSA2NS41MjA4IDE5Ljc4NzNWOS43Mzk1OEM2NS41MjA4IDkuMTU4MjEgNjUuNDA2MyA4LjU4MjUzIDY1LjE4MzggOC4wNDU0MUM2NC45NjE0IDcuNTA4MjkgNjQuNjM1MyA3LjAyMDI2IDY0LjIyNDIgNi42MDkxNkM2My44MTMxIDYuMTk4MDcgNjMuMzI1IDUuODcxOTcgNjIuNzg3OSA1LjY0OTQ5QzYyLjI1MDggNS40MjcwMSA2MS42NzUxIDUuMzEyNSA2MS4wOTM4IDUuMzEyNUg5LjczOTU4QzkuMTU4MjEgNS4zMTI1IDguNTgyNTMgNS40MjcwMSA4LjA0NTQxIDUuNjQ5NDlDNy41MDgyOSA1Ljg3MTk3IDcuMDIwMjUgNi4xOTgwNyA2LjYwOTE2IDYuNjA5MTZDNi4xOTgwNyA3LjAyMDI2IDUuODcxOTcgNy41MDgyOSA1LjY0OTQ5IDguMDQ1NDFDNS40MjcwMSA4LjU4MjUzIDUuMzEyNSA5LjE1ODIxIDUuMzEyNSA5LjczOTU4VjE5Ljc4NzNDMTAuMzg4NiAyMC45ODYxIDE0LjE2NjcgMjUuNTQ2OSAxNC4xNjY3IDMwLjk4OTZaIiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    opacity: 0.65;
 }
 
 /* ── 中间可滚动区域 ──────────────────────────────────── */
@@ -43,32 +59,31 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     min-height: 0;
+    padding: 0 16px;
 }
 
-/* ── 状态区域 ───────────────────────────────────────── */
-.cinema-state-area {
-    flex-shrink: 0;
-    padding: 12px 16px;
-}
-
-/* ── 空状态 ─────────────────────────────────────────── */
-.cinema-empty {
+/* ── 空状态区域：幕布感 ──────────────────────────────── */
+.cinema-screen-wrap {
+    background: #111;
+    border: 2px solid #2a2a2a;
+    border-radius: 6px;
+    margin: 12px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 32px 16px 24px;
+    justify-content: center;
+    padding: 36px 20px 28px;
+    min-height: 180px;
 }
 .cinema-empty-icon {
-    font-size: 52px;
-    opacity: 0.18;
-    color: var(--text-primary);
-    margin-bottom: 12px;
+    font-size: 46px;
+    color: rgba(255,255,255,0.18);
+    margin-bottom: 10px;
 }
 .cinema-empty-text {
     font-size: 14px;
-    color: var(--text-secondary);
-    opacity: 0.6;
-    margin-bottom: 18px;
+    color: rgba(255,255,255,0.38);
+    margin-bottom: 20px;
 }
 .cinema-invite-btn {
     background: var(--accent-color, #7BC8A4);
@@ -92,7 +107,7 @@
     border: 1px solid var(--border-color, #e0e0e0);
     border-radius: 12px;
     padding: 16px;
-    margin-bottom: 10px;
+    margin: 12px 0;
 }
 .cinema-appt-badge {
     display: inline-block;
@@ -149,37 +164,78 @@
     transform: scale(0.97);
 }
 
-/* ── 聊天占位区 ─────────────────────────────────────── */
+/* ── 聊天区：干净无边框，空状态提示 ──────────────────── */
 .cinema-chat-area {
     flex: 1;
-    min-height: 100px;
-    padding: 12px 16px;
+    min-height: 80px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
 }
-.cinema-chat-placeholder {
-    font-size: 13px;
+.cinema-chat-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     color: var(--text-secondary);
-    opacity: 0.45;
+    opacity: 0.35;
+    padding: 24px;
+    font-size: 13px;
+    min-height: 80px;
+}
+.cinema-chat-empty i {
+    font-size: 26px;
 }
 
-/* ── 底部输入栏 ─────────────────────────────────────── */
+/* ── 输入栏：对齐主界面输入风格 ──────────────────────── */
 .cinema-input-bar {
     flex-shrink: 0;
-    border-top: 1px solid var(--border-color, #e8e8e8);
-    padding: 10px 16px;
-    background: var(--main-bg, #fff);
-}
-.cinema-input-placeholder {
-    height: 36px;
-    background: var(--secondary-bg, #f5f5f5);
-    border-radius: 18px;
     display: flex;
     align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    background: var(--main-bg, #fff);
+    border-top: 1px solid var(--border-color, #e8e8e8);
+}
+.cinema-input-field {
+    flex: 1;
+    height: 36px;
+    background: var(--secondary-bg, #f5f5f5);
+    border: none;
+    border-radius: 18px;
     padding: 0 14px;
-    font-size: 13px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+    min-width: 0;
+}
+.cinema-input-field::placeholder {
     color: var(--text-secondary);
-    opacity: 0.5;
+    opacity: 0.6;
+}
+.cinema-chat-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    opacity: 0.6;
+}
+.cinema-chat-btn:active {
+    opacity: 0.4;
 }
 
 /* ── 观影中：播放器 ──────────────────────────────────── */
@@ -209,7 +265,7 @@
 }
 .cinema-video-placeholder {
     text-align: center;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255,255,255,0.5);
 }
 .cinema-video-placeholder i {
     font-size: 36px;
@@ -258,6 +314,7 @@
 }
 .cinema-body-watch {
     flex: 1;
+    padding: 0 16px;
 }
 
 /* ── 档案页 ─────────────────────────────────────────── */
@@ -278,17 +335,18 @@
 .cinema-archive-topbar {
     display: flex;
     align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color, #e8e8e8);
+    padding: 4px 4px 10px;
     flex-shrink: 0;
 }
 .cinema-archive-topbar .cs-icon-btn {
     margin-right: 8px;
 }
 .cinema-archive-topbar-title {
-    font-size: 16px;
-    font-weight: 600;
-    flex: 1;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 2px;
 }
 .cinema-archive-tabs {
     display: flex;
@@ -306,6 +364,7 @@
     background: transparent;
     font-family: inherit;
     border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
     transition: color 0.15s, border-color 0.15s;
 }
 .cinema-archive-tab.active {
@@ -322,7 +381,7 @@
 .cinema-archive-empty {
     text-align: center;
     color: var(--text-secondary);
-    opacity: 0.45;
+    opacity: 0.4;
     padding: 40px 0;
     font-size: 14px;
 }

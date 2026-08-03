@@ -853,6 +853,32 @@
 .cinema-hist-review-text { color: var(--text-primary); word-break: break-word; }
 .cinema-hist-review-empty { color: var(--text-secondary); opacity: 0.55; font-style: italic; }
 
+/* 卡片里只读的小星星，跟在称呼后面 */
+.cinema-hist-stars {
+    display: inline-flex;
+    gap: 1px;
+    margin-right: 5px;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+.cinema-hist-stars .cinema-hist-star {
+    font-size: 10px;
+    color: var(--border-color, #ddd);
+}
+.cinema-hist-stars .cinema-hist-star.filled { color: #f5b942; }
+
+/* 编辑弹层里可点击的大星星 */
+.cinema-hist-stars-clickable {
+    gap: 6px;
+    margin: 2px 0 0;
+}
+.cinema-hist-stars-clickable .cinema-hist-star {
+    font-size: 22px;
+    cursor: pointer;
+    transition: color 0.15s, transform 0.1s;
+}
+.cinema-hist-stars-clickable .cinema-hist-star:active { transform: scale(0.85); }
+
 /* ── 观看历史：编辑弹层 ─────────────────────────────── */
 .cinema-hist-edit-sheet {
     position: fixed;

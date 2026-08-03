@@ -139,7 +139,7 @@
         _currentVideo = { src: '', title: '' };
         _cinemaMessages = [];
         if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); _cinemaPendingReplyTimer = null; }
-        _cinemaTypingRowEl = null;
+        _cinemaHideTyping();
     }
 
     // ── 渲染：选片后的假加载过渡（纯视觉，全屏进度条，真实读取几乎不耗时）──
@@ -218,27 +218,19 @@
 
     // ── 梦角自动回复：复用主聊天"字卡"回复库(customReplies)的选取/过滤逻辑 ──
     var _cinemaPendingReplyTimer = null;
-    var _cinemaTypingRowEl = null;
 
     function _cinemaShowTyping() {
-        var area = document.getElementById('cinema-chat-area');
-        if (!area) return;
-        _cinemaHideTyping();
-        var emptyEl = area.querySelector('.cinema-chat-empty');
-        if (emptyEl) emptyEl.remove();
-        var row = document.createElement('div');
-        row.className = 'cinema-msg-row cinema-msg-partner';
-        row.innerHTML = '<div class="cinema-msg-avatar">' + _avatarHTML(true) + '</div>' +
-            '<div class="cinema-msg-bubble cinema-msg-typing"><span></span><span></span><span></span></div>';
-        area.appendChild(row);
-        area.scrollTop = area.scrollHeight;
-        _cinemaTypingRowEl = row;
+        var slot = document.getElementById('cinema-typing-fixed');
+        if (!slot) return;
+        slot.innerHTML = '<div class="cinema-msg-row cinema-msg-partner">' +
+            '<div class="cinema-msg-avatar">' + _avatarHTML(true) + '</div>' +
+            '<div class="cinema-msg-bubble cinema-msg-typing"><span></span><span></span><span></span></div>' +
+        '</div>';
+        slot.style.display = 'block';
     }
     function _cinemaHideTyping() {
-        if (_cinemaTypingRowEl && _cinemaTypingRowEl.parentNode) {
-            _cinemaTypingRowEl.parentNode.removeChild(_cinemaTypingRowEl);
-        }
-        _cinemaTypingRowEl = null;
+        var slot = document.getElementById('cinema-typing-fixed');
+        if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }
     }
     // 跟主聊天 simulateReply() 里一样：按 disabledReplyItems / 禁用分组 过滤 customReplies
     function _cinemaBuildReplyPool() {
@@ -577,6 +569,7 @@
             '</div>' +
             '<div class="cinema-body cinema-body-watch">' +
                 _chatAreaHTML() +
+                '<div class="cinema-typing-fixed" id="cinema-typing-fixed" style="display:none;"></div>' +
                 _inputBarHTML() +
             '</div>' +
             '<input type="file" id="cinema-file-input" accept="video/*" style="display:none;">';

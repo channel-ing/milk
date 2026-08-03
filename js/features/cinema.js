@@ -640,9 +640,167 @@
     }
 
     // ── 档案页 ───────────────────────────────────────────
+    var _archiveTab = 'history'; // 'history' | 'watchlist'
+    var _archiveTabsBound = false;
+
+    // 待看清单：独立持久化，跟 period.js 一样用 keys() 扫描避免 SESSION_ID 异步问题
+    var _watchlist = [];
+    var _wlLoaded = false;
+    var _wlStorageKey = null;
+
+    async function _wlGetKey() {
+        if (_wlStorageKey) return _wlStorageKey;
+        try {
+            var allKeys = await localforage.keys();
+            var found = allKeys.find(function (k) { return k.indexOf('_cinemaWatchlist') !== -1; });
+            if (found) { _wlStorageKey = found; return found; }
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            _wlStorageKey = prefix + '_cinemaWatchlist';
+        } catch (e) {
+            _wlStorageKey = 'CHAT_APP_V3__cinemaWatchlist';
+        }
+        return _wlStorageKey;
+    }
+    async function _wlLoad() {
+        if (_wlLoaded) return;
+        try {
+            var key = await _wlGetKey();
+            var saved = await localforage.getItem(key);
+            if (Array.isArray(saved)) _watchlist = saved;
+        } catch (e) { console.warn('[cinema] 待看清单加载失败:', e); }
+        _wlLoaded = true;
+    }
+    async function _wlSave() {
+        try {
+            var key = await _wlGetKey();
+            await localforage.setItem(key, _watchlist);
+        } catch (e) { console.warn('[cinema] 待看清单保存失败:', e); }
+    }
+
+    function _wlAdd(title) {
+        title = String(title || '').trim();
+        if (!title) return;
+        _watchlist.unshift({ id: Date.now() + Math.random(), title: title, watched: false, stars: 0, ts: Date.now() });
+        _wlSave();
+        _renderWatchlistContent();
+    }
+    function _wlToggleWatched(id) {
+        var item = _watchlist.find(function (w) { return String(w.id) === String(id); });
+        if (!item) return;
+        item.watched = !item.watched;
+        _wlSave();
+        _renderWatchlistContent();
+    }
+    function _wlSetStars(id, stars) {
+        var item = _watchlist.find(function (w) { return String(w.id) === String(id); });
+        if (!item) return;
+        item.stars = stars;
+        _wlSave();
+        _renderWatchlistContent();
+    }
+    function _wlDelete(id) {
+        var doDelete = function () {
+            _watchlist = _watchlist.filter(function (w) { return String(w.id) !== String(id); });
+            _wlSave();
+            _renderWatchlistContent();
+        };
+        if (typeof _alShowConfirm === 'function') {
+            _alShowConfirm('删除待看', '删除后无法恢复，确定吗？', '删除', true, doDelete);
+        } else if (confirm('确定要删除这条待看记录吗？')) {
+            doDelete();
+        }
+    }
+
+    function _wlItemHTML(item) {
+        var stars = '';
+        for (var i = 1; i <= 5; i++) {
+            var filled = i <= (item.stars || 0);
+            stars += '<i class="fas fa-star cinema-wl-star' + (filled ? ' filled' : '') + '" data-star="' + i + '"></i>';
+        }
+        return '<div class="cinema-wl-item' + (item.watched ? ' cinema-wl-watched' : '') + '" data-id="' + item.id + '">' +
+            '<div class="cinema-wl-check" data-action="toggle"><i class="fas fa-check"></i></div>' +
+            '<div class="cinema-wl-body">' +
+                '<div class="cinema-wl-title">' + _escapeHtml(item.title) + '</div>' +
+                '<div class="cinema-wl-stars" data-action="stars">' + stars + '</div>' +
+            '</div>' +
+            '<button class="cinema-wl-delete" data-action="delete"><i class="fas fa-trash-alt"></i></button>' +
+        '</div>';
+    }
+    function _renderWatchlistContent() {
+        var content = document.getElementById('cinema-archive-content');
+        if (!content) return;
+        var listHTML = _watchlist.length
+            ? _watchlist.map(_wlItemHTML).join('')
+            : '<div class="cinema-archive-empty">暂无待看片单</div>';
+        content.innerHTML =
+            '<div class="cinema-wl-addrow">' +
+                '<input type="text" class="cinema-wl-add-input" id="cinema-wl-add-input" placeholder="想看的片名…" maxlength="60">' +
+                '<button class="cinema-wl-add-btn" id="cinema-wl-add-btn"><i class="fas fa-plus"></i></button>' +
+            '</div>' +
+            '<div class="cinema-wl-list">' + listHTML + '</div>';
+
+        var input = document.getElementById('cinema-wl-add-input');
+        var addBtn = document.getElementById('cinema-wl-add-btn');
+        function doAdd() {
+            _wlAdd(input.value);
+            input.value = '';
+            input.focus();
+        }
+        if (addBtn) addBtn.addEventListener('click', doAdd);
+        if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAdd(); });
+
+        content.querySelectorAll('.cinema-wl-item').forEach(function (el) {
+            var id = el.dataset.id;
+            var checkEl = el.querySelector('[data-action="toggle"]');
+            if (checkEl) checkEl.addEventListener('click', function () { _wlToggleWatched(id); });
+            var starsEl = el.querySelector('[data-action="stars"]');
+            if (starsEl) {
+                starsEl.querySelectorAll('.cinema-wl-star').forEach(function (starEl) {
+                    starEl.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        _wlSetStars(id, parseInt(starEl.dataset.star, 10));
+                    });
+                });
+            }
+            var delEl = el.querySelector('[data-action="delete"]');
+            if (delEl) delEl.addEventListener('click', function (e) { e.stopPropagation(); _wlDelete(id); });
+        });
+    }
+    function _renderHistoryContent() {
+        var content = document.getElementById('cinema-archive-content');
+        if (!content) return;
+        content.innerHTML = '<div class="cinema-archive-empty">暂无记录</div>';
+    }
+    function _renderArchiveContent() {
+        if (_archiveTab === 'watchlist') _renderWatchlistContent();
+        else _renderHistoryContent();
+    }
+    function _bindArchiveTabsOnce() {
+        if (_archiveTabsBound) return;
+        _archiveTabsBound = true;
+        var historyTab = document.getElementById('cinema-tab-history');
+        var watchlistTab = document.getElementById('cinema-tab-watchlist');
+        if (historyTab) historyTab.addEventListener('click', function () {
+            _archiveTab = 'history';
+            historyTab.classList.add('active');
+            if (watchlistTab) watchlistTab.classList.remove('active');
+            _renderArchiveContent();
+        });
+        if (watchlistTab) watchlistTab.addEventListener('click', function () {
+            _archiveTab = 'watchlist';
+            watchlistTab.classList.add('active');
+            if (historyTab) historyTab.classList.remove('active');
+            _renderArchiveContent();
+        });
+    }
     function _openArchive() {
         var page = document.getElementById('cinema-archive-page');
         if (page) page.classList.add('cinema-archive-open');
+        _bindArchiveTabsOnce();
+        _wlLoad().then(function () {
+            _renderArchiveContent();
+        });
     }
     window._cinemaCloseArchive = function () {
         var page = document.getElementById('cinema-archive-page');

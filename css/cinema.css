@@ -18,6 +18,7 @@
     --text-primary: #f2f2f2;
     --text-secondary: #9a9a9a;
     --border-color: #333333;
+    --secondary-bg-rgb: 28, 28, 30;
     --main-bg: #000;
 }
 
@@ -316,7 +317,7 @@
     gap: 6px;
     padding: 8px 12px;
     padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
-    background: var(--main-bg, #fff);
+    background: var(--input-area-bg, #ffffff);
     border-top: 1px solid var(--border-color, #e8e8e8);
 }
 .cinema-input-field {
@@ -408,11 +409,45 @@
 /* ── 观影聊天："正在输入"固定槎位（不随消息列表滚动，永远贴在输入栏上方）── */
 .cinema-typing-fixed {
     flex-shrink: 0;
-    background: var(--main-bg, #fff);
+    background: var(--input-area-bg, #ffffff);
     padding: 4px 0 6px;
 }
 .cinema-typing-fixed .cinema-msg-row {
     padding: 0;
+}
+
+/* ── 观影聊天："正在输入"胶囊（对齐主聊天 typing-indicator 风格）── */
+.cinema-typing-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    background: rgba(var(--secondary-bg-rgb, 255,255,255), 0.92);
+    backdrop-filter: blur(20px) saturate(2);
+    -webkit-backdrop-filter: blur(20px) saturate(2);
+    border: 1px solid rgba(var(--accent-color-rgb, 123,200,164), 0.22);
+    padding: 7px 14px 7px 7px;
+    border-radius: 26px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.07);
+    animation: typingIndicatorIn 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.cinema-typing-pill-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(var(--accent-color-rgb, 123,200,164), 0.28);
+}
+.cinema-typing-pill-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-color, #7BC8A4);
+    letter-spacing: 0.3px;
+    opacity: 0.88;
+    white-space: nowrap;
 }
 
 /* ── 观影聊天：表情面板（独立样式，不复用主聊天那套全局类，避免样式冲突）── */
@@ -615,7 +650,7 @@
 .cinema-archive-page {
     position: absolute;
     inset: 0;
-    background: var(--main-bg, #fff);
+    background: var(--primary-bg, #f9f9f9);
     z-index: 50;
     transform: translateX(100%);
     transition: transform 0.25s ease;

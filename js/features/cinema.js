@@ -1023,4 +1023,28 @@
         _cinemaRender();
     };
 
+    // ── 接管 csSwitchTab：切到别的功能 tab 时，如果影日志档案页还开着
+    //     （全屏 overlay，z-index:50），必须先关掉，否则会一直挡住其它面板，
+    //     导致"点了别的 tab 但页面没有跳转"——跟 anniversary.js 用的是同一套
+    //     "包一层 window.csSwitchTab，不改 moments.js 原文件"的写法 ──
+    (function () {
+        function hookCsSwitchTab() {
+            if (typeof window.csSwitchTab !== 'function') {
+                setTimeout(hookCsSwitchTab, 100);
+                return;
+            }
+            var orig = window.csSwitchTab;
+            window.csSwitchTab = function (tab) {
+                if (tab !== 'cinema') {
+                    var page = document.getElementById('cinema-archive-page');
+                    if (page && page.classList.contains('cinema-archive-open')) {
+                        window._cinemaCloseArchive();
+                    }
+                }
+                orig.call(this, tab);
+            };
+        }
+        hookCsSwitchTab();
+    })();
+
 })();

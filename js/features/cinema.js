@@ -222,10 +222,17 @@
     function _cinemaShowTyping() {
         var slot = document.getElementById('cinema-typing-fixed');
         if (!slot) return;
-        slot.innerHTML = '<div class="cinema-msg-row cinema-msg-partner">' +
-            '<div class="cinema-msg-avatar">' + _avatarHTML(true) + '</div>' +
-            '<div class="cinema-msg-bubble cinema-msg-typing"><span></span><span></span><span></span></div>' +
-        '</div>';
+        var name = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
+        slot.innerHTML =
+            '<div class="cinema-typing-pill">' +
+                '<div class="cinema-typing-pill-avatar">' + _avatarHTML(true) + '</div>' +
+                '<span class="cinema-typing-pill-label">' + _escapeHtml(name) + ' 正在输入</span>' +
+                '<div class="typing-dots">' +
+                    '<div class="typing-dot"></div>' +
+                    '<div class="typing-dot"></div>' +
+                    '<div class="typing-dot"></div>' +
+                '</div>' +
+            '</div>';
         slot.style.display = 'block';
     }
     function _cinemaHideTyping() {
@@ -660,6 +667,24 @@
         _fakeAppt.dateStr = future.getFullYear() + '年' + (future.getMonth() + 1) + '月' + future.getDate() + '日';
         _fakeAppt.timeStr = String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0');
         if (_uiState === 'waiting') _renderWaiting();
+    };
+
+    // ── 调试专用：诊断梦角不回复 ──────────────────────────
+    // 控制台运行 _cinemaDebugReply() 可看到字卡池状态，并强制触发一次回复
+    window._cinemaDebugReply = function () {
+        var pool = _cinemaBuildReplyPool();
+        console.log('[cinema] 字卡池大小:', pool.length, '条');
+        if (pool.length === 0) {
+            var rawLen = (typeof customReplies !== 'undefined' && Array.isArray(customReplies))
+                ? customReplies.length : '变量不可用';
+            console.log('[cinema] customReplies 原始条数:', rawLen);
+            console.log('[cinema] 原因可能：① 字卡库为空 ② 字卡全部被禁用 ③ customReplies 未加载');
+        } else {
+            console.log('[cinema] 样例字卡:', pool.slice(0, 3));
+            console.log('[cinema] 正在强制触发一次回复...');
+            _cinemaSimulateReply();
+        }
+        return pool;
     };
 
     // ── 对外暴露 ─────────────────────────────────────────

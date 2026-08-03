@@ -581,22 +581,25 @@
         </div>
         <div class="cs-panel" id="cs-panel-cinema">
             <!-- 内容由 cinema.js 动态填充 -->
+        </div>
 
-            <!-- 档案页（全屏覆盖，陪伴日记风格） -->
-            <div class="cinema-archive-page" id="cinema-archive-page">
-                <div class="cinema-archive-topbar">
-                    <button class="cs-icon-btn" onclick="window._cinemaCloseArchive()">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <span class="cinema-archive-topbar-title">影日志</span>
-                </div>
-                <div class="cinema-archive-tabs">
-                    <button class="cinema-archive-tab active" id="cinema-tab-history">观看历史</button>
-                    <button class="cinema-archive-tab" id="cinema-tab-watchlist">待看清单</button>
-                </div>
-                <div class="cinema-archive-content" id="cinema-archive-content">
-                    <div class="cinema-archive-empty">暂无记录</div>
-                </div>
+        <!-- 档案页（全屏覆盖，陪伴日记风格）
+             注意：故意放在 #cs-panel-cinema 外面（.cs-content 的直接子元素），
+             因为 cinema.js 每次渲染都会用 panel.innerHTML 整体重写面板内容，
+             如果这个档案页节点放在里面会被连带清空，导致按钮点了没反应 -->
+        <div class="cinema-archive-page" id="cinema-archive-page">
+            <div class="cinema-archive-topbar">
+                <button class="cs-icon-btn" onclick="window._cinemaCloseArchive()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="cinema-archive-topbar-title">影日志</span>
+            </div>
+            <div class="cinema-archive-tabs">
+                <button class="cinema-archive-tab active" id="cinema-tab-history">观看历史</button>
+                <button class="cinema-archive-tab" id="cinema-tab-watchlist">待看清单</button>
+            </div>
+            <div class="cinema-archive-content" id="cinema-archive-content">
+                <div class="cinema-archive-empty">暂无记录</div>
             </div>
         </div>
 

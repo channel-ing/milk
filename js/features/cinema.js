@@ -809,13 +809,32 @@
         return (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' +
             (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
     }
+    function _histStarsHTML(stars, clickable) {
+        var wrapClass = clickable ? 'cinema-hist-stars cinema-hist-stars-clickable' : 'cinema-hist-stars';
+        var wrapAttr = clickable ? ' data-action="user-stars"' : '';
+        var html = '<span class="' + wrapClass + '"' + wrapAttr + '>';
+        for (var i = 1; i <= 5; i++) {
+            var filled = i <= (stars || 0);
+            html += '<i class="fas fa-star cinema-hist-star' + (filled ? ' filled' : '') + '" data-star="' + i + '"></i>';
+        }
+        html += '</span>';
+        return html;
+    }
     function _histEntryHTML(e) {
         var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
-        var partnerRowHtml = e.partnerReview
-            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">' + _escapeHtml(partnerName) + '：</span><span class="cinema-hist-review-text">' + _escapeHtml(e.partnerReview) + '</span></div>'
+        var partnerHasContent = e.partnerReview || (e.partnerStars > 0);
+        var partnerRowHtml = partnerHasContent
+            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">' + _escapeHtml(partnerName) + '：</span>' +
+                _histStarsHTML(e.partnerStars, false) +
+                (e.partnerReview ? '<span class="cinema-hist-review-text">' + _escapeHtml(e.partnerReview) + '</span>' : '') +
+              '</div>'
             : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">' + _escapeHtml(partnerName) + '没有留下评价</span></div>';
-        var userRowHtml = e.userReview
-            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">我：</span><span class="cinema-hist-review-text">' + _escapeHtml(e.userReview) + '</span></div>'
+        var userHasContent = e.userReview || (e.userStars > 0);
+        var userRowHtml = userHasContent
+            ? '<div class="cinema-hist-review-row"><span class="cinema-hist-review-who">我：</span>' +
+                _histStarsHTML(e.userStars, false) +
+                (e.userReview ? '<span class="cinema-hist-review-text">' + _escapeHtml(e.userReview) + '</span>' : '') +
+              '</div>'
             : '<div class="cinema-hist-review-row"><span class="cinema-hist-review-empty">点击此处添加我的评价…</span></div>';
         return '<div class="cinema-hist-entry" data-id="' + e.id + '">' +
             '<div class="cinema-hist-title">' + _escapeHtml(e.title) + '</div>' +
@@ -837,7 +856,7 @@
         });
     }
 
-    // ── 观看历史：编辑弹层（片名 + 我的评价可改，梦角评价只读）──
+    // ── 观看历史：编辑弹层（片名 + 我的评价/评分可改，梦角评价只读）──
     function _histOpenEditor(id) {
         var entry = _history.find(function (e) { return String(e.id) === String(id); });
         if (!entry) return;
@@ -848,14 +867,21 @@
         var sheet = document.createElement('div');
         sheet.id = 'cinema-hist-edit-sheet';
         sheet.className = 'cinema-hist-edit-sheet';
+        var editUserStars = entry.userStars || 0;
         sheet.innerHTML =
             '<div class="cinema-hist-edit-mask" id="cinema-hist-edit-mask"></div>' +
             '<div class="cinema-hist-edit-body">' +
                 '<div class="cinema-hist-edit-label">片名</div>' +
                 '<input type="text" class="cinema-hist-edit-input" id="cinema-hist-edit-title" maxlength="60" value="' + _escapeHtml(entry.title) + '">' +
-                (entry.partnerReview
-                    ? '<div class="cinema-hist-edit-label">' + _escapeHtml(partnerName) + '的评价</div><div class="cinema-hist-edit-readonly">' + _escapeHtml(entry.partnerReview) + '</div>'
+                ((entry.partnerReview || entry.partnerStars > 0)
+                    ? '<div class="cinema-hist-edit-label">' + _escapeHtml(partnerName) + '的评价</div>' +
+                      '<div class="cinema-hist-edit-readonly">' +
+                        _histStarsHTML(entry.partnerStars, false) +
+                        (entry.partnerReview ? '<div style="margin-top:6px;">' + _escapeHtml(entry.partnerReview) + '</div>' : '') +
+                      '</div>'
                     : '') +
+                '<div class="cinema-hist-edit-label">我的评分</div>' +
+                '<div id="cinema-hist-edit-stars">' + _histStarsHTML(editUserStars, true) + '</div>' +
                 '<div class="cinema-hist-edit-label">我的评价</div>' +
                 '<textarea class="cinema-hist-edit-textarea" id="cinema-hist-edit-review" maxlength="200" placeholder="写点什么吧…">' + _escapeHtml(entry.userReview || '') + '</textarea>' +
                 '<div class="cinema-hist-edit-actions">' +
@@ -864,6 +890,22 @@
                 '</div>' +
             '</div>';
         document.body.appendChild(sheet);
+
+        var starsWrap = document.getElementById('cinema-hist-edit-stars');
+        function refreshStars() {
+            starsWrap.innerHTML = _histStarsHTML(editUserStars, true);
+            bindStarClicks();
+        }
+        function bindStarClicks() {
+            starsWrap.querySelectorAll('.cinema-hist-star').forEach(function (starEl) {
+                starEl.addEventListener('click', function () {
+                    editUserStars = parseInt(starEl.dataset.star, 10);
+                    refreshStars();
+                });
+            });
+        }
+        bindStarClicks();
+
         function close() { sheet.remove(); _histEditingId = null; }
         document.getElementById('cinema-hist-edit-mask').addEventListener('click', close);
         document.getElementById('cinema-hist-edit-cancel').addEventListener('click', close);
@@ -872,6 +914,7 @@
             var reviewVal = document.getElementById('cinema-hist-edit-review').value.trim();
             if (titleVal) entry.title = titleVal;
             entry.userReview = reviewVal;
+            entry.userStars = editUserStars;
             _histSave();
             close();
             _renderHistoryContent();
@@ -883,10 +926,10 @@
         var now = Date.now();
         var day = 86400000;
         _history = _history.concat([
-            { id: now + 1, title: '阿嫚的情书', ts: now - day * 1,  partnerReview: '这段太戳心了，我看哭了', userReview: '结局猜到了但还是很感动' },
-            { id: now + 2, title: '深夜食堂 S01E03', ts: now - day * 3,  partnerReview: '', userReview: '适合睡前看，很治愈' },
-            { id: now + 3, title: 'error.mp4',        ts: now - day * 5,  partnerReview: '这个我们下次再看一遍吧', userReview: '' },
-            { id: now + 4, title: '风起',              ts: now - day * 9,  partnerReview: '摄影很好看', userReview: '剧情有点拖' }
+            { id: now + 1, title: '阿嫚的情书', ts: now - day * 1,  partnerReview: '这段太戳心了，我看哭了', partnerStars: 5, userReview: '结局猜到了但还是很感动', userStars: 4 },
+            { id: now + 2, title: '深夜食堂 S01E03', ts: now - day * 3,  partnerReview: '', partnerStars: 3, userReview: '适合睡前看，很治愈', userStars: 4 },
+            { id: now + 3, title: 'error.mp4',        ts: now - day * 5,  partnerReview: '这个我们下次再看一遍吧', partnerStars: 0, userReview: '', userStars: 0 },
+            { id: now + 4, title: '风起',              ts: now - day * 9,  partnerReview: '摄影很好看', partnerStars: 4, userReview: '剧情有点拖', userStars: 2 }
         ]);
         _histSave();
         if (_archiveTab === 'history') _renderHistoryContent();

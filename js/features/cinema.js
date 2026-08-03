@@ -559,7 +559,7 @@
             headerHTML +
             '<div class="cinema-watch-video-pad">' +
                 '<div class="cinema-player-wrap" id="cinema-player-wrap">' +
-                    '<video id="cinema-video" class="cinema-video" controls>' +
+                    '<video id="cinema-video" class="cinema-video" controls playsinline webkit-playsinline>' +
                         '<source src="' + _currentVideo.src + '" type="video/mp4">' +
                     '</video>' +
                     (_immersive ? '' :

@@ -421,6 +421,26 @@
         if (page) page.classList.remove('cinema-archive-open');
     };
 
+    // ── 调试专用：跳过邀请/倒计时，直接切状态（浏览器控制台里手动调用）──
+    window._cinemaDebugGoto = function (state) {
+        _uiState = state;
+        _cinemaRender();
+    };
+    // 把约定时间改成"刚刚"，强制解锁选片按钮（waiting 状态下调用）
+    window._cinemaDebugUnlock = function () {
+        var now = new Date();
+        _fakeAppt.dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+        _fakeAppt.timeStr = '00:00';
+        if (_uiState === 'waiting') _renderWaiting();
+    };
+    // 把约定时间改成 1 小时后，强制锁定选片按钮，方便看倒计时文案
+    window._cinemaDebugLock = function () {
+        var future = new Date(Date.now() + 3600000);
+        _fakeAppt.dateStr = future.getFullYear() + '年' + (future.getMonth() + 1) + '月' + future.getDate() + '日';
+        _fakeAppt.timeStr = String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0');
+        if (_uiState === 'waiting') _renderWaiting();
+    };
+
     // ── 对外暴露 ─────────────────────────────────────────
     window._cinemaInit = function () {
         _bindOutsideClickOnce();

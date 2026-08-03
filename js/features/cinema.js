@@ -1,32 +1,40 @@
 /**
- * cinema.js — 电影院功能 Step 1 v4
+ * cinema.js — 电影院功能 Step 1 v5
  *
- * 本轮改动（在 v3 基础上）：
- * 8. 选完片 → 先过一个假的"电影加载中"过渡（~1.5s，spinner+文案），再进播放页
- * 9. 观影模式（含加载过渡）新增沉浸式头部：返回 / 观影中 / 设置(占位)，
- *    进入后隐藏外层头像心跳条 + 情侣空间原顶栏，退出后恢复
- * 10. 观影模式强制暗色主题（用 CSS 变量局部覆盖，不受系统明暗设置影响）
- * 11. 新头部"返回" = 结束观影(二次确认) + 离开情侣空间；
- *     原工具栏"结束观影"按钮保留，作用是仅结束观影、留在情侣空间内
+ * 本轮改动（在 v4 基础上）：
+ * 12. "返回"改回：只退出沉浸模式，回到嵌入式观影视图（图2那种：外层头像条 +
+ *     电影院header都还在，视频框大小位置跟 waiting/empty 一致），不再直接结束观影/离开情侣空间
+ *     — 点嵌入视图里的视频框可以重新进沉浸模式
+ * 13. 表情面板改用独立类名（不复用主聊天 .sticker-picker-popover 等一堆全局样式，
+ *     之前因为规则冲突导致格子巨大），改成贴近"我的表情库"管理页那种小格子紧凑网格；
+ *     数据源从 stickerLibrary 换成 myStickerLibrary（用户自己的表情库，不是梦角的）
+ * 14. waiting 卡片徽标文案"约定待履行"→"待观影"
+ * 15. 加载过渡改为全屏进度条样式（纯黑背景+图标+进度条+文案，无header）
+ * 16. 聊天消息气泡加头像：自己的消息头像在右，梦角消息头像在左，
+ *     复用 moments.js 里现成的 _avEl() 头像解析逻辑（跟主聊天头像来源一致）
+ *
+ * 历史（v4）：
+ * 8. 选完片 → 先过一个假的"电影加载中"过渡，再进播放页
+ * 9. 观影模式新增沉浸式头部：返回 / 观影中 / 设置(占位)
+ * 10. 观影模式强制暗色主题（CSS 变量局部覆盖）
  *
  * 历史（v3）：
  * 1. 未在播放时（empty / waiting）隐藏底部输入栏，只在 watching 状态显示
- * 2. header 文字/icon 对齐纪念日/心情手账（padding 修正见 cinema.css）
- * 3. waiting 状态：黑框在上、信息卡在下；未到时间前"选择影片并开始"禁用+倒计时；
- *    点击后直接弹出文件选择框（不跳页面）；真正选中文件后才跳到 watching 页，
- *    且不自动播放，等用户自己点播放
- * 4. empty 状态：邀请按钮移到黑框下面，不再叠在黑框里
- * 5. watching 状态：黑框样式与 empty/waiting 保持一致（同样的圆角深色框），
- *    视频控件本身仍用原生 <video controls>
- * 6. 结束观影 → 二次确认（沿用项目里其它危险操作用的原生 confirm()）
- * 7. 输入栏表情/图片：表情面板复用用户自己的表情库(stickerLibrary/customEmojis)，
- *    图片按钮复用主聊天的图片处理逻辑(optimizeImage)，各自建一套独立 DOM，
- *    不侵入主聊天的 #user-sticker-picker / #image-input，避免互相影响
+ * 2. header 文字/icon 对齐纪念日/心情手账
+ * 3. waiting 状态：黑框在上、信息卡在下；未到时间前禁用+倒计时；
+ *    选完文件才跳转，且不自动播放
+ * 4. empty 状态：邀请按钮移到黑框下面
+ * 5. watching 状态：黑框样式与 empty/waiting 保持一致
+ * 6. 结束观影 → 二次确认
+ * 7. 输入栏表情/图片：不侵入主聊天的 #user-sticker-picker / #image-input
  */
 (function () {
     'use strict';
 
     var _uiState = 'empty'; // 'empty' | 'waiting' | 'watching'
+
+    // watching 状态下：true=沉浸全屏剧场模式，false=嵌入普通电影院tab视图
+    var _immersive = true;
 
     var _fakeAppt = {
         movieTitle: '阿嫚的情书',
@@ -113,15 +121,8 @@
         var backBtn = document.getElementById('cinema-theater-back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', function () {
-                if (!confirm('确定要结束观影吗？')) return;
-                _endWatchingCleanup();
-                _exitTheaterMode();
-                _uiState = 'empty';
-                if (typeof window.closeCoupleSpace === 'function') {
-                    window.closeCoupleSpace();
-                } else {
-                    _cinemaRender();
-                }
+                _immersive = false;
+                _renderWatching();
             });
         }
         var settingsBtn = document.getElementById('cinema-theater-settings-btn');
@@ -139,31 +140,47 @@
         _cinemaMessages = [];
     }
 
-    // ── 渲染：选片后的假加载过渡（纯视觉，真实读取几乎不耗时）──
+    // ── 渲染：选片后的假加载过渡（纯视觉，全屏进度条，真实读取几乎不耗时）──
     function _renderLoading() {
         _enterTheaterMode();
         var panel = _getPanel();
         if (!panel) return;
         panel.innerHTML =
-            _theaterHdHTML() +
-            '<div class="cinema-loading-box">' +
-                '<div class="cinema-loading-spinner"></div>' +
-                '<div class="cinema-loading-text">电影加载中…</div>' +
+            '<div class="cinema-loading-full">' +
+                '<div class="cinema-loading-icon"><i class="fas fa-film"></i></div>' +
+                '<div class="cinema-loading-bar-track">' +
+                    '<div class="cinema-loading-bar-fill" id="cinema-loading-bar-fill"></div>' +
+                '</div>' +
+                '<div class="cinema-loading-full-text">电影加载中……</div>' +
             '</div>';
-        _bindTheaterHdListeners();
+        // 双 rAF 确保初始 width:0% 已经上屏，再触发到 100% 的过渡动画
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                var fill = document.getElementById('cinema-loading-bar-fill');
+                if (fill) fill.style.width = '100%';
+            });
+        });
     }
 
-    // ── 聊天消息渲染 ─────────────────────────────────────
+    // ── 聊天消息渲染（带头像，跟主聊天头像来源一致）───────
     function _escapeHtml(s) {
         var d = document.createElement('div');
         d.textContent = s == null ? '' : String(s);
         return d.innerHTML;
     }
+    function _avatarHTML(isPartner) {
+        if (typeof _avEl === 'function') return _avEl(isPartner, 30);
+        return '<span style="font-size:20px;">' + (isPartner ? '🌸' : '🙂') + '</span>';
+    }
     function _msgHTML(msg) {
-        if (msg.type === 'image') {
-            return '<div class="cinema-msg-row"><div class="cinema-msg-img"><img src="' + msg.content + '" alt=""></div></div>';
-        }
-        return '<div class="cinema-msg-row"><div class="cinema-msg-bubble">' + _escapeHtml(msg.content) + '</div></div>';
+        var isPartner = msg.sender === 'partner';
+        var bodyHTML = msg.type === 'image'
+            ? '<div class="cinema-msg-img"><img src="' + msg.content + '" alt=""></div>'
+            : '<div class="cinema-msg-bubble">' + _escapeHtml(msg.content) + '</div>';
+        var avatarHTML = '<div class="cinema-msg-avatar">' + _avatarHTML(isPartner) + '</div>';
+        return '<div class="cinema-msg-row ' + (isPartner ? 'cinema-msg-partner' : 'cinema-msg-mine') + '">' +
+            (isPartner ? avatarHTML + bodyHTML : bodyHTML + avatarHTML) +
+        '</div>';
     }
     function _chatAreaHTML() {
         if (!_cinemaMessages.length) {
@@ -191,17 +208,16 @@
     function _pushMessage(msg) {
         msg.id = Date.now() + Math.random();
         msg.ts = Date.now();
+        msg.sender = msg.sender || 'user';
         _cinemaMessages.push(msg);
         _appendMsgToDOM(msg);
     }
 
     // ── 输入栏（只在 watching 状态渲染）───────────────────
     function _stickerPickerHTML() {
-        return '<div class="sticker-picker-popover" id="cinema-sticker-picker">' +
-            '<div class="combo-tabs-header">' +
-                '<span style="font-size:12px;color:var(--text-secondary);padding:8px 4px;">我的表情</span>' +
-            '</div>' +
-            '<div class="combo-content-area" id="cinema-sticker-grid"></div>' +
+        return '<div class="cinema-sticker-popover" id="cinema-sticker-picker">' +
+            '<div class="cinema-sticker-popover-hd">我的表情</div>' +
+            '<div class="cinema-sticker-grid" id="cinema-sticker-grid"></div>' +
         '</div>';
     }
     function _inputBarHTML() {
@@ -222,23 +238,18 @@
 
         var presets = (typeof CONSTANTS !== 'undefined' && CONSTANTS.REPLY_EMOJIS) ? CONSTANTS.REPLY_EMOJIS : [];
         var customs = (typeof customEmojis !== 'undefined' && customEmojis) ? customEmojis : [];
-        var stickers = (typeof stickerLibrary !== 'undefined' && stickerLibrary) ? stickerLibrary : [];
+        // 用户自己添加的表情库（不是梦角的）
+        var myStickers = (typeof myStickerLibrary !== 'undefined' && myStickerLibrary) ? myStickerLibrary : [];
 
-        if (!presets.length && !customs.length && !stickers.length) {
-            grid.style.display = 'block';
-            grid.innerHTML = '<div style="text-align:center;color:var(--text-secondary);opacity:.5;font-size:12px;padding:24px 10px;">暂无表情，去主聊天页添加你的表情包吧</div>';
+        if (!presets.length && !customs.length && !myStickers.length) {
+            grid.innerHTML = '<div class="cinema-sticker-empty">暂无表情，去主聊天页的"我的表情库"里添加吧</div>';
             return;
         }
 
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
-        grid.style.gap = '8px';
-        grid.style.padding = '10px';
-
         presets.concat(customs).forEach(function (emoji) {
             var item = document.createElement('div');
-            item.className = 'picker-item';
-            item.innerHTML = '<span style="font-size:24px;">' + _escapeHtml(emoji) + '</span>';
+            item.className = 'cinema-sticker-item';
+            item.innerHTML = '<span>' + _escapeHtml(emoji) + '</span>';
             item.onclick = function () {
                 var input = document.getElementById('cinema-input-field');
                 if (input) { input.value += emoji; input.focus(); }
@@ -248,9 +259,9 @@
             grid.appendChild(item);
         });
 
-        stickers.forEach(function (src) {
+        myStickers.forEach(function (src) {
             var item = document.createElement('div');
-            item.className = 'picker-item';
+            item.className = 'cinema-sticker-item';
             item.innerHTML = '<img>';
             var imgEl = item.querySelector('img');
             var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
@@ -260,7 +271,7 @@
                 imgEl.src = src;
             }
             item.onclick = function () {
-                _pushMessage({ type: 'image', content: imgEl.src });
+                _pushMessage({ type: 'image', content: imgEl.src, sender: 'user' });
                 var picker = document.getElementById('cinema-sticker-picker');
                 if (picker) picker.classList.remove('active');
             };
@@ -370,7 +381,7 @@
                     '<div class="cinema-waiting-sub">' + (locked ? '待到观影时间' : '时间已到，可以选片开始了') + '</div>' +
                 '</div>' +
                 '<div class="cinema-appt-card">' +
-                    '<div class="cinema-appt-badge">约定待履行</div>' +
+                    '<div class="cinema-appt-badge">待观影</div>' +
                     '<div class="cinema-appt-movie">' + _escapeHtml(_fakeAppt.movieTitle) + '</div>' +
                     '<div class="cinema-appt-time">' + _fakeAppt.dateStr + '&nbsp;&nbsp;' + _fakeAppt.timeStr + '</div>' +
                     '<div class="cinema-appt-actions">' +
@@ -402,11 +413,12 @@
             _clearWaitTimer();
             _currentVideo.src = URL.createObjectURL(file);
             _currentVideo.title = file.name.replace(/\.[^.]+$/, '');
+            _immersive = true;
             _renderLoading();
             setTimeout(function () {
                 _uiState = 'watching';
                 _cinemaRender();
-            }, 1500);
+            }, 1650);
         });
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
 
@@ -422,19 +434,25 @@
         }
     }
 
-    // ── 渲染：观影中 ─────────────────────────────────────
+    // ── 渲染：观影中（沉浸/嵌入两种视图共用同一套播放器+工具栏+聊天）──
     function _renderWatching() {
         _clearWaitTimer();
-        _enterTheaterMode();
         var panel = _getPanel();
         if (!panel) return;
 
+        if (_immersive) {
+            _enterTheaterMode();
+        } else {
+            _exitTheaterMode();
+        }
+
         var title = _currentVideo.title || _fakeAppt.movieTitle;
+        var headerHTML = _immersive ? _theaterHdHTML() : _hdHTML();
 
         panel.innerHTML =
-            _theaterHdHTML() +
+            headerHTML +
             '<div class="cinema-watch-video-pad">' +
-                '<div class="cinema-player-wrap">' +
+                '<div class="cinema-player-wrap" id="cinema-player-wrap">' +
                     '<video id="cinema-video" class="cinema-video" controls>' +
                         '<source src="' + _currentVideo.src + '" type="video/mp4">' +
                     '</video>' +
@@ -451,7 +469,20 @@
             '</div>' +
             '<input type="file" id="cinema-file-input" accept="video/*" style="display:none;">';
 
-        _bindTheaterHdListeners();
+        if (_immersive) {
+            _bindTheaterHdListeners();
+        } else {
+            var archiveBtn = document.getElementById('cinema-archive-btn');
+            if (archiveBtn) archiveBtn.addEventListener('click', _openArchive);
+            // 嵌入视图下，点视频区域重新进入沉浸模式
+            var wrap = document.getElementById('cinema-player-wrap');
+            if (wrap) {
+                wrap.addEventListener('click', function () {
+                    _immersive = true;
+                    _renderWatching();
+                });
+            }
+        }
 
         document.getElementById('cinema-change-film-btn').addEventListener('click', function () {
             document.getElementById('cinema-file-input').click();

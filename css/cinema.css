@@ -400,6 +400,15 @@
     display: block;
 }
 
+/* ── 观影聊天："正在输入"固定槎位（不随消息列表滚动，永远贴在输入栏上方）── */
+.cinema-typing-fixed {
+    flex-shrink: 0;
+    padding: 0 0 2px;
+}
+.cinema-typing-fixed .cinema-msg-row {
+    padding: 3px 0;
+}
+
 /* ── 观影聊天：表情面板（独立样式，不复用主聊天那套全局类，避免样式冲突）── */
 .cinema-input-bar-wrap {
     position: relative;
@@ -494,7 +503,7 @@
 .cinema-immersive-btn {
     position: absolute;
     right: 8px;
-    bottom: 8px;
+    top: 8px;
     width: 30px;
     height: 30px;
     border-radius: 50%;

@@ -1,7 +1,15 @@
 /**
- * cinema.js — 电影院功能 Step 1 v3
+ * cinema.js — 电影院功能 Step 1 v4
  *
- * 本轮改动（对齐用户反馈）：
+ * 本轮改动（在 v3 基础上）：
+ * 8. 选完片 → 先过一个假的"电影加载中"过渡（~1.5s，spinner+文案），再进播放页
+ * 9. 观影模式（含加载过渡）新增沉浸式头部：返回 / 观影中 / 设置(占位)，
+ *    进入后隐藏外层头像心跳条 + 情侣空间原顶栏，退出后恢复
+ * 10. 观影模式强制暗色主题（用 CSS 变量局部覆盖，不受系统明暗设置影响）
+ * 11. 新头部"返回" = 结束观影(二次确认) + 离开情侣空间；
+ *     原工具栏"结束观影"按钮保留，作用是仅结束观影、留在情侣空间内
+ *
+ * 历史（v3）：
  * 1. 未在播放时（empty / waiting）隐藏底部输入栏，只在 watching 状态显示
  * 2. header 文字/icon 对齐纪念日/心情手账（padding 修正见 cinema.css）
  * 3. waiting 状态：黑框在上、信息卡在下；未到时间前"选择影片并开始"禁用+倒计时；
@@ -81,6 +89,68 @@
                 '<span class="cinema-archive-icon"></span>' +
             '</button>' +
         '</div>';
+    }
+
+    // ── 观影沉浸模式：进入/退出（隐藏外层头像条+顶栏，强制暗色）──
+    function _enterTheaterMode() {
+        var page = document.getElementById('couple-space-page');
+        if (page) page.classList.add('cinema-theater-mode');
+    }
+    function _exitTheaterMode() {
+        var page = document.getElementById('couple-space-page');
+        if (page) page.classList.remove('cinema-theater-mode');
+    }
+
+    // ── 观影模式专属头部：返回 / 观影中 / 设置(占位) ──────
+    function _theaterHdHTML() {
+        return '<div class="cinema-theater-hd">' +
+            '<button class="cs-icon-btn" id="cinema-theater-back-btn" title="返回"><i class="fas fa-chevron-left"></i></button>' +
+            '<span class="cinema-theater-hd-title">观影中</span>' +
+            '<button class="cs-icon-btn" id="cinema-theater-settings-btn" title="设置"><i class="fas fa-cog"></i></button>' +
+        '</div>';
+    }
+    function _bindTheaterHdListeners() {
+        var backBtn = document.getElementById('cinema-theater-back-btn');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                if (!confirm('确定要结束观影吗？')) return;
+                _endWatchingCleanup();
+                _exitTheaterMode();
+                _uiState = 'empty';
+                if (typeof window.closeCoupleSpace === 'function') {
+                    window.closeCoupleSpace();
+                } else {
+                    _cinemaRender();
+                }
+            });
+        }
+        var settingsBtn = document.getElementById('cinema-theater-settings-btn');
+        if (settingsBtn) {
+            // 占位：整个情侣空间的设置，功能后续再接
+            settingsBtn.addEventListener('click', function () {});
+        }
+    }
+
+    // ── 结束观影时的公共清理（释放 blob、清空本次会话消息）────
+    function _endWatchingCleanup() {
+        var video = document.getElementById('cinema-video');
+        if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
+        _currentVideo = { src: '', title: '' };
+        _cinemaMessages = [];
+    }
+
+    // ── 渲染：选片后的假加载过渡（纯视觉，真实读取几乎不耗时）──
+    function _renderLoading() {
+        _enterTheaterMode();
+        var panel = _getPanel();
+        if (!panel) return;
+        panel.innerHTML =
+            _theaterHdHTML() +
+            '<div class="cinema-loading-box">' +
+                '<div class="cinema-loading-spinner"></div>' +
+                '<div class="cinema-loading-text">电影加载中…</div>' +
+            '</div>';
+        _bindTheaterHdListeners();
     }
 
     // ── 聊天消息渲染 ─────────────────────────────────────
@@ -261,6 +331,7 @@
     // ── 渲染：空状态 ────────────────────────────────────
     function _renderEmpty() {
         _clearWaitTimer();
+        _exitTheaterMode();
         var panel = _getPanel();
         if (!panel) return;
 
@@ -284,6 +355,7 @@
 
     // ── 渲染：有约定（等待中）────────────────────────────
     function _renderWaiting() {
+        _exitTheaterMode();
         var panel = _getPanel();
         if (!panel) return;
 
@@ -330,8 +402,11 @@
             _clearWaitTimer();
             _currentVideo.src = URL.createObjectURL(file);
             _currentVideo.title = file.name.replace(/\.[^.]+$/, '');
-            _uiState = 'watching';
-            _cinemaRender();
+            _renderLoading();
+            setTimeout(function () {
+                _uiState = 'watching';
+                _cinemaRender();
+            }, 1500);
         });
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
 
@@ -350,12 +425,14 @@
     // ── 渲染：观影中 ─────────────────────────────────────
     function _renderWatching() {
         _clearWaitTimer();
+        _enterTheaterMode();
         var panel = _getPanel();
         if (!panel) return;
 
         var title = _currentVideo.title || _fakeAppt.movieTitle;
 
         panel.innerHTML =
+            _theaterHdHTML() +
             '<div class="cinema-watch-video-pad">' +
                 '<div class="cinema-player-wrap">' +
                     '<video id="cinema-video" class="cinema-video" controls>' +
@@ -373,6 +450,8 @@
                 _inputBarHTML() +
             '</div>' +
             '<input type="file" id="cinema-file-input" accept="video/*" style="display:none;">';
+
+        _bindTheaterHdListeners();
 
         document.getElementById('cinema-change-film-btn').addEventListener('click', function () {
             document.getElementById('cinema-file-input').click();
@@ -393,10 +472,8 @@
         });
         document.getElementById('cinema-end-btn').addEventListener('click', function () {
             if (!confirm('确定要结束观影吗？')) return;
-            var video = document.getElementById('cinema-video');
-            if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
-            _currentVideo = { src: '', title: '' };
-            _cinemaMessages = [];
+            _endWatchingCleanup();
+            _exitTheaterMode();
             _uiState = 'empty';
             _cinemaRender();
         });

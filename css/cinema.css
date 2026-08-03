@@ -35,34 +35,50 @@
     color: var(--text-primary);
 }
 
-/* ── 选片后的假加载过渡 ──────────────────────────────── */
-.cinema-loading-box {
-    background: #111;
-    border: 2px solid #2a2a2a;
-    border-radius: 6px;
-    margin: 12px 16px;
+/* ── 选片后的假加载过渡：全屏进度条 ──────────────────── */
+.cinema-loading-full {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 46px 20px;
-    min-height: 180px;
+    background: #000;
+    padding: 24px;
 }
-.cinema-loading-spinner {
-    width: 34px;
-    height: 34px;
-    border: 3px solid rgba(255,255,255,0.18);
-    border-top-color: rgba(255,255,255,0.75);
-    border-radius: 50%;
+.cinema-loading-icon {
+    width: 64px;
+    height: 64px;
+    background: #fff;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+}
+.cinema-loading-icon i {
+    font-size: 28px;
+    color: #000;
+}
+.cinema-loading-bar-track {
+    width: 70%;
+    max-width: 260px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    overflow: hidden;
     margin-bottom: 14px;
-    animation: cinemaSpin 0.8s linear infinite;
 }
-@keyframes cinemaSpin {
-    to { transform: rotate(360deg); }
+.cinema-loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: #fff;
+    border-radius: 2px;
+    transition: width 1.5s linear;
 }
-.cinema-loading-text {
+.cinema-loading-full-text {
     font-size: 13px;
-    color: rgba(255,255,255,0.55);
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 1px;
 }
 
 /* ── Tab 图标 ────────────────────────────────────────── */
@@ -341,14 +357,24 @@
     flex-shrink: 0;
 }
 
-/* ── 观影聊天：消息气泡 ──────────────────────────────── */
+/* ── 观影聊天：消息气泡（带头像）─────────────────────── */
 .cinema-msg-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 6px;
     padding: 3px 0;
 }
+.cinema-msg-row.cinema-msg-mine {
+    justify-content: flex-end;
+}
+.cinema-msg-row.cinema-msg-partner {
+    justify-content: flex-start;
+}
+.cinema-msg-avatar {
+    flex-shrink: 0;
+}
 .cinema-msg-bubble {
-    max-width: 72%;
+    max-width: 68%;
     background: var(--accent-color, #7BC8A4);
     color: #fff;
     border-radius: 16px 16px 4px 16px;
@@ -358,8 +384,13 @@
     word-break: break-word;
     white-space: pre-wrap;
 }
+.cinema-msg-partner .cinema-msg-bubble {
+    background: var(--secondary-bg, #f0f0f0);
+    color: var(--text-primary);
+    border-radius: 16px 16px 16px 4px;
+}
 .cinema-msg-img {
-    max-width: 55%;
+    max-width: 50%;
     border-radius: 12px;
     overflow: hidden;
     line-height: 0;
@@ -369,14 +400,73 @@
     display: block;
 }
 
-/* ── 观影聊天：输入栏容器（用于定位表情面板）──────────── */
+/* ── 观影聊天：表情面板（独立样式，不复用主聊天那套全局类，避免样式冲突）── */
 .cinema-input-bar-wrap {
     position: relative;
     flex-shrink: 0;
 }
-.cinema-input-bar-wrap .sticker-picker-popover {
+.cinema-sticker-popover {
+    position: absolute;
     right: 12px;
     bottom: calc(100% + 6px);
+    width: 280px;
+    max-height: 300px;
+    background: var(--secondary-bg, #fff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 20;
+}
+.cinema-sticker-popover.active {
+    display: flex;
+}
+.cinema-sticker-popover-hd {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 10px 12px 6px;
+}
+.cinema-sticker-grid {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 4px 12px 12px;
+}
+.cinema-sticker-item {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    background: var(--primary-bg, rgba(0,0,0,0.03));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+}
+.cinema-sticker-item:active {
+    opacity: 0.7;
+}
+.cinema-sticker-item span {
+    font-size: 22px;
+}
+.cinema-sticker-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.cinema-sticker-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    font-size: 12px;
+    padding: 24px 10px;
 }
 
 /* ── 观影中：播放器（复用与空状态/等待状态一致的黑框）──── */

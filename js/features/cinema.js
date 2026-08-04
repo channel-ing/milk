@@ -43,7 +43,7 @@
     };
 
     // 观影中：当前视频信息（从 waiting 跳转过来时写入）
-    var _currentVideo = { src: '', title: '' };
+    var _currentVideo = { src: '', title: '', type: 'video' }; // type: 'video' | 'bilibili'
 
     // 观影开始时间（纯内存，不用持久化——'watching' 状态本身刷新就会退回 waiting，
     // 见下面 _apptLoad 里的说明，所以这个计时器只在同一次会话里有意义）
@@ -197,6 +197,7 @@
     var _videoLoadToken = 0;
     function _watchVideoLoad(videoEl) {
         if (!videoEl) return;
+        if (videoEl.tagName === 'IFRAME') return; // B站iframe是黑盒，跨域拿不到加载状态，没法检测
         var myToken = ++_videoLoadToken;
         var resolved = false;
         function isCurrent() { return myToken === _videoLoadToken; }
@@ -222,6 +223,7 @@
     }
 
     // ── 选择影片来源：本地文件 / 输入直连网址，选完统一走 onPicked(src, title) 回调 ──
+    // onPicked(src, title, type) —— type: 'video'(默认，走<video>播放) | 'bilibili'(走iframe嵌入)
     function _openVideoSourceModal(onPicked) {
         var old = document.getElementById('cinema-source-modal');
         if (old) old.remove();
@@ -243,6 +245,8 @@
                 '<div id="cinema-source-url-section" style="display:none;">' +
                     '<div class="cinema-invite-label">视频直链</div>' +
                     '<input type="text" class="cinema-invite-input" id="cinema-source-url-input" placeholder="https://…">' +
+                    '<div class="cinema-invite-label">B站链接</div>' +
+                    '<input type="text" class="cinema-invite-input" id="cinema-source-bili-input" placeholder="粘贴B站视频链接或BV号">' +
                     '<div class="cinema-invite-error" id="cinema-source-url-error"></div>' +
                     '<div class="cinema-invite-actions">' +
                         '<button class="cinema-invite-cancel" id="cinema-source-url-cancel">取消</button>' +
@@ -270,7 +274,7 @@
             var src = URL.createObjectURL(file);
             var title = file.name.replace(/\.[^.]+$/, '');
             close();
-            onPicked(src, title);
+            onPicked(src, title, 'video');
         });
 
         document.getElementById('cinema-source-local').addEventListener('click', function () {
@@ -281,10 +285,24 @@
         });
         document.getElementById('cinema-source-url-cancel').addEventListener('click', close);
         document.getElementById('cinema-source-url-confirm').addEventListener('click', function () {
-            var urlInput = document.getElementById('cinema-source-url-input');
             var errorEl = document.getElementById('cinema-source-url-error');
-            var url = urlInput.value.trim();
             errorEl.textContent = '';
+
+            // 优先看B站链接这一栏有没有填——两栏都填了就以B站为准
+            var biliInput = document.getElementById('cinema-source-bili-input');
+            var biliVal = biliInput.value.trim();
+            if (biliVal) {
+                var bvMatch = /BV[0-9A-Za-z]{10}/.exec(biliVal);
+                if (!bvMatch) { errorEl.textContent = '没找到有效的BV号，检查一下链接格式'; return; }
+                var bvid = bvMatch[0];
+                var embedSrc = 'https://player.bilibili.com/player.html?bvid=' + bvid + '&page=1&high_quality=1&danmaku=0';
+                close();
+                onPicked(embedSrc, 'B站视频', 'bilibili');
+                return;
+            }
+
+            var urlInput = document.getElementById('cinema-source-url-input');
+            var url = urlInput.value.trim();
             if (!url) { errorEl.textContent = '填一下视频链接吧'; return; }
             if (!/^https?:\/\//i.test(url)) { errorEl.textContent = '链接格式不对，得是 http:// 或 https:// 开头'; return; }
             var titleGuess = '网络视频';
@@ -294,9 +312,10 @@
                 if (last) titleGuess = decodeURIComponent(last.replace(/\.[^.]+$/, ''));
             } catch (e) { /* 解析失败就用默认标题，不影响功能 */ }
             close();
-            onPicked(url, titleGuess);
+            onPicked(url, titleGuess, 'video');
         });
     }
+
 
     // 本次观影会话的聊天记录（内存态，结束观影时清空）
     var _cinemaMessages = [];
@@ -1039,10 +1058,11 @@
         var startBtn = document.getElementById('cinema-start-btn');
         if (startBtn && !locked) {
             startBtn.addEventListener('click', function () {
-                _openVideoSourceModal(function (src, title) {
+                _openVideoSourceModal(function (src, title, type) {
                     _clearWaitTimer();
                     _currentVideo.src = src;
                     _currentVideo.title = title;
+                    _currentVideo.type = type || 'video';
                     _immersive = true;
                     _renderLoading();
                     setTimeout(function () {
@@ -1085,14 +1105,19 @@
 
         var title = _currentVideo.title || _fakeAppt.movieTitle;
         var headerHTML = _immersive ? _theaterHdHTML() : _hdHTML();
+        var isBili = _currentVideo.type === 'bilibili';
+        var playerHTML = isBili
+            ? '<iframe id="cinema-video" class="cinema-video cinema-video-iframe" src="' + _currentVideo.src + '" ' +
+                  'scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>'
+            : '<video id="cinema-video" class="cinema-video" controls playsinline webkit-playsinline>' +
+                  '<source src="' + _currentVideo.src + '" type="video/mp4">' +
+              '</video>';
 
         panel.innerHTML =
             headerHTML +
             '<div class="cinema-watch-video-pad">' +
                 '<div class="cinema-player-wrap" id="cinema-player-wrap">' +
-                    '<video id="cinema-video" class="cinema-video" controls playsinline webkit-playsinline>' +
-                        '<source src="' + _currentVideo.src + '" type="video/mp4">' +
-                    '</video>' +
+                    playerHTML +
                     (_immersive ? '' :
                         '<button class="cinema-immersive-btn" id="cinema-immersive-btn" title="进入沉浸模式">' +
                             '<i class="fas fa-expand"></i>' +
@@ -1138,16 +1163,17 @@
         _watchVideoLoad(videoEl);
 
         document.getElementById('cinema-change-film-btn').addEventListener('click', function () {
-            _openVideoSourceModal(function (src, title) {
+            _openVideoSourceModal(function (src, title, type) {
                 var video = document.getElementById('cinema-video');
-                var titleEl = document.getElementById('cinema-watch-title');
-                if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
+                if (video && video.tagName === 'VIDEO' && video.src && video.src.indexOf('blob:') === 0) {
+                    URL.revokeObjectURL(video.src);
+                }
                 _currentVideo.src = src;
                 _currentVideo.title = title;
-                video.src = src;
-                video.play();
-                if (titleEl) titleEl.textContent = title;
-                _watchVideoLoad(video);
+                _currentVideo.type = type || 'video';
+                // 换片可能是"普通视频→B站"或反过来，标签本身不一样(<video>↔<iframe>)，
+                // 没法直接改 src 了事，干脆整个面板重渲染一次，简单可靠
+                _renderWatching();
             });
         });
         document.getElementById('cinema-end-btn').addEventListener('click', function () {
@@ -2278,6 +2304,24 @@
     // 不用真的填个坏链接，直接看一眼"视频加载失败"弹窗长什么样
     window._cinemaDebugShowVideoError = function () {
         _showVideoLoadErrorModal();
+    };
+    // 跳过弹窗，直接用B站iframe进入观影中状态，测试嵌入播放效果（bvid可选，默认用一个示例BV号）
+    window._cinemaDebugStartBilibili = function (bvid) {
+        bvid = bvid || 'BV1xx4l1c7mD';
+        _clearWaitTimer();
+        if (_showtimeReminderTimer) { clearTimeout(_showtimeReminderTimer); _showtimeReminderTimer = null; }
+        _currentVideo.src = 'https://player.bilibili.com/player.html?bvid=' + bvid + '&page=1&high_quality=1&danmaku=0';
+        _currentVideo.title = 'B站视频';
+        _currentVideo.type = 'bilibili';
+        _immersive = true;
+        _uiState = 'watching';
+        _watchStartedAt = Date.now();
+        window._cinemaWatching = true;
+        _apptSave();
+        _cinemaSendWatchEvent(true);
+        _scheduleWatchAutoEnd();
+        if (_getPanel()) _cinemaRender();
+        console.log('[cinema] 已用B站iframe进入观影中状态，bvid=' + bvid);
     };
     // 跳过邀请/等待/选片，直接进入观影中状态（走完整流程：记开始时间、
     // 发"观影已开始"事件、启动6~8小时自动结束定时器），方便测试

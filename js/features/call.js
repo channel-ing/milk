@@ -709,6 +709,7 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
 
     function showIncomingCall() {
         if (!S.enabled || S.active) return;
+        if (window._cinemaWatching) return; // 观影中不弹视频通话邀请
         const ov = document.getElementById('call-incoming-overlay');
         if (!ov) return;
         fillAv('call-inc-avatar'); fillNm('call-inc-name');

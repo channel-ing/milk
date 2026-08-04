@@ -689,7 +689,8 @@
         var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
         var emptyText = negoActive ? ('邀请已发出，等' + _escapeHtml(partnerName) + '回主聊天里的消息～') : '还没有约定观影';
         var btnHtml = negoActive
-            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待' + _escapeHtml(partnerName) + '回复中…</button>'
+            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待' + _escapeHtml(partnerName) + '回复中…</button>' +
+              '<button class="cinema-cancel-invite-btn" id="cinema-cancel-invite-btn">取消邀请</button>'
             : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请' + _escapeHtml(partnerName) + '一起观影</button>';
 
         panel.innerHTML =
@@ -700,11 +701,12 @@
                     '<div class="cinema-empty-text">' + emptyText + '</div>' +
                 '</div>' +
                 btnHtml +
-                _chatAreaHTML() +
             '</div>';
 
         if (!negoActive) {
             document.getElementById('cinema-invite-btn').addEventListener('click', _openInviteSheet);
+        } else {
+            document.getElementById('cinema-cancel-invite-btn').addEventListener('click', _negoCancelInvite);
         }
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
     }
@@ -735,7 +737,6 @@
                     '</div>' +
                     (locked ? '<div class="cinema-appt-countdown">' + _countdownText() + '后可选择影片</div>' : '') +
                 '</div>' +
-                _chatAreaHTML() +
             '</div>' +
             '<input type="file" id="cinema-waiting-file-input" accept="video/*" style="display:none;">';
 
@@ -1532,6 +1533,12 @@
         _uiState = 'waiting';
         _apptSave();
         _cinemaSendInviteCard('accepted', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        _negoClear();
+        if (_getPanel()) _cinemaRender();
+    }
+
+    // 电影院tab里"取消邀请"按钮：直接撤回，不等梦角回复了
+    function _negoCancelInvite() {
         _negoClear();
         if (_getPanel()) _cinemaRender();
     }

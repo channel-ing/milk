@@ -395,13 +395,31 @@
     }
     function _msgHTML(msg) {
         var isPartner = msg.sender === 'partner';
-        var bodyHTML = msg.type === 'image'
-            ? '<div class="cinema-msg-img"><img src="' + msg.content + '" alt=""></div>'
-            : '<div class="cinema-msg-bubble">' + _escapeHtml(msg.content) + '</div>';
+        var bodyHTML;
+        if (msg.type === 'image') {
+            var isCloudRef = window.CloudMedia && typeof window.CloudMedia.isCloudRef === 'function' && window.CloudMedia.isCloudRef(msg.content);
+            // 云端引用（oss://...）不是真实可加载的图片地址，不能直接塞进 src，
+            // 否则浏览器会报 net::ERR_UNKNOWN_URL_SCHEME —— 要走 CloudMedia.bindLazyImage
+            // 解析成真实签名 URL 后再显示（跟主聊天图片消息用的是同一套机制）
+            bodyHTML = isCloudRef
+                ? '<div class="cinema-msg-img"><img data-cinema-cloud-ref="' + _escapeHtml(msg.content) + '" alt=""></div>'
+                : '<div class="cinema-msg-img"><img src="' + msg.content + '" alt=""></div>';
+        } else {
+            bodyHTML = '<div class="cinema-msg-bubble">' + _escapeHtml(msg.content) + '</div>';
+        }
         var avatarHTML = '<div class="cinema-msg-avatar">' + _avatarHTML(isPartner) + '</div>';
         return '<div class="cinema-msg-row ' + (isPartner ? 'cinema-msg-partner' : 'cinema-msg-mine') + '">' +
             (isPartner ? avatarHTML + bodyHTML : bodyHTML + avatarHTML) +
         '</div>';
+    }
+    // 扫描容器里带 data-cinema-cloud-ref 的图片，用 CloudMedia 解析成真实 URL
+    function _bindCinemaCloudImages(container) {
+        if (!container || !window.CloudMedia || typeof window.CloudMedia.bindLazyImage !== 'function') return;
+        container.querySelectorAll('img[data-cinema-cloud-ref]').forEach(function (imgEl) {
+            var ref = imgEl.getAttribute('data-cinema-cloud-ref');
+            imgEl.removeAttribute('data-cinema-cloud-ref');
+            window.CloudMedia.bindLazyImage(imgEl, ref);
+        });
     }
     function _chatAreaHTML() {
         if (!_cinemaMessages.length) {
@@ -423,7 +441,9 @@
         if (emptyEl) emptyEl.remove();
         var tmp = document.createElement('div');
         tmp.innerHTML = _msgHTML(msg);
-        area.appendChild(tmp.firstChild);
+        var newEl = tmp.firstChild;
+        area.appendChild(newEl);
+        _bindCinemaCloudImages(newEl);
         area.scrollTop = area.scrollHeight;
     }
     function _pushMessage(msg) {
@@ -857,6 +877,7 @@
         if (_uiState === 'empty')        _renderEmpty();
         else if (_uiState === 'waiting') _renderWaiting();
         else if (_uiState === 'watching')_renderWatching();
+        _bindCinemaCloudImages(_getPanel());
     }
 
     // ── 档案页 ───────────────────────────────────────────

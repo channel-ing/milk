@@ -190,6 +190,24 @@
     opacity: 0.7;
 }
 .cinema-invite-btn:disabled:active { transform: none; }
+.cinema-cancel-invite-btn {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border-color, #ddd);
+    color: var(--text-secondary, #888);
+    border-radius: 50px;
+    padding: 10px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    margin: 8px 0 4px;
+}
+.cinema-cancel-invite-btn:active {
+    opacity: 0.7;
+    transform: scale(0.97);
+}
 
 /* ── 等待中（黑框内展示已选片名 + 锁定态提示） ─────────── */
 .cinema-waiting-icon {

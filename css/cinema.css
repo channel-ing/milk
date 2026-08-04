@@ -1256,6 +1256,14 @@
     color: #fff;
     box-shadow: 0 4px 10px rgba(var(--accent-color-rgb, 123,200,164), 0.4);
 }
+.cinema-invite-card-btn--decline {
+    background: rgba(60,54,38,0.06);
+    color: #8a8168;
+}
+.cinema-invite-card-actions--three .cinema-invite-card-btn {
+    font-size: 11px;
+    padding: 9px 0;
+}
 .cinema-invite-card-btn:active { opacity: 0.85; transform: scale(0.96); }
 .cinema-invite-card-status {
     position: relative;
@@ -1276,6 +1284,54 @@
     color: #9a8f78;
     background: rgba(60,54,38,0.06);
 }
+.cinema-invite-card-status--declined {
+    color: #9a8f78;
+    background: rgba(60,54,38,0.06);
+}
+
+/* ── 电影院tab内直接回应面板：轮到用户回应梦角的提议时显示 ── */
+.cinema-invite-response-card {
+    background: var(--secondary-bg, #fff);
+    border: 1px solid var(--border-color, #eee);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 8px 0;
+}
+.cinema-invite-response-time {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+}
+.cinema-invite-response-actions {
+    display: flex;
+    gap: 8px;
+}
+.cinema-invite-resp-btn {
+    flex: 1;
+    padding: 11px 0;
+    border: none;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+.cinema-invite-resp-btn--decline {
+    background: var(--primary-bg, #f0f0f0);
+    color: var(--text-secondary, #888);
+}
+.cinema-invite-resp-btn--secondary {
+    background: rgba(var(--accent-color-rgb, 123,200,164), 0.12);
+    color: var(--accent-color, #5c9c7c);
+}
+.cinema-invite-resp-btn--primary {
+    background: var(--accent-color, #7BC8A4);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(var(--accent-color-rgb, 123,200,164), 0.35);
+}
+.cinema-invite-resp-btn:active { opacity: 0.85; transform: scale(0.96); }
 
 /* 小红点：电影院tab图标 + 主聊天头部"情侣空间"入口，提醒有邀请等你回应 */
 .cinema-invite-dot {

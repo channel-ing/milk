@@ -1137,10 +1137,13 @@
 .cinema-confirm-cancel:active, .cinema-confirm-ok:active { opacity: 0.8; transform: scale(0.97); }
 
 /* ── 主聊天里的电影邀请卡（由梦角发出）───────────────── */
-.cinema-invite-msg-wrap {
-    display: block;
-    flex-shrink: 0;
-    margin: 4px 0;
+/* .cinema-invite-msg-wrap 现在只是挂在真正的 .message-wrapper 上的一个标记类，
+   不需要额外样式——display:flex、flex-shrink:0、左右镜像这些全部靠
+   .message-wrapper / .message-wrapper.sent / .message-wrapper.received 本身提供 */
+.cinema-invite-msg-wrap .message-avatar img,
+.cinema-invite-msg-wrap .message-avatar span {
+    width: 100% !important;
+    height: 100% !important;
 }
 .cinema-invite-card {
     position: relative;

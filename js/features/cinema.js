@@ -101,13 +101,14 @@
         var defaultTime = String(later.getHours()).padStart(2, '0') + ':' + String(later.getMinutes()).padStart(2, '0');
         var minDate = defaultDate; // 日期选择器不能选比今天更早的日期
 
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
         var sheet = document.createElement('div');
         sheet.id = 'cinema-invite-sheet';
         sheet.className = 'cinema-invite-sheet';
         sheet.innerHTML =
             '<div class="cinema-invite-mask" id="cinema-invite-mask"></div>' +
             '<div class="cinema-invite-body">' +
-                '<div class="cinema-invite-title">邀请梦角一起观影</div>' +
+                '<div class="cinema-invite-title">邀请' + _escapeHtml(partnerName) + '一起观影</div>' +
                 '<div class="cinema-invite-label">片名</div>' +
                 '<input type="text" class="cinema-invite-input" id="cinema-invite-movie" maxlength="40" placeholder="想看什么电影？">' +
                 '<div class="cinema-invite-label">日期</div>' +
@@ -115,7 +116,7 @@
                 '<div class="cinema-invite-label">时间</div>' +
                 '<input type="time" class="cinema-invite-input" id="cinema-invite-time" value="' + defaultTime + '">' +
                 '<div class="cinema-invite-error" id="cinema-invite-error"></div>' +
-                '<div class="cinema-invite-hint">梦角还没学会拒绝，一邀请就会同意～</div>' +
+                '<div class="cinema-invite-hint">发出后' + _escapeHtml(partnerName) + '会在主聊天回复你，可能会提议换个时间～</div>' +
                 '<div class="cinema-invite-actions">' +
                     '<button class="cinema-invite-cancel" id="cinema-invite-cancel">取消</button>' +
                     '<button class="cinema-invite-confirm" id="cinema-invite-confirm">确定邀请</button>' +
@@ -685,10 +686,11 @@
         if (!panel) return;
 
         var negoActive = !!(_negoState && _negoState.active);
-        var emptyText = negoActive ? '邀请已发出，等梦角回主聊天里的消息～' : '还没有约定观影';
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
+        var emptyText = negoActive ? ('邀请已发出，等' + _escapeHtml(partnerName) + '回主聊天里的消息～') : '还没有约定观影';
         var btnHtml = negoActive
-            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待梦角回复中…</button>'
-            : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请梦角一起观影</button>';
+            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待' + _escapeHtml(partnerName) + '回复中…</button>'
+            : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请' + _escapeHtml(partnerName) + '一起观影</button>';
 
         panel.innerHTML =
             _hdHTML() +
@@ -1317,9 +1319,10 @@
         var data = msg.cinemaInviteData || {};
         var state = data.state || 'countered';
         var isUser = state === 'pending'; // 只有"发出邀请"这个状态是用户说的话，其余都是梦角的回复
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
         var actionsHtml;
         if (state === 'pending') {
-            actionsHtml = '<div class="cinema-invite-card-status">等待梦角回复中…</div>';
+            actionsHtml = '<div class="cinema-invite-card-status">等待' + _escapeHtml(partnerName) + '回复中…</div>';
         } else if (state === 'accepted') {
             actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--ok">🎉 约定成功</div>';
         } else {

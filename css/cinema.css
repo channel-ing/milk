@@ -1137,18 +1137,8 @@
 .cinema-confirm-cancel:active, .cinema-confirm-ok:active { opacity: 0.8; transform: scale(0.97); }
 
 /* ── 主聊天里的电影邀请卡（由梦角发出）───────────────── */
-/* 普通消息是"头像+气泡"横向并排（row/row-reverse），但这张卡想要头像在上、
-   卡片在下的纵向排列，所以这里改写 flex-direction，覆盖 .message-wrapper.sent/
-   .received 原本的 row/row-reverse。选择器凑够两个 class，跟被覆盖的规则
-   specificity 打平，靠 cinema.css 后加载的顺序赢。 */
-.message-wrapper.cinema-invite-msg-wrap {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-}
-.message-wrapper.cinema-invite-msg-wrap.sent {
-    align-items: flex-end;
-}
+/* 不再单独覆盖 flex-direction —— 直接用 .message-wrapper.sent/.received
+   原本的 row/row-reverse，头像跟卡片横向并排，跟普通消息完全一样 */
 .cinema-invite-msg-wrap .message-avatar img,
 .cinema-invite-msg-wrap .message-avatar span {
     width: 100% !important;

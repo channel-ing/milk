@@ -142,15 +142,8 @@
                 errorEl.textContent = '约的时间不能早于现在，改一下吧';
                 return;
             }
-            _fakeAppt = {
-                movieTitle: movieVal,
-                dateStr: (+dm[1]) + '年' + (+dm[2]) + '月' + (+dm[3]) + '日',
-                timeStr: timeVal
-            };
-            _uiState = 'waiting';
-            _apptSave();
             close();
-            _cinemaRender();
+            _negoStartRound(movieVal, (+dm[1]) + '年' + (+dm[2]) + '月' + (+dm[3]) + '日', timeVal, 1);
         });
     }
 
@@ -691,18 +684,26 @@
         var panel = _getPanel();
         if (!panel) return;
 
+        var negoActive = !!(_negoState && _negoState.active);
+        var emptyText = negoActive ? '邀请已发出，等梦角回主聊天里的消息～' : '还没有约定观影';
+        var btnHtml = negoActive
+            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待梦角回复中…</button>'
+            : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请梦角一起观影</button>';
+
         panel.innerHTML =
             _hdHTML() +
             '<div class="cinema-body">' +
                 '<div class="cinema-screen-wrap">' +
                     '<div class="cinema-empty-icon"><i class="fas fa-film"></i></div>' +
-                    '<div class="cinema-empty-text">还没有约定观影</div>' +
+                    '<div class="cinema-empty-text">' + emptyText + '</div>' +
                 '</div>' +
-                '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请梦角一起观影</button>' +
+                btnHtml +
                 _chatAreaHTML() +
             '</div>';
 
-        document.getElementById('cinema-invite-btn').addEventListener('click', _openInviteSheet);
+        if (!negoActive) {
+            document.getElementById('cinema-invite-btn').addEventListener('click', _openInviteSheet);
+        }
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
     }
 
@@ -1271,7 +1272,7 @@
     // ── 对外暴露 ─────────────────────────────────────────
     window._cinemaInit = function () {
         _bindOutsideClickOnce();
-        _apptLoad().then(function () {
+        Promise.all([_apptLoad(), _negoLoad()]).then(function () {
             _cinemaRender();
         });
     };
@@ -1306,23 +1307,35 @@
     // 完全不用改 core.js。
     var CINEMA_INVITE_BG = 'assets/cinema/invite-card-bg.svg';
 
+    // 卡片有三种状态：
+    //   pending   —— 用户刚发出的邀请，等梦角回复，没有按钮
+    //   countered —— 梦角提议了新时间，等用户选择，"更换时间"/"接受邀请"两个按钮
+    //   accepted  —— 最终同意，没有按钮，显示"约定成功"
     function _cinemaInviteCardFragment(msg) {
         var data = msg.cinemaInviteData || {};
-        var primaryText = data.primaryText || '接受邀请';
-        var secondaryText = data.secondaryText || '更换时间';
+        var state = data.state || 'countered';
+        var actionsHtml;
+        if (state === 'pending') {
+            actionsHtml = '<div class="cinema-invite-card-status">等待梦角回复中…</div>';
+        } else if (state === 'accepted') {
+            actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--ok">🎉 约定成功</div>';
+        } else {
+            actionsHtml =
+                '<div class="cinema-invite-card-actions">' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="reschedule">更换时间</button>' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">接受邀请</button>' +
+                '</div>';
+        }
         var fragment = new DocumentFragment();
         var wrap = document.createElement('div');
         wrap.className = 'message message-received message-image-bubble-none cinema-invite-msg-wrap';
         wrap.dataset.id = msg.id;
         wrap.innerHTML =
-            '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.apptId || '')) + '">' +
+            '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.negoId || '')) + '">' +
                 '<img class="cinema-invite-card-bg" src="' + CINEMA_INVITE_BG + '" alt="">' +
                 '<div class="cinema-invite-card-movie">' + _escapeHtml(data.movieTitle || '') + '</div>' +
                 '<div class="cinema-invite-card-time">' + _escapeHtml((data.dateStr || '') + '  ' + (data.timeStr || '')) + '</div>' +
-                '<div class="cinema-invite-card-actions">' +
-                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="reschedule">' + _escapeHtml(secondaryText) + '</button>' +
-                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">' + _escapeHtml(primaryText) + '</button>' +
-                '</div>' +
+                actionsHtml +
             '</div>';
         fragment.appendChild(wrap);
         return fragment;
@@ -1347,8 +1360,8 @@
     }
     _hookCreateMessageFragment();
 
-    // ── 调试专用：往主聊天发一张测试邀请卡，方便先看卡片效果 ──
-    window._cinemaDebugSendInviteCard = function (movieTitle, dateStr, timeStr) {
+    // 真正把卡片发到主聊天（跟 envelope.js 一样直接裸调用 addMessage，不用改 core.js）
+    function _cinemaSendInviteCard(state, movieTitle, dateStr, timeStr, negoId) {
         if (typeof addMessage !== 'function') {
             console.warn('[cinema] addMessage 不可用，无法发送邀请卡');
             return;
@@ -1360,18 +1373,246 @@
             timestamp: new Date(),
             status: 'received',
             type: 'cinema-invite',
-            cinemaInviteData: {
-                apptId: 'debug-' + Date.now(),
-                movieTitle: movieTitle || '阿嫊的情书',
-                dateStr: dateStr || '2026年8月3日',
-                timeStr: timeStr || '20:30',
-                primaryText: '接受邀请',
-                secondaryText: '更换时间'
-            },
+            cinemaInviteData: { state: state, movieTitle: movieTitle, dateStr: dateStr, timeStr: timeStr, negoId: negoId },
             favorited: false,
             note: null
         });
-        console.log('[cinema] 测试邀请卡已发送到主聊天');
+    }
+
+    // ── 邀请协商状态：持久化，跟 tab 开不开无关，app 一启动就会检查 ──
+    var _negoState = null; // null=没有进行中的协商；否则见下面结构
+    var _negoLoaded = false;
+    var _negoStorageKey = null;
+    var _negoReplyTimer = null;
+
+    async function _negoGetKey() {
+        if (_negoStorageKey) return _negoStorageKey;
+        try {
+            var allKeys = await localforage.keys();
+            var found = allKeys.find(function (k) { return k.indexOf('_cinemaNego') !== -1; });
+            if (found) { _negoStorageKey = found; return found; }
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            _negoStorageKey = prefix + '_cinemaNego';
+        } catch (e) {
+            _negoStorageKey = 'CHAT_APP_V3__cinemaNego';
+        }
+        return _negoStorageKey;
+    }
+    async function _negoLoad() {
+        if (_negoLoaded) return;
+        _negoLoaded = true;
+        try {
+            var key = await _negoGetKey();
+            var saved = await localforage.getItem(key);
+            if (saved && typeof saved === 'object') _negoState = saved;
+        } catch (e) { console.warn('[cinema] 协商状态加载失败:', e); }
+    }
+    async function _negoSave() {
+        try {
+            var key = await _negoGetKey();
+            await localforage.setItem(key, _negoState);
+        } catch (e) { console.warn('[cinema] 协商状态保存失败:', e); }
+    }
+    async function _negoClear() {
+        _negoState = null;
+        if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        try {
+            var key = await _negoGetKey();
+            await localforage.removeItem(key);
+        } catch (e) { console.warn('[cinema] 协商状态清除失败:', e); }
+    }
+
+    // 第几次回复对应的"梦角同意"概率：第1次70%，第2次90%，第3次及以后100%
+    function _negoAcceptProbability(replyIndex) {
+        if (replyIndex <= 1) return 0.7;
+        if (replyIndex === 2) return 0.9;
+        return 1;
+    }
+
+    // 生成梦角的"换时间"提议：在基准时间前后 2~3 小时内随机取一个点，尽量取整（round 到最近的半小时）
+    function _negoGenerateCounterTime(dateStr, timeStr) {
+        var m = /(\d+)年(\d+)月(\d+)日/.exec(dateStr || '');
+        var t = /(\d+):(\d+)/.exec(timeStr || '');
+        var base = (m && t) ? new Date(+m[1], +m[2] - 1, +m[3], +t[1], +t[2], 0, 0) : new Date(Date.now() + 3600000);
+        var offsetHours = 2 + Math.random(); // 2~3 小时
+        var sign = Math.random() < 0.5 ? -1 : 1;
+        var newTime = new Date(base.getTime() + sign * offsetHours * 3600000);
+        // 取整到最近的半小时
+        var minutes = newTime.getMinutes();
+        var roundedMinutes = minutes < 15 ? 0 : (minutes < 45 ? 30 : 60);
+        newTime.setMinutes(0, 0, 0);
+        if (roundedMinutes === 60) newTime.setHours(newTime.getHours() + 1);
+        else newTime.setMinutes(roundedMinutes);
+        // 保底：不能早于现在，否则往后推到最近的下一个整/半小时
+        if (newTime.getTime() <= Date.now()) {
+            newTime = new Date(Date.now() + 3600000);
+            var mm = newTime.getMinutes();
+            newTime.setMinutes(0, 0, 0);
+            if (mm > 30) newTime.setHours(newTime.getHours() + 1);
+            else newTime.setMinutes(30);
+        }
+        return {
+            dateStr: newTime.getFullYear() + '年' + (newTime.getMonth() + 1) + '月' + newTime.getDate() + '日',
+            timeStr: String(newTime.getHours()).padStart(2, '0') + ':' + String(newTime.getMinutes()).padStart(2, '0')
+        };
+    }
+
+    // 开始新一轮协商（用户主动邀请，或者用户换时间后重新提议）—— 发"等待中"卡 + 排定梦角的定时回复
+    function _negoStartRound(movieTitle, dateStr, timeStr, replyIndex) {
+        var negoId = 'nego-' + Date.now();
+        _negoState = {
+            active: true,
+            replyIndex: replyIndex, // 这是梦角接下来要做的第几次回复
+            movieTitle: movieTitle,
+            dateStr: dateStr,
+            timeStr: timeStr,
+            replyDueAt: Date.now() + (2 + Math.random() * 3) * 60000, // 2~5 分钟后
+            negoId: negoId
+        };
+        _negoSave();
+        _cinemaSendInviteCard('pending', movieTitle, dateStr, timeStr, negoId);
+        if (typeof showNotification === 'function') showNotification('邀请已发出', 'success');
+        _negoScheduleReply();
+    }
+
+    function _negoScheduleReply() {
+        if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        if (!_negoState || !_negoState.active) return;
+        var delay = _negoState.replyDueAt - Date.now();
+        if (delay <= 0) { _negoResolveReply(); return; }
+        _negoReplyTimer = setTimeout(_negoResolveReply, delay);
+    }
+
+    function _negoResolveReply() {
+        if (!_negoState || !_negoState.active) return;
+        var accept = Math.random() < _negoAcceptProbability(_negoState.replyIndex);
+        if (accept) {
+            _fakeAppt = { movieTitle: _negoState.movieTitle, dateStr: _negoState.dateStr, timeStr: _negoState.timeStr };
+            _uiState = 'waiting';
+            _apptSave();
+            _cinemaSendInviteCard('accepted', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+            _negoClear();
+            if (_getPanel()) _cinemaRender();
+        } else {
+            var newTime = _negoGenerateCounterTime(_negoState.dateStr, _negoState.timeStr);
+            _negoState.dateStr = newTime.dateStr;
+            _negoState.timeStr = newTime.timeStr;
+            _negoState.active = true;
+            // replyIndex 不变——它代表"梦角刚做的这次回复是第几次"，用户看到后如果换时间，
+            // 下一次梦角回复时 replyIndex 才 +1（见 reschedule 按钮的处理）
+            _negoSave();
+            _cinemaSendInviteCard('countered', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        }
+    }
+
+    // 卡片按钮：接受梦角提议的时间
+    function _negoAcceptCountered() {
+        if (!_negoState || !_negoState.active) return;
+        _fakeAppt = { movieTitle: _negoState.movieTitle, dateStr: _negoState.dateStr, timeStr: _negoState.timeStr };
+        _uiState = 'waiting';
+        _apptSave();
+        _cinemaSendInviteCard('accepted', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        _negoClear();
+        if (_getPanel()) _cinemaRender();
+    }
+
+    // 卡片按钮：用户不想要梦角提议的时间，自己重新选一个（打开居中弹窗）
+    function _negoOpenRescheduleModal() {
+        if (!_negoState || !_negoState.active) return;
+        var old = document.getElementById('cinema-reschedule-modal');
+        if (old) old.remove();
+        var now = new Date();
+        var defaultDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        var later = new Date(now.getTime() + 3600000);
+        var defaultTime = String(later.getHours()).padStart(2, '0') + ':' + String(later.getMinutes()).padStart(2, '0');
+
+        var modal = document.createElement('div');
+        modal.id = 'cinema-reschedule-modal';
+        modal.className = 'cinema-invite-sheet';
+        modal.innerHTML =
+            '<div class="cinema-invite-mask" id="cinema-reschedule-mask"></div>' +
+            '<div class="cinema-invite-body">' +
+                '<div class="cinema-invite-title">换个时间</div>' +
+                '<div class="cinema-invite-label">日期</div>' +
+                '<input type="date" class="cinema-invite-input" id="cinema-reschedule-date" min="' + defaultDate + '" value="' + defaultDate + '">' +
+                '<div class="cinema-invite-label">时间</div>' +
+                '<input type="time" class="cinema-invite-input" id="cinema-reschedule-time" value="' + defaultTime + '">' +
+                '<div class="cinema-invite-error" id="cinema-reschedule-error"></div>' +
+                '<div class="cinema-invite-actions">' +
+                    '<button class="cinema-invite-cancel" id="cinema-reschedule-cancel">取消</button>' +
+                    '<button class="cinema-invite-confirm" id="cinema-reschedule-confirm">发出新时间</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        function close() { modal.remove(); }
+        document.getElementById('cinema-reschedule-mask').addEventListener('click', close);
+        document.getElementById('cinema-reschedule-cancel').addEventListener('click', close);
+        document.getElementById('cinema-reschedule-confirm').addEventListener('click', function () {
+            var dateVal = document.getElementById('cinema-reschedule-date').value;
+            var timeVal = document.getElementById('cinema-reschedule-time').value;
+            var errorEl = document.getElementById('cinema-reschedule-error');
+            var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateVal || '');
+            var tm = /^(\d{2}):(\d{2})$/.exec(timeVal || '');
+            if (!dm || !tm) return;
+            var picked = new Date(+dm[1], +dm[2] - 1, +dm[3], +tm[1], +tm[2], 0, 0);
+            if (picked.getTime() <= Date.now()) {
+                errorEl.textContent = '约的时间不能早于现在，改一下吧';
+                return;
+            }
+            var newDateStr = (+dm[1]) + '年' + (+dm[2]) + '月' + (+dm[3]) + '日';
+            var newTimeStr = timeVal;
+            close();
+            // 用户重新提议时间 → 梦角下一次回复的"第几次"要 +1（比如梦角第1次换时间后，
+            // 用户重选，梦角第2次回复概率是90%）
+            var nextReplyIndex = (_negoState ? _negoState.replyIndex : 1) + 1;
+            _negoStartRound(_negoState.movieTitle, newDateStr, newTimeStr, nextReplyIndex);
+        });
+    }
+
+    // 主聊天里邀请卡按钮的事件委托（卡片是动态插入主聊天的，绑定在 document 上）
+    function _bindInviteCardDelegation() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest && e.target.closest('[data-invite-action]');
+            if (!btn) return;
+            var card = btn.closest('.cinema-invite-card');
+            if (!card) return;
+            var negoId = card.getAttribute('data-invite-id');
+            if (!_negoState || _negoState.negoId !== negoId) return; // 已经是过期的卡片，不响应
+            var action = btn.getAttribute('data-invite-action');
+            if (action === 'accept') _negoAcceptCountered();
+            else if (action === 'reschedule') _negoOpenRescheduleModal();
+        });
+    }
+    _bindInviteCardDelegation();
+
+    // ── app 启动时检查：如果有正在进行的协商，恢复定时器（哪怕中途关过 app）──
+    function _negoBootCheck() {
+        _negoLoad().then(function () {
+            if (_negoState && _negoState.active) _negoScheduleReply();
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _negoBootCheck);
+    } else {
+        setTimeout(_negoBootCheck, 0);
+    }
+
+    // ── 调试专用 ──────────────────────────────────────────
+    window._cinemaDebugSendInviteCard = function (movieTitle, dateStr, timeStr) {
+        _cinemaSendInviteCard('countered', movieTitle || '阿嫊的情书', dateStr || '2026年8月3日', timeStr || '20:30', 'debug-' + Date.now());
+        console.log('[cinema] 测试邀请卡已发送到主聊天（countered 状态，两个按钮不会真正生效，仅看样式）');
+    };
+    window._cinemaDebugNegoStatus = function () {
+        console.log('[cinema] 当前协商状态:', _negoState);
+        return _negoState;
+    };
+    window._cinemaDebugForceReply = function () {
+        if (!_negoState || !_negoState.active) { console.log('[cinema] 目前没有进行中的协商'); return; }
+        if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        _negoResolveReply();
+        console.log('[cinema] 已强制触发梦角回复');
     };
 
 })();

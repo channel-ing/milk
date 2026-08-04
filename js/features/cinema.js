@@ -125,6 +125,7 @@
                 '<input type="time" class="cinema-invite-input" id="cinema-invite-time" value="' + defaultTime + '">' +
                 '<div class="cinema-invite-error" id="cinema-invite-error"></div>' +
                 '<div class="cinema-invite-hint">发出后' + _escapeHtml(partnerName) + '会在主聊天回复你，可能会提议换个时间～</div>' +
+                '<button type="button" class="cinema-test-source-link" id="cinema-invite-test-source">先测试一下片源？</button>' +
                 '<div class="cinema-invite-actions">' +
                     '<button class="cinema-invite-cancel" id="cinema-invite-cancel">取消</button>' +
                     '<button class="cinema-invite-confirm" id="cinema-invite-confirm">确定邀请</button>' +
@@ -135,6 +136,7 @@
         function close() { sheet.remove(); }
         document.getElementById('cinema-invite-mask').addEventListener('click', close);
         document.getElementById('cinema-invite-cancel').addEventListener('click', close);
+        document.getElementById('cinema-invite-test-source').addEventListener('click', _testVideoSource);
         document.getElementById('cinema-invite-confirm').addEventListener('click', function () {
             var movieInput = document.getElementById('cinema-invite-movie');
             var movieVal = movieInput.value.trim();
@@ -220,6 +222,42 @@
         videoEl.addEventListener('loadedmetadata', onSuccess, { once: true });
         videoEl.addEventListener('canplay', onSuccess, { once: true });
         videoEl.addEventListener('error', onFail, { once: true });
+    }
+
+    // ── 测试片源：极简播放页，只有播放器居中 + 关闭按钮，
+    //    没有换片/结束观影/聊天这些东西，纯粹让你在正式邀请/正式观影之前
+    //    先确认一下这个片源能不能用。不会碰 _uiState，跟真实观影流程完全独立。
+    function _openTestPlayerOverlay(src, type) {
+        var old = document.getElementById('cinema-test-player-overlay');
+        if (old) old.remove();
+        var isBili = type === 'bilibili';
+        var playerHTML = isBili
+            ? '<iframe class="cinema-test-player-el" src="' + src + '" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>'
+            : '<video class="cinema-test-player-el" id="cinema-test-video" controls autoplay playsinline webkit-playsinline>' +
+                  '<source src="' + src + '" type="video/mp4">' +
+              '</video>';
+        var overlay = document.createElement('div');
+        overlay.id = 'cinema-test-player-overlay';
+        overlay.className = 'cinema-test-player-overlay';
+        overlay.innerHTML =
+            '<button class="cinema-test-player-close" id="cinema-test-player-close"><i class="fas fa-times"></i></button>' +
+            (isBili ? '<div class="cinema-test-player-hint">B站视频没法自动检测，自己看看能不能正常播放～</div>' : '') +
+            '<div class="cinema-test-player-wrap">' + playerHTML + '</div>';
+        document.body.appendChild(overlay);
+        document.getElementById('cinema-test-player-close').addEventListener('click', function () {
+            var v = document.getElementById('cinema-test-video');
+            if (v && v.src && v.src.indexOf('blob:') === 0) URL.revokeObjectURL(v.src);
+            overlay.remove();
+        });
+        if (!isBili) {
+            _watchVideoLoad(document.getElementById('cinema-test-video'));
+        }
+    }
+    // 打开来源选择弹窗，选完不进入真实观影，而是丢进上面这个测试播放页
+    function _testVideoSource() {
+        _openVideoSourceModal(function (src, title, type) {
+            _openTestPlayerOverlay(src, type);
+        });
     }
 
     // ── 选择影片来源：本地文件 / 输入直连网址，选完统一走 onPicked(src, title) 回调 ──
@@ -1088,8 +1126,11 @@
                         '<button class="cinema-start-btn" id="cinema-start-btn"' + (locked ? ' disabled' : '') + '>选择影片并开始</button>' +
                     '</div>' +
                     (locked ? '<div class="cinema-appt-countdown">' + _countdownText() + '后可选择影片</div>' : '') +
+                    '<button type="button" class="cinema-test-source-link" id="cinema-waiting-test-source">先测试一下片源？</button>' +
                 '</div>' +
             '</div>';
+
+        document.getElementById('cinema-waiting-test-source').addEventListener('click', _testVideoSource);
 
         document.getElementById('cinema-cancel-btn').addEventListener('click', function () {
             _clearWaitTimer();

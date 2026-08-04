@@ -960,3 +960,106 @@
     font-weight: 500;
 }
 .cinema-hist-edit-cancel:active, .cinema-hist-edit-save:active { opacity: 0.8; transform: scale(0.97); }
+
+/* ── 邀请弹层：片名 + 日期 + 时间 ───────────────────── */
+.cinema-invite-sheet, .cinema-rating-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+}
+.cinema-invite-mask, .cinema-rating-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+}
+.cinema-invite-body, .cinema-rating-body {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--secondary-bg, #fff);
+    border-radius: 18px 18px 0 0;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.cinema-invite-title, .cinema-rating-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.cinema-rating-sub {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    opacity: 0.75;
+    margin-bottom: 14px;
+}
+.cinema-invite-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 14px 0 6px;
+}
+.cinema-invite-label:first-of-type { margin-top: 14px; }
+.cinema-invite-input {
+    width: 100%;
+    height: 38px;
+    background: var(--primary-bg, #f5f5f5);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+}
+.cinema-invite-hint {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    margin-top: 10px;
+}
+.cinema-invite-actions, .cinema-rating-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+.cinema-invite-cancel, .cinema-invite-confirm,
+.cinema-rating-skip, .cinema-rating-save {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 50px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.cinema-invite-cancel, .cinema-rating-skip {
+    background: var(--primary-bg, #f0f0f0);
+    color: var(--text-secondary);
+}
+.cinema-invite-confirm, .cinema-rating-save {
+    background: var(--accent-color, #7BC8A4);
+    color: #fff;
+    font-weight: 500;
+}
+.cinema-invite-cancel:active, .cinema-invite-confirm:active,
+.cinema-rating-skip:active, .cinema-rating-save:active { opacity: 0.8; transform: scale(0.97); }
+
+/* ── 打分/写影评弹层：复用编辑弹层的星星样式(.cinema-hist-star) ── */
+.cinema-rating-body #cinema-rating-stars.cinema-hist-stars-clickable,
+.cinema-rating-body .cinema-hist-stars-clickable {
+    margin: 4px 0 14px;
+    justify-content: center;
+    display: flex;
+}
+.cinema-rating-textarea {
+    width: 100%;
+    min-height: 70px;
+    background: var(--primary-bg, #f5f5f5);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+    resize: none;
+}

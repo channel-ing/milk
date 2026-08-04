@@ -1006,18 +1006,13 @@
         } else {
             var archiveBtn = document.getElementById('cinema-archive-btn');
             if (archiveBtn) archiveBtn.addEventListener('click', _openArchive);
-            // 嵌入视图下：点右下角按钮，或直接点视频区域，都能重新进入沉浸模式
+            // 嵌入视图下：只用右上角的独立按钮进入沉浸模式，不再监听整个视频区域的点击——
+            // 之前"点视频框任意位置都能进沉浸模式"跟点原生播放按钮冲突了（iOS 上尤其明显，
+            // 点播放这个 tap 会冒泡到外层容器，被误判成"要进沉浸模式"，导致点播放却跳转)
             var immersiveBtn = document.getElementById('cinema-immersive-btn');
             if (immersiveBtn) {
                 immersiveBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    _immersive = true;
-                    _renderWatching();
-                });
-            }
-            var wrap = document.getElementById('cinema-player-wrap');
-            if (wrap) {
-                wrap.addEventListener('click', function () {
                     _immersive = true;
                     _renderWatching();
                 });

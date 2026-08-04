@@ -236,8 +236,9 @@
         var d = _parseApptDate();
         if (!d) return;
         var now = Date.now();
-        if (now >= d.getTime()) return; // 已经开场了，不用再提醒
         var reminderAt = d.getTime() - 2 * 60000;
+        // 不管是"快到点了"还是"已经过点了"，只要还没提醒过、也还没开始看，
+        // 一打开网站/切到电影院 tab 就该立刻提醒——不能因为时间已经过了就跳过。
         if (now >= reminderAt) { _showShowtimeReminder(); return; }
         _showtimeReminderTimer = setTimeout(_showShowtimeReminder, reminderAt - now);
     }
@@ -916,6 +917,7 @@
 
         document.getElementById('cinema-cancel-btn').addEventListener('click', function () {
             _clearWaitTimer();
+            if (_showtimeReminderTimer) { clearTimeout(_showtimeReminderTimer); _showtimeReminderTimer = null; }
             _uiState = 'empty';
             _apptSave();
             _cinemaRender();
@@ -1648,14 +1650,14 @@
     }
 
     // ── 提醒 + 过期：只在"轮到用户回应"（_negoState.turn === 'user'）时生效 ──
-    // 解析当前协商里的电影时间，算出"过期时间点" = 电影时间 - 1小时
+    // 解析当前协商里的电影时间，算出"过期时间点" = 电影时间 - 30分钟
     function _negoComputeDeadline() {
         if (!_negoState) return null;
         var m = /(\d+)年(\d+)月(\d+)日/.exec(_negoState.dateStr || '');
         var t = /(\d+):(\d+)/.exec(_negoState.timeStr || '');
         if (!m || !t) return null;
         var movieTime = new Date(+m[1], +m[2] - 1, +m[3], +t[1], +t[2], 0, 0);
-        return movieTime.getTime() - 3600000;
+        return movieTime.getTime() - 30 * 60000;
     }
     // 排下一次"提醒/过期"事件：常规每 3~8 小时重发同一张卡；
     // 保底在"过期前 2 小时"一定有一次；到了过期时间点就直接判定没约上
@@ -1682,7 +1684,7 @@
         _cinemaSendInviteCard('countered', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
         _negoScheduleReminderCycle();
     }
-    // 到了"电影时间前1小时"这个点还没回应，发一张"没约上"的卡（不是文字），
+    // 到了"电影时间前30分钟"这个点还没回应，发一张"没约上"的卡（不是文字），
     // 然后清掉协商——顺便解锁梦角以后的主动邀请（不会被卡死）
     function _negoExpire() {
         if (!_negoState) return;
@@ -1733,9 +1735,11 @@
         newTime.setMinutes(0, 0, 0);
         if (roundedMinutes === 60) newTime.setHours(newTime.getHours() + 1);
         else newTime.setMinutes(roundedMinutes);
-        // 保底：不能早于现在，否则往后推到最近的下一个整/半小时
+        // 保底：不能早于现在，否则往后推。这里给足 3 小时缓冲——"过期"判定是
+        // "电影时间前30分钟"，留足缓冲能保证卡片发出去之后用户至少有几个小时
+        // 可以看到、可以回应，不会刚发就被判定过期。
         if (newTime.getTime() <= Date.now()) {
-            newTime = new Date(Date.now() + 3600000);
+            newTime = new Date(Date.now() + 3 * 3600000);
             var mm = newTime.getMinutes();
             newTime.setMinutes(0, 0, 0);
             if (mm > 30) newTime.setHours(newTime.getHours() + 1);
@@ -2131,7 +2135,7 @@
         _negoReminderFire();
         console.log('[cinema] 已强制重发一次提醒卡');
     };
-    // 强制立刻判定"过期/没约上"（不用等到电影时间前1小时）
+    // 强制立刻判定"过期/没约上"（不用等到电影时间前30分钟）
     window._cinemaDebugForceExpire = function () {
         if (!_negoState || !_negoState.active) {
             console.log('[cinema] 现在没有进行中的协商');

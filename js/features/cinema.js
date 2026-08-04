@@ -1638,7 +1638,7 @@
         var watchedPool = (_history || []);
         var canRewatch = watchedPool.length > 0;
         var canFresh = notWatched.length > 0;
-        if (!canRewatch && !canFresh) return null; // 心愿单和历史都是空的，选不出电影
+        if (!canRewatch && !canFresh) return '一起看电影'; // 心愿单和历史都是空的，用固定文案，不跳过
         var useRewatch = canRewatch && (!canFresh || Math.random() < 0.1);
         if (useRewatch) return watchedPool[Math.floor(Math.random() * watchedPool.length)].title;
         return notWatched[Math.floor(Math.random() * notWatched.length)].title;
@@ -1659,8 +1659,7 @@
     }
 
     function _startPartnerInvite() {
-        var movieTitle = _pickMoviePartnerInvite();
-        if (!movieTitle) return false; // 没有可选的电影，跳过这次，等用户往心愿单/历史里加了内容再说
+        var movieTitle = _pickMoviePartnerInvite(); // 心愿单/历史都空时会兜底成固定文案，永远有得选
         var t = _pickTimePartnerInvite();
         _negoStartFromPartner(movieTitle, t.dateStr, t.timeStr);
         return true;
@@ -1723,10 +1722,8 @@
         var missed = _partnerInviteState.missedCount || 0;
         var prob = missed >= 2 ? 1 : 0.7;
         if (canInvite && Math.random() < prob) {
-            var didInvite = _startPartnerInvite();
-            if (didInvite) _partnerInviteState.missedCount = 0;
-            // 没有素材时 didInvite 是 false —— missedCount 保持原样，不清零也不多加，
-            // 等用户往心愿单/观看历史里加了内容，下一轮自然会正常判断
+            _startPartnerInvite(); // 永远会成功（心愿单/历史都空时用固定文案兜底）
+            _partnerInviteState.missedCount = 0;
         } else {
             _partnerInviteState.missedCount = missed + 1;
         }
@@ -1789,19 +1786,15 @@
 
     // ── 调试专用：梦角主动邀请 ────────────────────────────
     // 不用等 5~7 天，立刻触发一次梦角主动邀请（会真正走挑电影/挑时间/发卡片的完整逻辑，
-    // 前提是心愿单或观看历史里至少有一条数据，也要求当前是 empty 状态且没有进行中的协商）
+    // 心愿单和历史都是空的时候会用固定文案兜底，也要求当前是 empty 状态且没有进行中的协商）
     window._cinemaDebugTriggerPartnerInvite = function () {
         Promise.all([_wlLoad(), _histLoad(), _negoLoad(), _apptLoad()]).then(function () {
             if (_uiState !== 'empty' || (_negoState && _negoState.active)) {
                 console.log('[cinema] 现在有约定或协商中，不会触发梦角主动邀请（先取消/结束当前的再试）');
                 return;
             }
-            var didInvite = _startPartnerInvite();
-            if (!didInvite) {
-                console.log('[cinema] 没触发——心愿单和观看历史都是空的，选不出电影。先加几条待看清单/影评数据再试');
-            } else {
-                console.log('[cinema] 已触发梦角主动邀请，去主聊天看邀请卡');
-            }
+            _startPartnerInvite();
+            console.log('[cinema] 已触发梦角主动邀请，去主聊天看邀请卡');
         });
     };
     window._cinemaDebugPartnerInviteStatus = function () {

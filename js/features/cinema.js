@@ -224,6 +224,43 @@
 
     // ── 选择影片来源：本地文件 / 输入直连网址，选完统一走 onPicked(src, title) 回调 ──
     // onPicked(src, title, type) —— type: 'video'(默认，走<video>播放) | 'bilibili'(走iframe嵌入)
+    // ── B站链接怎么获取的说明弹层 ──────────────────────────
+    function _showBiliHelpModal() {
+        var old = document.getElementById('cinema-bili-help-modal');
+        if (old) old.remove();
+        var modal = document.createElement('div');
+        modal.id = 'cinema-bili-help-modal';
+        modal.className = 'cinema-invite-sheet';
+        modal.innerHTML =
+            '<div class="cinema-invite-mask" id="cinema-bili-help-mask"></div>' +
+            '<div class="cinema-invite-body cinema-bili-help-body">' +
+                '<div class="cinema-invite-title">怎么获取B站链接</div>' +
+                '<div class="cinema-bili-help-section">' +
+                    '<div class="cinema-bili-help-heading">方法一：电脑网页版</div>' +
+                    '<div class="cinema-bili-help-text">打开电脑浏览器上的哔哩哔哩，找到想看的视频 → 点"分享" → 点"复制链接" → 直接粘贴到上面的输入框就行。</div>' +
+                '</div>' +
+                '<div class="cinema-bili-help-section">' +
+                    '<div class="cinema-bili-help-heading">方法二：手机App</div>' +
+                    '<div class="cinema-bili-help-text">在B站App里找到视频 → 点"分享" → 点"复制链接"，这时候复制到的是一个短链接，还不能直接用。打开手机浏览器（比如Safari、Chrome、Edge），把这个短链接粘贴进地址栏打开，等它跳转完，把地址栏里变成的新链接复制出来，再粘贴到这里。</div>' +
+                '</div>' +
+                '<div class="cinema-bili-help-warn">' +
+                    '<div class="cinema-bili-help-warn-title">⚠️ 有两个限制要提前知道：</div>' +
+                    '<div class="cinema-bili-help-warn-item">· 只能看不需要登录也能看的普通清晰度内容，高清、大会员专享的内容看不了</div>' +
+                    '<div class="cinema-bili-help-warn-item">· 如果你在里面点了"登录"，会直接跳出这个页面去登录，边看边聊会被打断</div>' +
+                '</div>' +
+                '<div class="cinema-bili-help-why">' +
+                    '❓为什么：因为这个视频窗口是"借用"哔哩哔哩自己的播放器嵌进来的，不是网站的播放器，所以要遵守哔站自己设的规矩（要登录、清晰度限制）' +
+                '</div>' +
+                '<div class="cinema-invite-actions">' +
+                    '<button class="cinema-invite-confirm" id="cinema-bili-help-ok" style="width:100%;">知道了</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        function close() { modal.remove(); }
+        document.getElementById('cinema-bili-help-mask').addEventListener('click', close);
+        document.getElementById('cinema-bili-help-ok').addEventListener('click', close);
+    }
+
     function _openVideoSourceModal(onPicked) {
         var old = document.getElementById('cinema-source-modal');
         if (old) old.remove();
@@ -245,7 +282,10 @@
                 '<div id="cinema-source-url-section" style="display:none;">' +
                     '<div class="cinema-invite-label">视频直链</div>' +
                     '<input type="text" class="cinema-invite-input" id="cinema-source-url-input" placeholder="https://…">' +
-                    '<div class="cinema-invite-label">B站链接</div>' +
+                    '<div class="cinema-invite-label cinema-invite-label-row">' +
+                        '<span>B站链接</span>' +
+                        '<button type="button" class="cinema-help-btn" id="cinema-bili-help-btn" title="怎么获取B站链接">?</button>' +
+                    '</div>' +
                     '<input type="text" class="cinema-invite-input" id="cinema-source-bili-input" placeholder="粘贴B站视频链接或BV号">' +
                     '<div class="cinema-invite-error" id="cinema-source-url-error"></div>' +
                     '<div class="cinema-invite-actions">' +
@@ -282,6 +322,10 @@
         });
         document.getElementById('cinema-source-url').addEventListener('click', function () {
             document.getElementById('cinema-source-url-section').style.display = 'block';
+        });
+        document.getElementById('cinema-bili-help-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            _showBiliHelpModal();
         });
         document.getElementById('cinema-source-url-cancel').addEventListener('click', close);
         document.getElementById('cinema-source-url-confirm').addEventListener('click', function () {

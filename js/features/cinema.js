@@ -1305,7 +1305,9 @@
     // 包一层 window.createMessageFragment（跟上面包 csSwitchTab 同一个原理），
     // 遇到 msg.type === 'cinema-invite' 就渲染邀请卡，其余类型原样交给原函数处理，
     // 完全不用改 core.js。
-    var CINEMA_INVITE_BG = 'assets/cinema/invite-card-bg.svg';
+    //
+    // 卡片纯 CSS 画，不依赖图片素材（GitHub Pages 部署那张背景图一直 404，
+    // 排查了分支/Jekyll 都没解决，索性直接用代码画一张风格类似但更简洁的卡片）。
 
     // 卡片有三种状态：
     //   pending   —— 用户刚发出的邀请，靠右，用户头像，没有按钮
@@ -1338,9 +1340,14 @@
             '<div class="message-avatar">' + _avatarHTML(!isUser, 36) + '</div>' +
             '<div class="message-content-wrapper">' +
                 '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.negoId || '')) + '">' +
-                    '<img class="cinema-invite-card-bg" src="' + CINEMA_INVITE_BG + '" alt="">' +
+                    '<div class="cinema-invite-card-decor">' +
+                        '<span class="d1">🍿</span><span class="d2">⭐</span>' +
+                        '<span class="d3">🥤</span><span class="d4">💕</span>' +
+                    '</div>' +
+                    '<div class="cinema-invite-card-banner">CINEMA</div>' +
                     '<div class="cinema-invite-card-movie">' + _escapeHtml(data.movieTitle || '') + '</div>' +
                     '<div class="cinema-invite-card-time">' + _escapeHtml((data.dateStr || '') + '  ' + (data.timeStr || '')) + '</div>' +
+                    '<div class="cinema-invite-card-divider"></div>' +
                     actionsHtml +
                 '</div>' +
             '</div>';

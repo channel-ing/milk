@@ -1613,6 +1613,138 @@
     }
     _bindInviteCardDelegation();
 
+    // ── 梦角主动邀请：复用上面整套协商引擎，只是起点不一样 ──
+    // 用户邀请梦角：先发"等待中"卡 + 计时器等梦角回复。
+    // 梦角邀请用户：梦角直接把提议发出来（没有"等待"这一步，球一开始就在用户这边），
+    // 用户如果点"更换时间"，才会走进 _negoStartRound 这套跟用户邀请完全一样的
+    // 计时+概率逻辑（replyIndex 从 1 开始，70%/90%/100%）。
+    function _negoStartFromPartner(movieTitle, dateStr, timeStr) {
+        var negoId = 'nego-' + Date.now();
+        _negoState = {
+            active: true,
+            replyIndex: 0, // 用户还没被梦角"回复"过；用户换时间后才变成第1轮(70%)
+            movieTitle: movieTitle,
+            dateStr: dateStr,
+            timeStr: timeStr,
+            negoId: negoId
+        };
+        _negoSave();
+        _cinemaSendInviteCard('countered', movieTitle, dateStr, timeStr, negoId);
+    }
+
+    // 挑电影：90% 从心愿单里挑一部没看过的，10% 从观看历史里挑一部看过的重温
+    function _pickMoviePartnerInvite() {
+        var notWatched = (_watchlist || []).filter(function (w) { return !w.watched; });
+        var watchedPool = (_history || []);
+        var canRewatch = watchedPool.length > 0;
+        var canFresh = notWatched.length > 0;
+        if (!canRewatch && !canFresh) return null; // 心愿单和历史都是空的，选不出电影
+        var useRewatch = canRewatch && (!canFresh || Math.random() < 0.1);
+        if (useRewatch) return watchedPool[Math.floor(Math.random() * watchedPool.length)].title;
+        return notWatched[Math.floor(Math.random() * notWatched.length)].title;
+    }
+
+    // 挑时间：12~72 小时后，取整到最近的半小时
+    function _pickTimePartnerInvite() {
+        var future = new Date(Date.now() + (12 + Math.random() * 60) * 3600000);
+        var minutes = future.getMinutes();
+        var rounded = minutes < 15 ? 0 : (minutes < 45 ? 30 : 60);
+        future.setMinutes(0, 0, 0);
+        if (rounded === 60) future.setHours(future.getHours() + 1);
+        else future.setMinutes(rounded);
+        return {
+            dateStr: future.getFullYear() + '年' + (future.getMonth() + 1) + '月' + future.getDate() + '日',
+            timeStr: String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0')
+        };
+    }
+
+    function _startPartnerInvite() {
+        var movieTitle = _pickMoviePartnerInvite();
+        if (!movieTitle) return false; // 没有可选的电影，跳过这次，等用户往心愿单/历史里加了内容再说
+        var t = _pickTimePartnerInvite();
+        _negoStartFromPartner(movieTitle, t.dateStr, t.timeStr);
+        return true;
+    }
+
+    // ── 定时检查：每 5~7 天一次，70% 概率触发；连续 2 次没触发，第 3 次必定触发
+    //    （保证最多 15~21 天内一定会等到一次邀请，不会无限沉默）。持久化，跟
+    //    tab 开不开无关，app 一启动就会检查有没有错过。 ──
+    var _partnerInviteState = null; // { nextCheckAt, missedCount }
+    var _partnerInviteLoaded = false;
+    var _partnerInviteStorageKey = null;
+    var _partnerInviteTimer = null;
+
+    async function _partnerInviteGetKey() {
+        if (_partnerInviteStorageKey) return _partnerInviteStorageKey;
+        try {
+            var allKeys = await localforage.keys();
+            var found = allKeys.find(function (k) { return k.indexOf('_cinemaPartnerInvite') !== -1; });
+            if (found) { _partnerInviteStorageKey = found; return found; }
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            _partnerInviteStorageKey = prefix + '_cinemaPartnerInvite';
+        } catch (e) {
+            _partnerInviteStorageKey = 'CHAT_APP_V3__cinemaPartnerInvite';
+        }
+        return _partnerInviteStorageKey;
+    }
+    async function _partnerInviteLoad() {
+        if (_partnerInviteLoaded) return;
+        _partnerInviteLoaded = true;
+        try {
+            var key = await _partnerInviteGetKey();
+            var saved = await localforage.getItem(key);
+            if (saved && typeof saved === 'object') _partnerInviteState = saved;
+        } catch (e) { console.warn('[cinema] 梦角主动邀请状态加载失败:', e); }
+    }
+    async function _partnerInviteSave() {
+        try {
+            var key = await _partnerInviteGetKey();
+            await localforage.setItem(key, _partnerInviteState);
+        } catch (e) { console.warn('[cinema] 梦角主动邀请状态保存失败:', e); }
+    }
+
+    function _scheduleNextPartnerInviteCheck() {
+        if (_partnerInviteTimer) { clearTimeout(_partnerInviteTimer); _partnerInviteTimer = null; }
+        if (!_partnerInviteState) {
+            // 第一次用，从现在起 5~7 天后才第一次检查，不是装上就立刻查
+            _partnerInviteState = { nextCheckAt: Date.now() + (5 + Math.random() * 2) * 86400000, missedCount: 0 };
+            _partnerInviteSave();
+        }
+        var delay = _partnerInviteState.nextCheckAt - Date.now();
+        if (delay <= 0) { _runPartnerInviteCheck(); return; }
+        _partnerInviteTimer = setTimeout(_runPartnerInviteCheck, delay);
+    }
+
+    async function _runPartnerInviteCheck() {
+        await Promise.all([_wlLoad(), _histLoad(), _negoLoad(), _apptLoad()]);
+        // 只有在"没有约定、没有协商中"的时候才可能触发，不然会跟用户自己发的邀请撞车
+        var canInvite = _uiState === 'empty' && !(_negoState && _negoState.active);
+        var missed = _partnerInviteState.missedCount || 0;
+        var prob = missed >= 2 ? 1 : 0.7;
+        if (canInvite && Math.random() < prob) {
+            var didInvite = _startPartnerInvite();
+            if (didInvite) _partnerInviteState.missedCount = 0;
+            // 没有素材时 didInvite 是 false —— missedCount 保持原样，不清零也不多加，
+            // 等用户往心愿单/观看历史里加了内容，下一轮自然会正常判断
+        } else {
+            _partnerInviteState.missedCount = missed + 1;
+        }
+        var days = 5 + Math.random() * 2;
+        _partnerInviteState.nextCheckAt = Date.now() + days * 86400000;
+        _partnerInviteSave();
+        _scheduleNextPartnerInviteCheck();
+    }
+
+    function _partnerInviteBootCheck() {
+        _partnerInviteLoad().then(_scheduleNextPartnerInviteCheck);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _partnerInviteBootCheck);
+    } else {
+        setTimeout(_partnerInviteBootCheck, 0);
+    }
+
     // ── app 启动时检查：如果有正在进行的协商，恢复定时器（哪怕中途关过 app）──
     function _negoBootCheck() {
         _negoLoad().then(function () {
@@ -1653,6 +1785,28 @@
         if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
         _negoResolveReply(true);
         console.log('[cinema] 已强制触发"同意"');
+    };
+
+    // ── 调试专用：梦角主动邀请 ────────────────────────────
+    // 不用等 5~7 天，立刻触发一次梦角主动邀请（会真正走挑电影/挑时间/发卡片的完整逻辑，
+    // 前提是心愿单或观看历史里至少有一条数据，也要求当前是 empty 状态且没有进行中的协商）
+    window._cinemaDebugTriggerPartnerInvite = function () {
+        Promise.all([_wlLoad(), _histLoad(), _negoLoad(), _apptLoad()]).then(function () {
+            if (_uiState !== 'empty' || (_negoState && _negoState.active)) {
+                console.log('[cinema] 现在有约定或协商中，不会触发梦角主动邀请（先取消/结束当前的再试）');
+                return;
+            }
+            var didInvite = _startPartnerInvite();
+            if (!didInvite) {
+                console.log('[cinema] 没触发——心愿单和观看历史都是空的，选不出电影。先加几条待看清单/影评数据再试');
+            } else {
+                console.log('[cinema] 已触发梦角主动邀请，去主聊天看邀请卡');
+            }
+        });
+    };
+    window._cinemaDebugPartnerInviteStatus = function () {
+        console.log('[cinema] 梦角主动邀请状态:', _partnerInviteState);
+        return _partnerInviteState;
     };
 
 })();

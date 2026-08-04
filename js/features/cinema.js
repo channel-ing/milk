@@ -687,23 +687,46 @@
 
         var negoActive = !!(_negoState && _negoState.active);
         var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
-        var emptyText = negoActive ? ('邀请已发出，等' + _escapeHtml(partnerName) + '回主聊天里的消息～') : '还没有约定观影';
-        var btnHtml = negoActive
-            ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待' + _escapeHtml(partnerName) + '回复中…</button>' +
-              '<button class="cinema-cancel-invite-btn" id="cinema-cancel-invite-btn">取消邀请</button>'
-            : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请' + _escapeHtml(partnerName) + '一起观影</button>';
+        var isUserTurn = negoActive && _negoState.turn === 'user'; // 球在用户这边，该表态了
 
-        panel.innerHTML =
-            _hdHTML() +
-            '<div class="cinema-body">' +
+        var bodyHtml;
+        if (isUserTurn) {
+            // 不管这轮是梦角一开始就邀请的，还是你邀请梦角、梦角换了时间反弹回来的，
+            // 只要是"梦角提议的时间在等你回应"，就用同一套三按钮面板，不用分场景
+            bodyHtml =
+                '<div class="cinema-screen-wrap">' +
+                    '<div class="cinema-empty-icon"><i class="fas fa-film"></i></div>' +
+                    '<div class="cinema-empty-text">' + _escapeHtml(partnerName) + '邀你一起看《' + _escapeHtml(_negoState.movieTitle) + '》</div>' +
+                '</div>' +
+                '<div class="cinema-invite-response-card">' +
+                    '<div class="cinema-invite-response-time">' + _escapeHtml(_negoState.dateStr) + '  ' + _escapeHtml(_negoState.timeStr) + '</div>' +
+                    '<div class="cinema-invite-response-actions">' +
+                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--decline" id="cinema-resp-decline">拒绝</button>' +
+                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--secondary" id="cinema-resp-reschedule">更换时间</button>' +
+                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--primary" id="cinema-resp-accept">同意</button>' +
+                    '</div>' +
+                '</div>';
+        } else {
+            var emptyText = negoActive ? ('邀请已发出，等' + _escapeHtml(partnerName) + '回主聊天里的消息～') : '还没有约定观影';
+            var btnHtml = negoActive
+                ? '<button class="cinema-invite-btn" id="cinema-invite-btn" disabled>等待' + _escapeHtml(partnerName) + '回复中…</button>' +
+                  '<button class="cinema-cancel-invite-btn" id="cinema-cancel-invite-btn">取消邀请</button>'
+                : '<button class="cinema-invite-btn" id="cinema-invite-btn">邀请' + _escapeHtml(partnerName) + '一起观影</button>';
+            bodyHtml =
                 '<div class="cinema-screen-wrap">' +
                     '<div class="cinema-empty-icon"><i class="fas fa-film"></i></div>' +
                     '<div class="cinema-empty-text">' + emptyText + '</div>' +
                 '</div>' +
-                btnHtml +
-            '</div>';
+                btnHtml;
+        }
 
-        if (!negoActive) {
+        panel.innerHTML = _hdHTML() + '<div class="cinema-body">' + bodyHtml + '</div>';
+
+        if (isUserTurn) {
+            document.getElementById('cinema-resp-accept').addEventListener('click', _negoAcceptCountered);
+            document.getElementById('cinema-resp-reschedule').addEventListener('click', _negoOpenRescheduleModal);
+            document.getElementById('cinema-resp-decline').addEventListener('click', _negoDecline);
+        } else if (!negoActive) {
             document.getElementById('cinema-invite-btn').addEventListener('click', _openInviteSheet);
         } else {
             document.getElementById('cinema-cancel-invite-btn').addEventListener('click', _negoCancelInvite);
@@ -1312,14 +1335,16 @@
     // 卡片纯 CSS 画，不依赖图片素材（GitHub Pages 部署那张背景图一直 404，
     // 排查了分支/Jekyll 都没解决，索性直接用代码画一张风格类似但更简洁的卡片）。
 
-    // 卡片有三种状态：
+    // 卡片有四种状态：
     //   pending   —— 用户刚发出的邀请，靠右，用户头像，没有按钮
-    //   countered —— 梦角提议了新时间，靠左，梦角头像，"更换时间"/"接受邀请"两个按钮
-    //   accepted  —— 梦角最终同意，靠左，梦角头像，没有按钮，显示"约定成功"
+    //   countered —— 梦角提议了新时间，靠左，梦角头像，"拒绝"/"更换时间"/"同意"三个按钮
+    //   accepted  —— 最终同意，靠左，梦角头像，没有按钮，显示"约定成功"
+    //   declined  —— 用户拒绝了梦角的提议，靠右，用户头像，没有按钮，显示"下次吧"
+    //                （只有用户能拒绝，梦角不能拒绝用户的邀请，梦角只会同意或换时间）
     function _cinemaInviteCardFragment(msg) {
         var data = msg.cinemaInviteData || {};
         var state = data.state || 'countered';
-        var isUser = state === 'pending'; // 只有"发出邀请"这个状态是用户说的话，其余都是梦角的回复
+        var isUser = state === 'pending' || state === 'declined'; // 这两种是用户自己的表态
         var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
         var actionsHtml;
         if (state === 'pending') {
@@ -1328,11 +1353,14 @@
             actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--ok">🎉 约定成功</div>';
         } else if (state === 'expired') {
             actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--expired">这次没约上呢…</div>';
+        } else if (state === 'declined') {
+            actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--declined">下次吧…</div>';
         } else {
             actionsHtml =
-                '<div class="cinema-invite-card-actions">' +
+                '<div class="cinema-invite-card-actions cinema-invite-card-actions--three">' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--decline" data-invite-action="decline">拒绝</button>' +
                     '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="reschedule">更换时间</button>' +
-                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">接受邀请</button>' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">同意</button>' +
                 '</div>';
         }
         var fragment = new DocumentFragment();
@@ -1387,7 +1415,7 @@
             console.warn('[cinema] addMessage 不可用，无法发送邀请卡');
             return;
         }
-        var sender = state === 'pending' ? 'user' : 'partner';
+        var sender = (state === 'pending' || state === 'declined') ? 'user' : 'partner';
         addMessage({
             id: Date.now() + Math.random(),
             sender: sender,
@@ -1620,6 +1648,14 @@
         if (_getPanel()) _cinemaRender();
     }
 
+    // 拒绝梦角提议的时间——只有用户能拒绝，梦角不能拒绝用户的邀请（梦角只会同意或换时间）
+    function _negoDecline() {
+        if (!_negoState || !_negoState.active) return;
+        _cinemaSendInviteCard('declined', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        _negoClear();
+        if (_getPanel()) _cinemaRender();
+    }
+
     // 电影院tab里"取消邀请"按钮：直接撤回，不等梦角回复了
     function _negoCancelInvite() {
         _negoClear();
@@ -1692,6 +1728,7 @@
             var action = btn.getAttribute('data-invite-action');
             if (action === 'accept') _negoAcceptCountered();
             else if (action === 'reschedule') _negoOpenRescheduleModal();
+            else if (action === 'decline') _negoDecline();
         });
     }
     _bindInviteCardDelegation();

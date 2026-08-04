@@ -183,6 +183,13 @@
     opacity: 0.85;
     transform: scale(0.97);
 }
+.cinema-invite-btn:disabled {
+    background: var(--border-color, #ccc);
+    color: var(--text-secondary, #888);
+    cursor: default;
+    opacity: 0.7;
+}
+.cinema-invite-btn:disabled:active { transform: none; }
 
 /* ── 等待中（黑框内展示已选片名 + 锁定态提示） ─────────── */
 .cinema-waiting-icon {
@@ -1198,3 +1205,17 @@
     color: #fff;
 }
 .cinema-invite-card-btn:active { opacity: 0.8; transform: scale(0.96); }
+.cinema-invite-card-status {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 83%;
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #7a7460;
+    padding: 8px 0;
+}
+.cinema-invite-card-status--ok {
+    color: #4a8f6e;
+}

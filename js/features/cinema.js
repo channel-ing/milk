@@ -45,6 +45,14 @@
     // 观影中：当前视频信息（从 waiting 跳转过来时写入）
     var _currentVideo = { src: '', title: '' };
 
+    // 观影开始时间（纯内存，不用持久化——'watching' 状态本身刷新就会退回 waiting，
+    // 见下面 _apptLoad 里的说明，所以这个计时器只在同一次会话里有意义）
+    var _watchStartedAt = null;
+    var _watchAutoEndTimer = null;
+
+    // 开场前 2 分钟提醒（弹黑色蒙层），只在 waiting 状态下有意义
+    var _showtimeReminderTimer = null;
+
     // ── 约定状态持久化：_uiState + _fakeAppt ──────────────
     // 之前这两个是纯内存变量，刷新/重进页面就丢，导致约好了时间也会
     // 打回"待邀请"。现在跟待看清单/观看历史一样存到 localforage。
@@ -220,6 +228,67 @@
         return '还有' + m + '分钟';
     }
 
+    // ── 开场前 2 分钟提醒：黑色蒙层，仿照"梦角邀请陪伴"那套视觉，
+    //    但完全是 cinema.js 自己独立实现的，不调用 companion.js 的任何函数 ──
+    function _scheduleShowtimeReminder() {
+        if (_showtimeReminderTimer) { clearTimeout(_showtimeReminderTimer); _showtimeReminderTimer = null; }
+        if (_uiState !== 'waiting' || _fakeAppt.reminderShown) return;
+        var d = _parseApptDate();
+        if (!d) return;
+        var now = Date.now();
+        if (now >= d.getTime()) return; // 已经开场了，不用再提醒
+        var reminderAt = d.getTime() - 2 * 60000;
+        if (now >= reminderAt) { _showShowtimeReminder(); return; }
+        _showtimeReminderTimer = setTimeout(_showShowtimeReminder, reminderAt - now);
+    }
+    function _showShowtimeReminder() {
+        if (_uiState !== 'waiting' || _fakeAppt.reminderShown) return;
+        // 如果正好撞上别的邀请/通话弹窗，稍等半分钟再重试，不硬挤上去
+        if (document.querySelector('#companion-incoming-overlay, #companion-inviting-overlay') ||
+            document.getElementById('call-incoming-overlay')?.classList.contains('visible') ||
+            document.getElementById('call-window')?.classList.contains('visible')) {
+            _showtimeReminderTimer = setTimeout(_showShowtimeReminder, 30000);
+            return;
+        }
+        _fakeAppt.reminderShown = true;
+        _apptSave();
+
+        var old = document.getElementById('cinema-showtime-overlay');
+        if (old) old.remove();
+        var partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
+        var overlay = document.createElement('div');
+        overlay.id = 'cinema-showtime-overlay';
+        overlay.className = 'cinema-showtime-overlay';
+        overlay.innerHTML =
+            '<div class="cinema-showtime-content">' +
+                '<div class="cinema-showtime-avatar-wrap">' +
+                    '<div class="cinema-showtime-ring"></div>' +
+                    '<div class="cinema-showtime-ring cinema-showtime-ring--delay"></div>' +
+                    '<div class="cinema-showtime-avatar">' + _avatarHTML(true, 96) + '</div>' +
+                '</div>' +
+                '<div class="cinema-showtime-name">' + _escapeHtml(partnerName) + '</div>' +
+                '<div class="cinema-showtime-hint"><span class="cinema-showtime-dot"></span><span>电影要开场啦</span></div>' +
+                '<div class="cinema-showtime-line"><i class="fas fa-film"></i><span>《' + _escapeHtml(_fakeAppt.movieTitle) + '》马上就要开始了</span></div>' +
+                '<div class="cinema-showtime-actions">' +
+                    '<button id="cinema-showtime-later" class="cinema-showtime-btn">' +
+                        '<div class="cinema-showtime-btn-circle cinema-showtime-btn-circle--later"><i class="fas fa-clock"></i></div>' +
+                        '<span>等一会</span>' +
+                    '</button>' +
+                    '<button id="cinema-showtime-go" class="cinema-showtime-btn">' +
+                        '<div class="cinema-showtime-btn-circle cinema-showtime-btn-circle--go"><i class="fas fa-play"></i></div>' +
+                        '<span>现在过去</span>' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+        document.documentElement.appendChild(overlay);
+        document.getElementById('cinema-showtime-later').addEventListener('click', function () { overlay.remove(); });
+        document.getElementById('cinema-showtime-go').addEventListener('click', function () {
+            overlay.remove();
+            if (typeof openCoupleSpace === 'function') openCoupleSpace();
+            if (typeof csSwitchTab === 'function') setTimeout(function () { csSwitchTab('cinema'); }, 50);
+        });
+    }
+
     // ── 公共 header HTML ────────────────────────────────
     function _hdHTML() {
         return '<div class="cinema-hd">' +
@@ -271,6 +340,64 @@
         _cinemaMessages = [];
         if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); _cinemaPendingReplyTimer = null; }
         _cinemaHideTyping();
+        _clearWatchAutoEnd();
+    }
+
+    // 观影开始/结束，往主聊天发一条事件记录（复用 call-event 那套小药丸样式，
+    // 跟"视频通话已结束""XX陪伴已结束"是同一个视觉语言）
+    function _cinemaSendWatchEvent(started, durationMin) {
+        if (typeof addMessage !== 'function') return;
+        var text = started ? '观影已开始' : '观影已结束';
+        var detail = (!started && typeof durationMin === 'number') ? (durationMin + ' 分钟') : null;
+        addMessage({
+            id: Date.now() + Math.random(),
+            sender: 'system',
+            text: text + (detail ? ' · ' + detail : ''),
+            timestamp: new Date(),
+            status: 'received',
+            type: 'call-event',
+            callIcon: 'fa-film',
+            callDetail: detail,
+            favorited: false,
+            note: null
+        });
+    }
+
+    // 观影超过 6~8 小时（随机）没手动结束——大概率是用户忘了，自动收尾
+    function _scheduleWatchAutoEnd() {
+        _clearWatchAutoEnd();
+        var hours = 6 + Math.random() * 2;
+        _watchAutoEndTimer = setTimeout(_autoEndWatching, hours * 3600000);
+    }
+    function _clearWatchAutoEnd() {
+        if (_watchAutoEndTimer) { clearTimeout(_watchAutoEndTimer); _watchAutoEndTimer = null; }
+    }
+    function _autoEndWatching() {
+        if (_uiState !== 'watching') return;
+        var watchedTitle = _currentVideo.title || _fakeAppt.movieTitle || '这部电影';
+        var startedAt = _watchStartedAt;
+        _endWatchingCleanup();
+        _exitTheaterMode();
+        var durationMin = startedAt ? Math.round((Date.now() - startedAt) / 60000) : null;
+        _cinemaSendWatchEvent(false, durationMin);
+        // 自动结束时用户不在，不弹打分面板，直接按"跳过"的规则记一条历史
+        // （梦角这边还是 100% 给评分+评语，跟正常"跳过"路径完全一致）
+        var partner = _cinemaGeneratePartnerReview();
+        _histLoad().then(function () {
+            _history.unshift({
+                id: Date.now() + Math.random(),
+                title: watchedTitle,
+                ts: Date.now(),
+                userStars: 0,
+                userReview: '',
+                partnerStars: partner.stars,
+                partnerReview: partner.review
+            });
+            _histSave();
+        });
+        _uiState = 'empty';
+        _apptSave();
+        if (_getPanel()) _cinemaRender();
     }
 
     // ── 结束观影后：弹出打分/写影评弹层 ──────────────────
@@ -440,12 +567,35 @@
         _bindCinemaCloudImages(newEl);
         area.scrollTop = area.scrollHeight;
     }
+    // 观影中的聊天消息，同步一份到主聊天（文字用 text，图片/表情复用主聊天的
+    // msg.image 字段——跟主聊天原生图片消息同一套字段，oss://云端引用能正常解析）
+    function _cinemaSyncToMainChat(msg) {
+        if (typeof addMessage !== 'function') return;
+        var sender = msg.sender === 'partner' ? 'partner' : 'user';
+        var payload = {
+            id: Date.now() + Math.random(),
+            sender: sender,
+            timestamp: new Date(),
+            status: sender === 'user' ? 'sent' : 'received',
+            type: 'normal',
+            favorited: false,
+            note: null
+        };
+        if (msg.type === 'image') {
+            payload.text = '';
+            payload.image = msg.content;
+        } else {
+            payload.text = msg.content;
+        }
+        addMessage(payload);
+    }
     function _pushMessage(msg) {
         msg.id = Date.now() + Math.random();
         msg.ts = Date.now();
         msg.sender = msg.sender || 'user';
         _cinemaMessages.push(msg);
         _appendMsgToDOM(msg);
+        _cinemaSyncToMainChat(msg);
         if (msg.sender === 'user') _cinemaScheduleReply();
     }
 
@@ -787,7 +937,10 @@
             _renderLoading();
             setTimeout(function () {
                 _uiState = 'watching';
+                _watchStartedAt = Date.now();
                 _apptSave();
+                _cinemaSendWatchEvent(true);
+                _scheduleWatchAutoEnd();
                 _cinemaRender();
             }, 1650);
         });
@@ -889,8 +1042,11 @@
         document.getElementById('cinema-end-btn').addEventListener('click', function () {
             var doEnd = function () {
                 var watchedTitle = _currentVideo.title || _fakeAppt.movieTitle || '这部电影';
+                var startedAt = _watchStartedAt;
                 _endWatchingCleanup();
                 _exitTheaterMode();
+                var durationMin = startedAt ? Math.round((Date.now() - startedAt) / 60000) : null;
+                _cinemaSendWatchEvent(false, durationMin);
                 _openRatingSheet(watchedTitle);
             };
             _cinemaCenterConfirm('结束观影', '确定要结束观影吗？', '结束观影', doEnd);
@@ -1621,6 +1777,7 @@
             _apptSave();
             _cinemaSendInviteCard('accepted', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
             _negoClear();
+            _scheduleShowtimeReminder();
             if (_getPanel()) _cinemaRender();
         } else {
             var newTime = _negoGenerateCounterTime(_negoState.dateStr, _negoState.timeStr);
@@ -1645,6 +1802,7 @@
         _apptSave();
         _cinemaSendInviteCard('accepted', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
         _negoClear();
+        _scheduleShowtimeReminder();
         if (_getPanel()) _cinemaRender();
     }
 
@@ -1881,6 +2039,18 @@
         setTimeout(_negoBootCheck, 0);
     }
 
+    // ── app 启动时检查：如果已经有约定在等待观影，恢复开场前提醒的调度 ──
+    function _showtimeReminderBootCheck() {
+        _apptLoad().then(function () {
+            if (_uiState === 'waiting') _scheduleShowtimeReminder();
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _showtimeReminderBootCheck);
+    } else {
+        setTimeout(_showtimeReminderBootCheck, 0);
+    }
+
     // ── 调试专用 ──────────────────────────────────────────
     window._cinemaDebugSendInviteCard = function (movieTitle, dateStr, timeStr) {
         _cinemaSendInviteCard('countered', movieTitle || '阿嫊的情书', dateStr || '2026年8月3日', timeStr || '20:30', 'debug-' + Date.now());
@@ -1948,6 +2118,24 @@
         if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
         _negoExpire();
         console.log('[cinema] 已强制判定"没约上"');
+    };
+    // 不用等到开场前2分钟，立刻弹一次开场提醒蒙层（前提：当前是 waiting 状态）
+    window._cinemaDebugShowShowtimeReminder = function () {
+        if (_uiState !== 'waiting') {
+            console.log('[cinema] 现在不是 waiting 状态，没有约定可以提醒');
+            return;
+        }
+        _fakeAppt.reminderShown = false; // 强制忽略"已经提醒过"这个标记
+        _showShowtimeReminder();
+    };
+    // 不用等 6~8 小时，立刻强制自动结束观影（前提：当前是 watching 状态）
+    window._cinemaDebugForceAutoEndWatch = function () {
+        if (_uiState !== 'watching') {
+            console.log('[cinema] 现在不是 watching 状态');
+            return;
+        }
+        _autoEndWatching();
+        console.log('[cinema] 已强制触发"自动结束观影"');
     };
 
 })();

@@ -158,7 +158,8 @@
 
     // ── 居中卡片式确认弹窗（跟 album.js 的 _alShowConfirm 底部弹出不一样，
     //    这个是居中卡片，配对之前打分/邀请弹层的圆角卡片风格）──────
-    function _cinemaCenterConfirm(title, desc, confirmText, onConfirm) {
+    // singleBtn=true 时只显示一个按钮（用于错误提示这种不需要"取消"的场景）
+    function _cinemaCenterConfirm(title, desc, confirmText, onConfirm, singleBtn) {
         var old = document.getElementById('cinema-confirm-modal');
         if (old) old.remove();
         var modal = document.createElement('div');
@@ -170,17 +171,99 @@
                 '<div class="cinema-confirm-title">' + _escapeHtml(title) + '</div>' +
                 '<div class="cinema-confirm-desc">' + _escapeHtml(desc) + '</div>' +
                 '<div class="cinema-confirm-actions">' +
-                    '<button class="cinema-confirm-cancel" id="cinema-confirm-cancel">取消</button>' +
+                    (singleBtn ? '' : '<button class="cinema-confirm-cancel" id="cinema-confirm-cancel">取消</button>') +
                     '<button class="cinema-confirm-ok" id="cinema-confirm-ok">' + _escapeHtml(confirmText) + '</button>' +
                 '</div>' +
             '</div>';
         document.body.appendChild(modal);
         function close() { modal.remove(); }
         document.getElementById('cinema-confirm-mask').addEventListener('click', close);
-        document.getElementById('cinema-confirm-cancel').addEventListener('click', close);
+        var cancelBtn = document.getElementById('cinema-confirm-cancel');
+        if (cancelBtn) cancelBtn.addEventListener('click', close);
         document.getElementById('cinema-confirm-ok').addEventListener('click', function () {
             close();
-            onConfirm();
+            if (onConfirm) onConfirm();
+        });
+    }
+    // 视频加载失败的提示，复用居中弹窗，单按钮
+    function _showVideoLoadErrorModal() {
+        _cinemaCenterConfirm('视频加载失败', '检查一下链接是否正确，或者换一个视频源试试', '知道了', null, true);
+    }
+
+    // ── 选择影片来源：本地文件 / 输入直连网址，选完统一走 onPicked(src, title) 回调 ──
+    function _openVideoSourceModal(onPicked) {
+        var old = document.getElementById('cinema-source-modal');
+        if (old) old.remove();
+        var modal = document.createElement('div');
+        modal.id = 'cinema-source-modal';
+        modal.className = 'cinema-invite-sheet';
+        modal.innerHTML =
+            '<div class="cinema-invite-mask" id="cinema-source-mask"></div>' +
+            '<div class="cinema-invite-body">' +
+                '<div class="cinema-invite-title">选择影片来源</div>' +
+                '<div class="cinema-source-choice-actions">' +
+                    '<button class="cinema-source-choice-btn" id="cinema-source-local">' +
+                        '<i class="fas fa-folder-open"></i><span>本地文件</span>' +
+                    '</button>' +
+                    '<button class="cinema-source-choice-btn" id="cinema-source-url">' +
+                        '<i class="fas fa-link"></i><span>输入网址</span>' +
+                    '</button>' +
+                '</div>' +
+                '<div id="cinema-source-url-section" style="display:none;">' +
+                    '<div class="cinema-invite-label">视频直链</div>' +
+                    '<input type="text" class="cinema-invite-input" id="cinema-source-url-input" placeholder="https://…">' +
+                    '<div class="cinema-invite-error" id="cinema-source-url-error"></div>' +
+                    '<div class="cinema-invite-actions">' +
+                        '<button class="cinema-invite-cancel" id="cinema-source-url-cancel">取消</button>' +
+                        '<button class="cinema-invite-confirm" id="cinema-source-url-confirm">确定</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        var localInput = document.createElement('input');
+        localInput.type = 'file';
+        localInput.accept = 'video/*';
+        localInput.style.display = 'none';
+        document.body.appendChild(localInput);
+
+        function close() {
+            modal.remove();
+            if (localInput.parentNode) localInput.remove();
+        }
+        document.getElementById('cinema-source-mask').addEventListener('click', close);
+
+        localInput.addEventListener('change', function (e) {
+            var file = e.target.files && e.target.files[0];
+            if (!file) { close(); return; } // 用户在系统选择框里点了取消
+            var src = URL.createObjectURL(file);
+            var title = file.name.replace(/\.[^.]+$/, '');
+            close();
+            onPicked(src, title);
+        });
+
+        document.getElementById('cinema-source-local').addEventListener('click', function () {
+            localInput.click();
+        });
+        document.getElementById('cinema-source-url').addEventListener('click', function () {
+            document.getElementById('cinema-source-url-section').style.display = 'block';
+        });
+        document.getElementById('cinema-source-url-cancel').addEventListener('click', close);
+        document.getElementById('cinema-source-url-confirm').addEventListener('click', function () {
+            var urlInput = document.getElementById('cinema-source-url-input');
+            var errorEl = document.getElementById('cinema-source-url-error');
+            var url = urlInput.value.trim();
+            errorEl.textContent = '';
+            if (!url) { errorEl.textContent = '填一下视频链接吧'; return; }
+            if (!/^https?:\/\//i.test(url)) { errorEl.textContent = '链接格式不对，得是 http:// 或 https:// 开头'; return; }
+            var titleGuess = '网络视频';
+            try {
+                var path = new URL(url).pathname;
+                var last = path.split('/').filter(Boolean).pop();
+                if (last) titleGuess = decodeURIComponent(last.replace(/\.[^.]+$/, ''));
+            } catch (e) { /* 解析失败就用默认标题，不影响功能 */ }
+            close();
+            onPicked(url, titleGuess);
         });
     }
 
@@ -912,8 +995,7 @@
                     '</div>' +
                     (locked ? '<div class="cinema-appt-countdown">' + _countdownText() + '后可选择影片</div>' : '') +
                 '</div>' +
-            '</div>' +
-            '<input type="file" id="cinema-waiting-file-input" accept="video/*" style="display:none;">';
+            '</div>';
 
         document.getElementById('cinema-cancel-btn').addEventListener('click', function () {
             _clearWaitTimer();
@@ -924,30 +1006,26 @@
         });
 
         var startBtn = document.getElementById('cinema-start-btn');
-        var waitingFileInput = document.getElementById('cinema-waiting-file-input');
         if (startBtn && !locked) {
             startBtn.addEventListener('click', function () {
-                waitingFileInput.click();
+                _openVideoSourceModal(function (src, title) {
+                    _clearWaitTimer();
+                    _currentVideo.src = src;
+                    _currentVideo.title = title;
+                    _immersive = true;
+                    _renderLoading();
+                    setTimeout(function () {
+                        _uiState = 'watching';
+                        _watchStartedAt = Date.now();
+                        window._cinemaWatching = true;
+                        _apptSave();
+                        _cinemaSendWatchEvent(true);
+                        _scheduleWatchAutoEnd();
+                        _cinemaRender();
+                    }, 1650);
+                });
             });
         }
-        waitingFileInput.addEventListener('change', function (e) {
-            var file = e.target.files && e.target.files[0];
-            if (!file) return; // 用户在文件框里取消了，留在原地不跳转
-            _clearWaitTimer();
-            _currentVideo.src = URL.createObjectURL(file);
-            _currentVideo.title = file.name.replace(/\.[^.]+$/, '');
-            _immersive = true;
-            _renderLoading();
-            setTimeout(function () {
-                _uiState = 'watching';
-                _watchStartedAt = Date.now();
-                window._cinemaWatching = true;
-                _apptSave();
-                _cinemaSendWatchEvent(true);
-                _scheduleWatchAutoEnd();
-                _cinemaRender();
-            }, 1650);
-        });
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
 
         // 未到时间：定时轮询，一旦解锁自动刷新按钮态
@@ -1000,8 +1078,7 @@
                 _chatAreaHTML() +
                 '<div class="cinema-typing-fixed" id="cinema-typing-fixed" style="display:none;"></div>' +
                 _inputBarHTML() +
-            '</div>' +
-            '<input type="file" id="cinema-file-input" accept="video/*" style="display:none;">';
+            '</div>';
 
         if (_immersive) {
             _bindTheaterHdListeners();
@@ -1021,22 +1098,26 @@
             }
         }
 
+        // 视频加载失败（网络直链链接失效、格式不支持等）弹居中提示，
+        // 不管是刚进来的这个视频，还是换片换过来的新视频，都走这一个监听
+        var videoEl = document.getElementById('cinema-video');
+        if (videoEl) {
+            videoEl.addEventListener('error', function () {
+                _showVideoLoadErrorModal();
+            });
+        }
+
         document.getElementById('cinema-change-film-btn').addEventListener('click', function () {
-            document.getElementById('cinema-file-input').click();
-        });
-        document.getElementById('cinema-file-input').addEventListener('change', function (e) {
-            var file = e.target.files && e.target.files[0];
-            if (!file) return;
-            var video = document.getElementById('cinema-video');
-            var titleEl = document.getElementById('cinema-watch-title');
-            if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
-            var newSrc = URL.createObjectURL(file);
-            var newTitle = file.name.replace(/\.[^.]+$/, '');
-            _currentVideo.src = newSrc;
-            _currentVideo.title = newTitle;
-            video.src = newSrc;
-            video.play();
-            if (titleEl) titleEl.textContent = newTitle;
+            _openVideoSourceModal(function (src, title) {
+                var video = document.getElementById('cinema-video');
+                var titleEl = document.getElementById('cinema-watch-title');
+                if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
+                _currentVideo.src = src;
+                _currentVideo.title = title;
+                video.src = src;
+                video.play();
+                if (titleEl) titleEl.textContent = title;
+            });
         });
         document.getElementById('cinema-end-btn').addEventListener('click', function () {
             var doEnd = function () {
@@ -2162,6 +2243,10 @@
         }
         _autoEndWatching();
         console.log('[cinema] 已强制触发"自动结束观影"');
+    };
+    // 不用真的填个坏链接，直接看一眼"视频加载失败"弹窗长什么样
+    window._cinemaDebugShowVideoError = function () {
+        _showVideoLoadErrorModal();
     };
     // 跳过邀请/等待/选片，直接进入观影中状态（走完整流程：记开始时间、
     // 发"观影已开始"事件、启动6~8小时自动结束定时器），方便测试

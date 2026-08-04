@@ -1300,4 +1300,78 @@
         hookCsSwitchTab();
     })();
 
+    // ── 主聊天里的"电影邀请卡"消息类型 ────────────────────
+    // 包一层 window.createMessageFragment（跟上面包 csSwitchTab 同一个原理），
+    // 遇到 msg.type === 'cinema-invite' 就渲染邀请卡，其余类型原样交给原函数处理，
+    // 完全不用改 core.js。
+    var CINEMA_INVITE_BG = 'assets/cinema/invite-card-bg.svg';
+
+    function _cinemaInviteCardFragment(msg) {
+        var data = msg.cinemaInviteData || {};
+        var primaryText = data.primaryText || '接受邀请';
+        var secondaryText = data.secondaryText || '更换时间';
+        var fragment = new DocumentFragment();
+        var wrap = document.createElement('div');
+        wrap.className = 'message message-received message-image-bubble-none cinema-invite-msg-wrap';
+        wrap.dataset.id = msg.id;
+        wrap.innerHTML =
+            '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.apptId || '')) + '">' +
+                '<img class="cinema-invite-card-bg" src="' + CINEMA_INVITE_BG + '" alt="">' +
+                '<div class="cinema-invite-card-movie">' + _escapeHtml(data.movieTitle || '') + '</div>' +
+                '<div class="cinema-invite-card-time">' + _escapeHtml((data.dateStr || '') + '  ' + (data.timeStr || '')) + '</div>' +
+                '<div class="cinema-invite-card-actions">' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="reschedule">' + _escapeHtml(secondaryText) + '</button>' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">' + _escapeHtml(primaryText) + '</button>' +
+                '</div>' +
+            '</div>';
+        fragment.appendChild(wrap);
+        return fragment;
+    }
+
+    function _hookCreateMessageFragment() {
+        function tryHook() {
+            if (typeof window.createMessageFragment !== 'function') {
+                setTimeout(tryHook, 100);
+                return;
+            }
+            var origFn = window.createMessageFragment;
+            window.createMessageFragment = function (msg, prevMsg, nextMsg, lastSenderRef) {
+                if (msg && msg.type === 'cinema-invite') {
+                    if (lastSenderRef) lastSenderRef.current = 'partner';
+                    return _cinemaInviteCardFragment(msg);
+                }
+                return origFn.apply(this, arguments);
+            };
+        }
+        tryHook();
+    }
+    _hookCreateMessageFragment();
+
+    // ── 调试专用：往主聊天发一张测试邀请卡，方便先看卡片效果 ──
+    window._cinemaDebugSendInviteCard = function (movieTitle, dateStr, timeStr) {
+        if (typeof addMessage !== 'function') {
+            console.warn('[cinema] addMessage 不可用，无法发送邀请卡');
+            return;
+        }
+        addMessage({
+            id: Date.now() + Math.random(),
+            sender: 'partner',
+            text: '',
+            timestamp: new Date(),
+            status: 'received',
+            type: 'cinema-invite',
+            cinemaInviteData: {
+                apptId: 'debug-' + Date.now(),
+                movieTitle: movieTitle || '阿嫊的情书',
+                dateStr: dateStr || '2026年8月3日',
+                timeStr: timeStr || '20:30',
+                primaryText: '接受邀请',
+                secondaryText: '更换时间'
+            },
+            favorited: false,
+            note: null
+        });
+        console.log('[cinema] 测试邀请卡已发送到主聊天');
+    };
+
 })();

@@ -2061,33 +2061,7 @@
         setTimeout(_negoBootCheck, 0);
     }
 
-    // ── 手机上没法敲控制台时用：网址后面加 ?cinemaDebug=waiting 打开一次，
-    //    自动把状态设成"约定已生效、可以选片开始"，等价于在电脑控制台跑
-    //    _cinemaDebugGoto('waiting'); _cinemaDebugUnlock();
-    //    只在检测到这个参数时才会动，平时正常打开网址完全不受影响。
-    function _cinemaUrlDebugBootCheck() {
-        try {
-            var params = new URLSearchParams(location.search);
-            if (params.get('cinemaDebug') !== 'waiting') return;
-        } catch (e) { return; }
-        Promise.all([_apptLoad(), _negoLoad()]).then(function () {
-            _uiState = 'waiting';
-            var now = new Date();
-            _fakeAppt.dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
-            _fakeAppt.timeStr = '00:00';
-            if (!_fakeAppt.movieTitle) _fakeAppt.movieTitle = '阿嫊的情书';
-            _apptSave();
-            if (_getPanel()) _cinemaRender();
-            console.log('[cinema] 已通过网址参数注入：约定生效 + 选片解锁');
-        });
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _cinemaUrlDebugBootCheck);
-    } else {
-        setTimeout(_cinemaUrlDebugBootCheck, 0);
-    }
-
-
+    // ── app 启动时检查：如果已经有约定在等待观影，恢复开场前提醒的调度 ──
     function _showtimeReminderBootCheck() {
         _apptLoad().then(function () {
             if (_uiState === 'waiting') _scheduleShowtimeReminder();

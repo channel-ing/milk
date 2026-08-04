@@ -1503,9 +1503,9 @@
         _negoReplyTimer = setTimeout(_negoResolveReply, delay);
     }
 
-    function _negoResolveReply() {
+    function _negoResolveReply(forceAccept) {
         if (!_negoState || !_negoState.active) return;
-        var accept = Math.random() < _negoAcceptProbability(_negoState.replyIndex);
+        var accept = (typeof forceAccept === 'boolean') ? forceAccept : (Math.random() < _negoAcceptProbability(_negoState.replyIndex));
         if (accept) {
             _fakeAppt = { movieTitle: _negoState.movieTitle, dateStr: _negoState.dateStr, timeStr: _negoState.timeStr };
             _uiState = 'waiting';
@@ -1631,7 +1631,21 @@
         if (!_negoState || !_negoState.active) { console.log('[cinema] 目前没有进行中的协商'); return; }
         if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
         _negoResolveReply();
-        console.log('[cinema] 已强制触发梦角回复');
+        console.log('[cinema] 已强制触发梦角回复（走真实概率，可能同意也可能换时间）');
+    };
+    // 强制这一次回复一定是"换时间"，方便测试改时间的弹窗，不用反复重试等运气
+    window._cinemaDebugForceCounter = function () {
+        if (!_negoState || !_negoState.active) { console.log('[cinema] 目前没有进行中的协商'); return; }
+        if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        _negoResolveReply(false);
+        console.log('[cinema] 已强制触发"换时间"，去主聊天看新的邀请卡');
+    };
+    // 强制这一次回复一定是"同意"，方便测试约定成功的流程
+    window._cinemaDebugForceAccept = function () {
+        if (!_negoState || !_negoState.active) { console.log('[cinema] 目前没有进行中的协商'); return; }
+        if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        _negoResolveReply(true);
+        console.log('[cinema] 已强制触发"同意"');
     };
 
 })();

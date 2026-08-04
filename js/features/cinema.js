@@ -1454,6 +1454,17 @@
     };
 
     // ── 对外暴露 ─────────────────────────────────────────
+    // ── 供 companion.js / call.js 调用的统一判断：观影中，或者约定时间前2小时内，
+    //    都不应该弹陪伴邀请/视频通话邀请（避免撞车，也避免用户正准备看电影时被打扰）──
+    window._cinemaShouldBlockInterruptions = function () {
+        if (window._cinemaWatching) return true;
+        if (_uiState === 'waiting') {
+            var d = _parseApptDate();
+            if (d && (d.getTime() - Date.now()) <= 2 * 3600000) return true;
+        }
+        return false;
+    };
+
     window._cinemaInit = function () {
         _bindOutsideClickOnce();
         Promise.all([_apptLoad(), _negoLoad()]).then(function () {
@@ -1915,16 +1926,30 @@
         _negoUpdateBadges();
     }
 
-    // 挑电影：90% 从心愿单里挑一部没看过的，10% 从观看历史里挑一部看过的重温
+    // 挑电影：80% 从心愿单挑没看过的，10% 从"看过的池子"（心愿单勾了已看过的 +
+    // 影评里正式记录的观看历史，这两个合并算一类）挑一个重温，10% 直接说"一起看电影吧"
+    // 不提具体片名。如果骰到的那个方向刚好没数据，再骰一次 50/50：
+    // 50% 换另一个池子接着挑，50% 直接说"一起看电影吧"——两个方向都是对称的规则。
     function _pickMoviePartnerInvite() {
-        var notWatched = (_watchlist || []).filter(function (w) { return !w.watched; });
-        var watchedPool = (_history || []);
-        var canRewatch = watchedPool.length > 0;
-        var canFresh = notWatched.length > 0;
-        if (!canRewatch && !canFresh) return '一起看电影'; // 心愿单和历史都是空的，用固定文案，不跳过
-        var useRewatch = canRewatch && (!canFresh || Math.random() < 0.1);
-        if (useRewatch) return watchedPool[Math.floor(Math.random() * watchedPool.length)].title;
-        return notWatched[Math.floor(Math.random() * notWatched.length)].title;
+        var notWatchedPool = (_watchlist || []).filter(function (w) { return !w.watched; });
+        var watchedPool = (_history || []).concat((_watchlist || []).filter(function (w) { return w.watched; }));
+
+        function pickFrom(pool) { return pool[Math.floor(Math.random() * pool.length)].title; }
+        function fallbackPick(altPool) {
+            if (altPool.length > 0 && Math.random() < 0.5) return pickFrom(altPool);
+            return '一起看电影';
+        }
+
+        var roll = Math.random();
+        if (roll < 0.8) { // 80%：心愿单没看过的
+            if (notWatchedPool.length > 0) return pickFrom(notWatchedPool);
+            return fallbackPick(watchedPool);
+        } else if (roll < 0.9) { // 10%：看过的重温
+            if (watchedPool.length > 0) return pickFrom(watchedPool);
+            return fallbackPick(notWatchedPool);
+        } else { // 10%：直接邀请，不用管有没有数据
+            return '一起看电影';
+        }
     }
 
     // 挑时间：12~72 小时后，取整到最近的半小时

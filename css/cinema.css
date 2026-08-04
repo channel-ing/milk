@@ -563,6 +563,9 @@
     display: block;
     object-fit: contain;
 }
+.cinema-video-iframe {
+    border: none;
+}
 
 /* ── 嵌入视图下：右下角"进入沉浸模式"按钮 ─────────────── */
 .cinema-immersive-btn {

@@ -45,6 +45,50 @@
     // 观影中：当前视频信息（从 waiting 跳转过来时写入）
     var _currentVideo = { src: '', title: '' };
 
+    // ── 约定状态持久化：_uiState + _fakeAppt ──────────────
+    // 之前这两个是纯内存变量，刷新/重进页面就丢，导致约好了时间也会
+    // 打回"待邀请"。现在跟待看清单/观看历史一样存到 localforage。
+    // 注意：'watching' 不落盘 —— 播放的视频是本地文件对象(createObjectURL)，
+    // 刷新后浏览器拿不到这个文件了没法自动续播，所以观影中被刷新/重进时
+    // 退回到 'waiting'（约定还在，只是要重新选一次片），而不是清空到 'empty'。
+    var _apptLoaded = false;
+    var _apptStorageKey = null;
+    async function _apptGetKey() {
+        if (_apptStorageKey) return _apptStorageKey;
+        try {
+            var allKeys = await localforage.keys();
+            var found = allKeys.find(function (k) { return k.indexOf('_cinemaAppt') !== -1; });
+            if (found) { _apptStorageKey = found; return found; }
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            _apptStorageKey = prefix + '_cinemaAppt';
+        } catch (e) {
+            _apptStorageKey = 'CHAT_APP_V3__cinemaAppt';
+        }
+        return _apptStorageKey;
+    }
+    async function _apptLoad() {
+        if (_apptLoaded) return;
+        _apptLoaded = true;
+        try {
+            var key = await _apptGetKey();
+            var saved = await localforage.getItem(key);
+            if (saved && typeof saved === 'object') {
+                if (saved.fakeAppt) _fakeAppt = saved.fakeAppt;
+                if (saved.uiState === 'waiting' || saved.uiState === 'watching') {
+                    _uiState = 'waiting'; // watching 也统一落回 waiting，见上面注释
+                }
+            }
+        } catch (e) { console.warn('[cinema] 约定状态加载失败:', e); }
+    }
+    async function _apptSave() {
+        try {
+            var key = await _apptGetKey();
+            var stateToSave = (_uiState === 'watching') ? 'waiting' : _uiState;
+            await localforage.setItem(key, { uiState: stateToSave, fakeAppt: _fakeAppt });
+        } catch (e) { console.warn('[cinema] 约定状态保存失败:', e); }
+    }
+
     // 本次观影会话的聊天记录（内存态，结束观影时清空）
     var _cinemaMessages = [];
 
@@ -466,6 +510,7 @@
 
         document.getElementById('cinema-invite-btn').addEventListener('click', function () {
             _uiState = 'waiting';
+            _apptSave();
             _cinemaRender();
         });
         document.getElementById('cinema-archive-btn').addEventListener('click', _openArchive);
@@ -504,6 +549,7 @@
         document.getElementById('cinema-cancel-btn').addEventListener('click', function () {
             _clearWaitTimer();
             _uiState = 'empty';
+            _apptSave();
             _cinemaRender();
         });
 
@@ -524,6 +570,7 @@
             _renderLoading();
             setTimeout(function () {
                 _uiState = 'watching';
+                _apptSave();
                 _cinemaRender();
             }, 1650);
         });
@@ -627,6 +674,7 @@
             _endWatchingCleanup();
             _exitTheaterMode();
             _uiState = 'empty';
+            _apptSave();
             _cinemaRender();
         });
 
@@ -982,6 +1030,7 @@
     // ── 调试专用：跳过邀请/倒计时，直接切状态（浏览器控制台里手动调用）──
     window._cinemaDebugGoto = function (state) {
         _uiState = state;
+        _apptSave();
         _cinemaRender();
     };
     // 把约定时间改成"刚刚"，强制解锁选片按钮（waiting 状态下调用）
@@ -989,6 +1038,7 @@
         var now = new Date();
         _fakeAppt.dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
         _fakeAppt.timeStr = '00:00';
+        _apptSave();
         if (_uiState === 'waiting') _renderWaiting();
     };
     // 把约定时间改成 1 小时后，强制锁定选片按钮，方便看倒计时文案
@@ -996,9 +1046,18 @@
         var future = new Date(Date.now() + 3600000);
         _fakeAppt.dateStr = future.getFullYear() + '年' + (future.getMonth() + 1) + '月' + future.getDate() + '日';
         _fakeAppt.timeStr = String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0');
+        _apptSave();
         if (_uiState === 'waiting') _renderWaiting();
     };
 
+    // 清空约定状态持久化数据，方便测试（回到最初的"待邀请"）
+    window._cinemaDebugResetAppt = function () {
+        _uiState = 'empty';
+        _fakeAppt = { movieTitle: '阿嫚的情书', dateStr: '2026年8月3日', timeStr: '20:30' };
+        _apptSave();
+        _cinemaRender();
+        console.log('[cinema] 约定状态已重置为 empty');
+    };
     // ── 调试专用：诊断梦角不回复 ──────────────────────────
     // 控制台运行 _cinemaDebugReply() 可看到字卡池状态，并强制触发一次回复
     window._cinemaDebugReply = function () {
@@ -1020,7 +1079,9 @@
     // ── 对外暴露 ─────────────────────────────────────────
     window._cinemaInit = function () {
         _bindOutsideClickOnce();
-        _cinemaRender();
+        _apptLoad().then(function () {
+            _cinemaRender();
+        });
     };
 
     // ── 接管 csSwitchTab：切到别的功能 tab 时，如果影日志档案页还开着

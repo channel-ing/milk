@@ -682,6 +682,8 @@
         // 如果当前已经在陪伴中或有其他陪伴弹窗/过渡画面在，跳过
         if (document.getElementById('companion-page')?.classList.contains('active')) return;
         if (document.querySelector('#companion-inviting-overlay, #companion-incoming-overlay, #companion-modal-dynamic, #setup-modal-dynamic, #time-modal-dynamic, .companion-transition')) return;
+        // 观影中不弹陪伴邀请
+        if (window._cinemaWatching) return;
         // 通话中不弹陪伴邀请
         const isCallActive = document.getElementById('call-window')?.classList.contains('visible')
             || document.getElementById('call-incoming-overlay')?.classList.contains('visible')

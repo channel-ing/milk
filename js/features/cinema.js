@@ -1326,6 +1326,8 @@
             actionsHtml = '<div class="cinema-invite-card-status">等待' + _escapeHtml(partnerName) + '回复中…</div>';
         } else if (state === 'accepted') {
             actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--ok">🎉 约定成功</div>';
+        } else if (state === 'expired') {
+            actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--expired">这次没约上呢…</div>';
         } else {
             actionsHtml =
                 '<div class="cinema-invite-card-actions">' +
@@ -1404,6 +1406,7 @@
     var _negoLoaded = false;
     var _negoStorageKey = null;
     var _negoReplyTimer = null;
+    var _negoReminderTimer = null;
 
     async function _negoGetKey() {
         if (_negoStorageKey) return _negoStorageKey;
@@ -1437,10 +1440,12 @@
     async function _negoClear() {
         _negoState = null;
         if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
+        if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
         try {
             var key = await _negoGetKey();
             await localforage.removeItem(key);
         } catch (e) { console.warn('[cinema] 协商状态清除失败:', e); }
+        _negoUpdateBadges();
     }
 
     // 第几次回复对应的"梦角同意"概率：第1次70%，第2次90%，第3次及以后100%
@@ -1448,6 +1453,78 @@
         if (replyIndex <= 1) return 0.7;
         if (replyIndex === 2) return 0.9;
         return 1;
+    }
+
+    // ── 提醒 + 过期：只在"轮到用户回应"（_negoState.turn === 'user'）时生效 ──
+    // 解析当前协商里的电影时间，算出"过期时间点" = 电影时间 - 1小时
+    function _negoComputeDeadline() {
+        if (!_negoState) return null;
+        var m = /(\d+)年(\d+)月(\d+)日/.exec(_negoState.dateStr || '');
+        var t = /(\d+):(\d+)/.exec(_negoState.timeStr || '');
+        if (!m || !t) return null;
+        var movieTime = new Date(+m[1], +m[2] - 1, +m[3], +t[1], +t[2], 0, 0);
+        return movieTime.getTime() - 3600000;
+    }
+    // 排下一次"提醒/过期"事件：常规每 3~8 小时重发同一张卡；
+    // 保底在"过期前 2 小时"一定有一次；到了过期时间点就直接判定没约上
+    function _negoScheduleReminderCycle() {
+        if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
+        if (!_negoState || !_negoState.active || _negoState.turn !== 'user') return;
+        var deadline = _negoComputeDeadline();
+        if (deadline === null) return; // 时间解析失败就不设这套机制，避免出错
+        var now = Date.now();
+        if (now >= deadline) { _negoExpire(); return; }
+        var finalReminderAt = deadline - 2 * 3600000;
+        var nextAt = now + (3 + Math.random() * 5) * 3600000; // 常规：3~8 小时后
+        if (finalReminderAt > now && nextAt >= finalReminderAt) nextAt = finalReminderAt; // 保底
+        if (nextAt >= deadline) nextAt = deadline; // 别越过过期点
+        _negoState.nextReminderAt = nextAt;
+        _negoSave();
+        _negoReminderTimer = setTimeout(_negoReminderFire, nextAt - now);
+    }
+    function _negoReminderFire() {
+        if (!_negoState || !_negoState.active || _negoState.turn !== 'user') return;
+        var deadline = _negoComputeDeadline();
+        if (deadline !== null && Date.now() >= deadline) { _negoExpire(); return; }
+        // 重发同一张卡，内容跟上次完全一样，不做任何变化
+        _cinemaSendInviteCard('countered', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        _negoScheduleReminderCycle();
+    }
+    // 到了"电影时间前1小时"这个点还没回应，发一张"没约上"的卡（不是文字），
+    // 然后清掉协商——顺便解锁梦角以后的主动邀请（不会被卡死）
+    function _negoExpire() {
+        if (!_negoState) return;
+        _cinemaSendInviteCard('expired', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+        _negoClear();
+    }
+
+    // ── 小红点：电影院tab图标 + 主聊天头部"情侣空间"入口，只要轮到用户回应就一直显示 ──
+    function _negoEnsureBadgeElements() {
+        var cinemaTab = document.getElementById('csp-cinema');
+        if (cinemaTab && !document.getElementById('cinema-tab-invite-badge')) {
+            cinemaTab.style.position = 'relative';
+            var dot1 = document.createElement('span');
+            dot1.id = 'cinema-tab-invite-badge';
+            dot1.className = 'cinema-invite-dot';
+            dot1.style.display = 'none';
+            cinemaTab.appendChild(dot1);
+        }
+        var momentsBtn = document.getElementById('moments-header-btn');
+        if (momentsBtn && !document.getElementById('cinema-header-invite-badge')) {
+            var dot2 = document.createElement('span');
+            dot2.id = 'cinema-header-invite-badge';
+            dot2.className = 'cinema-invite-dot';
+            dot2.style.display = 'none';
+            momentsBtn.appendChild(dot2);
+        }
+    }
+    function _negoUpdateBadges() {
+        _negoEnsureBadgeElements();
+        var show = !!(_negoState && _negoState.active && _negoState.turn === 'user');
+        ['cinema-tab-invite-badge', 'cinema-header-invite-badge'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = show ? 'block' : 'none';
+        });
     }
 
     // 生成梦角的"换时间"提议：在基准时间前后 2~3 小时内随机取一个点，尽量取整（round 到最近的半小时）
@@ -1481,8 +1558,10 @@
     // 开始新一轮协商（用户主动邀请，或者用户换时间后重新提议）—— 发"等待中"卡 + 排定梦角的定时回复
     function _negoStartRound(movieTitle, dateStr, timeStr, replyIndex) {
         var negoId = 'nego-' + Date.now();
+        if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
         _negoState = {
             active: true,
+            turn: 'partner', // 球在梦角那边，等它回复
             replyIndex: replyIndex, // 这是梦角接下来要做的第几次回复
             movieTitle: movieTitle,
             dateStr: dateStr,
@@ -1494,6 +1573,7 @@
         _cinemaSendInviteCard('pending', movieTitle, dateStr, timeStr, negoId);
         if (typeof showNotification === 'function') showNotification('邀请已发出', 'success');
         _negoScheduleReply();
+        _negoUpdateBadges();
     }
 
     function _negoScheduleReply() {
@@ -1519,10 +1599,13 @@
             _negoState.dateStr = newTime.dateStr;
             _negoState.timeStr = newTime.timeStr;
             _negoState.active = true;
+            _negoState.turn = 'user'; // 球换到用户这边，等用户回应
             // replyIndex 不变——它代表"梦角刚做的这次回复是第几次"，用户看到后如果换时间，
             // 下一次梦角回复时 replyIndex 才 +1（见 reschedule 按钮的处理）
             _negoSave();
             _cinemaSendInviteCard('countered', _negoState.movieTitle, _negoState.dateStr, _negoState.timeStr, _negoState.negoId);
+            _negoScheduleReminderCycle();
+            _negoUpdateBadges();
         }
     }
 
@@ -1622,6 +1705,7 @@
         var negoId = 'nego-' + Date.now();
         _negoState = {
             active: true,
+            turn: 'user', // 球一开始就在用户这边，等用户回应
             replyIndex: 0, // 用户还没被梦角"回复"过；用户换时间后才变成第1轮(70%)
             movieTitle: movieTitle,
             dateStr: dateStr,
@@ -1630,6 +1714,8 @@
         };
         _negoSave();
         _cinemaSendInviteCard('countered', movieTitle, dateStr, timeStr, negoId);
+        _negoScheduleReminderCycle();
+        _negoUpdateBadges();
     }
 
     // 挑电影：90% 从心愿单里挑一部没看过的，10% 从观看历史里挑一部看过的重温
@@ -1745,7 +1831,11 @@
     // ── app 启动时检查：如果有正在进行的协商，恢复定时器（哪怕中途关过 app）──
     function _negoBootCheck() {
         _negoLoad().then(function () {
-            if (_negoState && _negoState.active) _negoScheduleReply();
+            if (_negoState && _negoState.active) {
+                if (_negoState.turn === 'user') _negoScheduleReminderCycle();
+                else _negoScheduleReply();
+            }
+            _negoUpdateBadges();
         });
     }
     if (document.readyState === 'loading') {
@@ -1800,6 +1890,27 @@
     window._cinemaDebugPartnerInviteStatus = function () {
         console.log('[cinema] 梦角主动邀请状态:', _partnerInviteState);
         return _partnerInviteState;
+    };
+
+    // 强制立刻重发一次提醒卡（不用等 3~8 小时），前提是当前轮到用户回应
+    window._cinemaDebugForceReminder = function () {
+        if (!_negoState || !_negoState.active || _negoState.turn !== 'user') {
+            console.log('[cinema] 现在没有"轮到用户回应"的协商，不会有提醒');
+            return;
+        }
+        if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
+        _negoReminderFire();
+        console.log('[cinema] 已强制重发一次提醒卡');
+    };
+    // 强制立刻判定"过期/没约上"（不用等到电影时间前1小时）
+    window._cinemaDebugForceExpire = function () {
+        if (!_negoState || !_negoState.active) {
+            console.log('[cinema] 现在没有进行中的协商');
+            return;
+        }
+        if (_negoReminderTimer) { clearTimeout(_negoReminderTimer); _negoReminderTimer = null; }
+        _negoExpire();
+        console.log('[cinema] 已强制判定"没约上"');
     };
 
 })();

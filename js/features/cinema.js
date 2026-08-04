@@ -341,6 +341,7 @@
         if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); _cinemaPendingReplyTimer = null; }
         _cinemaHideTyping();
         _clearWatchAutoEnd();
+        window._cinemaWatching = false;
     }
 
     // 观影开始/结束，往主聊天发一条事件记录（复用 call-event 那套小药丸样式，
@@ -938,6 +939,7 @@
             setTimeout(function () {
                 _uiState = 'watching';
                 _watchStartedAt = Date.now();
+                window._cinemaWatching = true;
                 _apptSave();
                 _cinemaSendWatchEvent(true);
                 _scheduleWatchAutoEnd();
@@ -2136,6 +2138,24 @@
         }
         _autoEndWatching();
         console.log('[cinema] 已强制触发"自动结束观影"');
+    };
+    // 跳过邀请/等待/选片，直接进入观影中状态（走完整流程：记开始时间、
+    // 发"观影已开始"事件、启动6~8小时自动结束定时器），方便测试
+    window._cinemaDebugStartWatching = function (title) {
+        _clearWaitTimer();
+        if (_showtimeReminderTimer) { clearTimeout(_showtimeReminderTimer); _showtimeReminderTimer = null; }
+        if (!_fakeAppt.movieTitle) _fakeAppt.movieTitle = title || '阿嫊的情书';
+        _currentVideo.src = '';
+        _currentVideo.title = title || _fakeAppt.movieTitle || '测试片名';
+        _immersive = true;
+        _uiState = 'watching';
+        _watchStartedAt = Date.now();
+        window._cinemaWatching = true;
+        _apptSave();
+        _cinemaSendWatchEvent(true);
+        _scheduleWatchAutoEnd();
+        if (_getPanel()) _cinemaRender();
+        console.log('[cinema] 已直接进入观影中状态（没有真实视频文件，播放器会是空的，但周边逻辑都是真实跑的）');
     };
 
 })();

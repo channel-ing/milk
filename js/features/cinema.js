@@ -190,6 +190,37 @@
         _cinemaCenterConfirm('视频加载失败', '检查一下链接是否正确，或者换一个视频源试试', '知道了', null, true);
     }
 
+    // 监听视频是否真的加载成功——不能只靠 error 事件，有些"假直链"服务器返回的
+    // 其实是登录页/提示页而不是真视频数据，浏览器不一定会触发标准 error，只会卡在
+    // 空白播放器上。所以加一层 8 秒超时兜底：到点了既没成功也没报错，就当失败。
+    // myToken 机制：如果这期间又换了一次片，旧的这次检测会失效，不会误报。
+    var _videoLoadToken = 0;
+    function _watchVideoLoad(videoEl) {
+        if (!videoEl) return;
+        var myToken = ++_videoLoadToken;
+        var resolved = false;
+        function isCurrent() { return myToken === _videoLoadToken; }
+        var timer = setTimeout(function () {
+            if (resolved || !isCurrent()) return;
+            resolved = true;
+            _showVideoLoadErrorModal();
+        }, 8000);
+        function onSuccess() {
+            if (resolved || !isCurrent()) return;
+            resolved = true;
+            clearTimeout(timer);
+        }
+        function onFail() {
+            if (resolved || !isCurrent()) return;
+            resolved = true;
+            clearTimeout(timer);
+            _showVideoLoadErrorModal();
+        }
+        videoEl.addEventListener('loadedmetadata', onSuccess, { once: true });
+        videoEl.addEventListener('canplay', onSuccess, { once: true });
+        videoEl.addEventListener('error', onFail, { once: true });
+    }
+
     // ── 选择影片来源：本地文件 / 输入直连网址，选完统一走 onPicked(src, title) 回调 ──
     function _openVideoSourceModal(onPicked) {
         var old = document.getElementById('cinema-source-modal');
@@ -1098,14 +1129,13 @@
             }
         }
 
-        // 视频加载失败（网络直链链接失效、格式不支持等）弹居中提示，
-        // 不管是刚进来的这个视频，还是换片换过来的新视频，都走这一个监听
+        // 视频加载失败检测：不能只靠 error 事件——有些"假直链"(比如网盘分享链接，
+        // 服务器返回的其实是登录页/提示页，不是真视频数据)浏览器不一定会触发标准的
+        // error，只会卡在一个空白、时长 0:00 的播放器上。所以加一层超时兜底：
+        // 8秒内既没有真正加载出内容、也没有报错，就直接当失败处理。
+        // 用 token 机制防止连续换片时，上一次的检测干扰这一次的判断。
         var videoEl = document.getElementById('cinema-video');
-        if (videoEl) {
-            videoEl.addEventListener('error', function () {
-                _showVideoLoadErrorModal();
-            });
-        }
+        _watchVideoLoad(videoEl);
 
         document.getElementById('cinema-change-film-btn').addEventListener('click', function () {
             _openVideoSourceModal(function (src, title) {
@@ -1117,6 +1147,7 @@
                 video.src = src;
                 video.play();
                 if (titleEl) titleEl.textContent = title;
+                _watchVideoLoad(video);
             });
         });
         document.getElementById('cinema-end-btn').addEventListener('click', function () {

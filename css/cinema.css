@@ -1138,14 +1138,13 @@
 
 /* ── 主聊天里的电影邀请卡（由梦角发出）───────────────── */
 .cinema-invite-msg-wrap {
-    display: flex;
-    justify-content: flex-start;
+    display: block;
     margin: 4px 0;
 }
 .cinema-invite-card {
     position: relative;
     width: 240px;
-    aspect-ratio: 768 / 798;
+    height: 249px; /* 240 * (798/768)，跟背景图原始比例一致，直接写死，不用 aspect-ratio 反推高度 */
     border-radius: 14px;
     overflow: hidden;
 }

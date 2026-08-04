@@ -99,6 +99,7 @@
         var defaultDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
         var later = new Date(now.getTime() + 3600000);
         var defaultTime = String(later.getHours()).padStart(2, '0') + ':' + String(later.getMinutes()).padStart(2, '0');
+        var minDate = defaultDate; // 日期选择器不能选比今天更早的日期
 
         var sheet = document.createElement('div');
         sheet.id = 'cinema-invite-sheet';
@@ -110,9 +111,10 @@
                 '<div class="cinema-invite-label">片名</div>' +
                 '<input type="text" class="cinema-invite-input" id="cinema-invite-movie" maxlength="40" placeholder="想看什么电影？">' +
                 '<div class="cinema-invite-label">日期</div>' +
-                '<input type="date" class="cinema-invite-input" id="cinema-invite-date" value="' + defaultDate + '">' +
+                '<input type="date" class="cinema-invite-input" id="cinema-invite-date" min="' + minDate + '" value="' + defaultDate + '">' +
                 '<div class="cinema-invite-label">时间</div>' +
                 '<input type="time" class="cinema-invite-input" id="cinema-invite-time" value="' + defaultTime + '">' +
+                '<div class="cinema-invite-error" id="cinema-invite-error"></div>' +
                 '<div class="cinema-invite-hint">梦角还没学会拒绝，一邀请就会同意～</div>' +
                 '<div class="cinema-invite-actions">' +
                     '<button class="cinema-invite-cancel" id="cinema-invite-cancel">取消</button>' +
@@ -129,9 +131,17 @@
             var movieVal = movieInput.value.trim();
             var dateVal = document.getElementById('cinema-invite-date').value; // "YYYY-MM-DD"
             var timeVal = document.getElementById('cinema-invite-time').value; // "HH:MM"
+            var errorEl = document.getElementById('cinema-invite-error');
+            errorEl.textContent = '';
             if (!movieVal) { movieInput.focus(); return; }
             var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateVal || '');
-            if (!dm || !timeVal) return;
+            var tm = /^(\d{2}):(\d{2})$/.exec(timeVal || '');
+            if (!dm || !tm) return;
+            var picked = new Date(+dm[1], +dm[2] - 1, +dm[3], +tm[1], +tm[2], 0, 0);
+            if (picked.getTime() <= Date.now()) {
+                errorEl.textContent = '约的时间不能早于现在，改一下吧';
+                return;
+            }
             _fakeAppt = {
                 movieTitle: movieVal,
                 dateStr: (+dm[1]) + '年' + (+dm[2]) + '月' + (+dm[3]) + '日',
@@ -141,6 +151,34 @@
             _apptSave();
             close();
             _cinemaRender();
+        });
+    }
+
+    // ── 居中卡片式确认弹窗（跟 album.js 的 _alShowConfirm 底部弹出不一样，
+    //    这个是居中卡片，配对之前打分/邀请弹层的圆角卡片风格）──────
+    function _cinemaCenterConfirm(title, desc, confirmText, onConfirm) {
+        var old = document.getElementById('cinema-confirm-modal');
+        if (old) old.remove();
+        var modal = document.createElement('div');
+        modal.id = 'cinema-confirm-modal';
+        modal.className = 'cinema-confirm-modal';
+        modal.innerHTML =
+            '<div class="cinema-confirm-mask" id="cinema-confirm-mask"></div>' +
+            '<div class="cinema-confirm-card">' +
+                '<div class="cinema-confirm-title">' + _escapeHtml(title) + '</div>' +
+                '<div class="cinema-confirm-desc">' + _escapeHtml(desc) + '</div>' +
+                '<div class="cinema-confirm-actions">' +
+                    '<button class="cinema-confirm-cancel" id="cinema-confirm-cancel">取消</button>' +
+                    '<button class="cinema-confirm-ok" id="cinema-confirm-ok">' + _escapeHtml(confirmText) + '</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        function close() { modal.remove(); }
+        document.getElementById('cinema-confirm-mask').addEventListener('click', close);
+        document.getElementById('cinema-confirm-cancel').addEventListener('click', close);
+        document.getElementById('cinema-confirm-ok').addEventListener('click', function () {
+            close();
+            onConfirm();
         });
     }
 
@@ -246,6 +284,23 @@
     // 保证"影评"里能看到真实看过的片子，而不是只有手动造的假数据。
     // 保存前先 _histLoad()，避免这次会话都没打开过"影评"tab 时 _history
     // 还是空数组，写回去把之前存的记录覆盖掉。
+    // ── 梦角对本次观影的自动评价：100% 给星，评语从字卡池真实抽取 ──
+    // 星级 1-5 随机；评语从 customReplies 字卡池（跟聊天自动回复同一个池子）
+    // 随机不重复抽 2-4 条拼起来，绝不使用任何预设/编造的文案。
+    // 如果字卡池是空的，星级照给，评语只能空着（没有素材可用）。
+    function _cinemaGeneratePartnerReview() {
+        var stars = 1 + Math.floor(Math.random() * 5);
+        var pool = _cinemaBuildReplyPool();
+        if (!pool.length) return { stars: stars, review: '' };
+        var shuffled = pool.slice();
+        for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+        }
+        var count = Math.min(2 + Math.floor(Math.random() * 3), shuffled.length); // 2~4 条
+        return { stars: stars, review: shuffled.slice(0, count).join(' ') };
+    }
+
     function _openRatingSheet(title) {
         var old = document.getElementById('cinema-rating-sheet');
         if (old) old.remove();
@@ -259,7 +314,7 @@
                 '<div class="cinema-rating-title">《' + _escapeHtml(title) + '》看完啦</div>' +
                 '<div class="cinema-rating-sub">给这次观影打个分吧</div>' +
                 '<div id="cinema-rating-stars">' + _histStarsHTML(0, true) + '</div>' +
-                '<textarea class="cinema-rating-textarea" id="cinema-rating-review" maxlength="200" placeholder="写点感想吧…（可以不写）"></textarea>' +
+                '<textarea class="cinema-rating-textarea" id="cinema-rating-review" maxlength="200" placeholder="影评（可选）"></textarea>' +
                 '<div class="cinema-rating-actions">' +
                     '<button class="cinema-rating-skip" id="cinema-rating-skip">跳过</button>' +
                     '<button class="cinema-rating-save" id="cinema-rating-save">保存</button>' +
@@ -282,6 +337,7 @@
         function finish(withReview) {
             var reviewVal = withReview ? document.getElementById('cinema-rating-review').value.trim() : '';
             var finalStars = withReview ? stars : 0;
+            var partner = _cinemaGeneratePartnerReview();
             _histLoad().then(function () {
                 _history.unshift({
                     id: Date.now() + Math.random(),
@@ -289,8 +345,8 @@
                     ts: Date.now(),
                     userStars: finalStars,
                     userReview: reviewVal,
-                    partnerStars: 0,
-                    partnerReview: ''
+                    partnerStars: partner.stars,
+                    partnerReview: partner.review
                 });
                 _histSave();
                 sheet.remove();
@@ -790,11 +846,7 @@
                 _exitTheaterMode();
                 _openRatingSheet(watchedTitle);
             };
-            if (typeof _alShowConfirm === 'function') {
-                _alShowConfirm('结束观影', '确定要结束观影吗？', '结束观影', true, doEnd);
-            } else if (confirm('确定要结束观影吗？')) {
-                doEnd();
-            }
+            _cinemaCenterConfirm('结束观影', '确定要结束观影吗？', '结束观影', doEnd);
         });
 
         _bindInputBarListeners();

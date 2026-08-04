@@ -1139,6 +1139,7 @@
 /* ── 主聊天里的电影邀请卡（由梦角发出）───────────────── */
 .cinema-invite-msg-wrap {
     display: block;
+    flex-shrink: 0;
     margin: 4px 0;
 }
 .cinema-invite-card {

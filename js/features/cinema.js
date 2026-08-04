@@ -1308,12 +1308,13 @@
     var CINEMA_INVITE_BG = 'assets/cinema/invite-card-bg.svg';
 
     // 卡片有三种状态：
-    //   pending   —— 用户刚发出的邀请，等梦角回复，没有按钮
-    //   countered —— 梦角提议了新时间，等用户选择，"更换时间"/"接受邀请"两个按钮
-    //   accepted  —— 最终同意，没有按钮，显示"约定成功"
+    //   pending   —— 用户刚发出的邀请，靠右，用户头像，没有按钮
+    //   countered —— 梦角提议了新时间，靠左，梦角头像，"更换时间"/"接受邀请"两个按钮
+    //   accepted  —— 梦角最终同意，靠左，梦角头像，没有按钮，显示"约定成功"
     function _cinemaInviteCardFragment(msg) {
         var data = msg.cinemaInviteData || {};
         var state = data.state || 'countered';
+        var isUser = state === 'pending'; // 只有"发出邀请"这个状态是用户说的话，其余都是梦角的回复
         var actionsHtml;
         if (state === 'pending') {
             actionsHtml = '<div class="cinema-invite-card-status">等待梦角回复中…</div>';
@@ -1327,15 +1328,21 @@
                 '</div>';
         }
         var fragment = new DocumentFragment();
+        // 用真正的 .message-wrapper 结构（跟主聊天普通消息完全一样），
+        // 这样自动继承 flex-shrink:0、sent/received 左右镜像、头像位置这些既有布局逻辑，
+        // 不用自己再重新发明一套。卡片本身不套 .message 气泡样式，只是内容换成卡片。
         var wrap = document.createElement('div');
-        wrap.className = 'message message-received message-image-bubble-none cinema-invite-msg-wrap';
+        wrap.className = 'message-wrapper ' + (isUser ? 'sent' : 'received') + ' cinema-invite-msg-wrap';
         wrap.dataset.id = msg.id;
         wrap.innerHTML =
-            '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.negoId || '')) + '">' +
-                '<img class="cinema-invite-card-bg" src="' + CINEMA_INVITE_BG + '" alt="">' +
-                '<div class="cinema-invite-card-movie">' + _escapeHtml(data.movieTitle || '') + '</div>' +
-                '<div class="cinema-invite-card-time">' + _escapeHtml((data.dateStr || '') + '  ' + (data.timeStr || '')) + '</div>' +
-                actionsHtml +
+            '<div class="message-avatar">' + _avatarHTML(!isUser, 36) + '</div>' +
+            '<div class="message-content-wrapper">' +
+                '<div class="cinema-invite-card" data-invite-id="' + _escapeHtml(String(data.negoId || '')) + '">' +
+                    '<img class="cinema-invite-card-bg" src="' + CINEMA_INVITE_BG + '" alt="">' +
+                    '<div class="cinema-invite-card-movie">' + _escapeHtml(data.movieTitle || '') + '</div>' +
+                    '<div class="cinema-invite-card-time">' + _escapeHtml((data.dateStr || '') + '  ' + (data.timeStr || '')) + '</div>' +
+                    actionsHtml +
+                '</div>' +
             '</div>';
         fragment.appendChild(wrap);
         return fragment;
@@ -1350,7 +1357,7 @@
             var origFn = window.createMessageFragment;
             window.createMessageFragment = function (msg, prevMsg, nextMsg, lastSenderRef) {
                 if (msg && msg.type === 'cinema-invite') {
-                    if (lastSenderRef) lastSenderRef.current = 'partner';
+                    if (lastSenderRef) lastSenderRef.current = (msg.sender === 'user' ? 'user' : 'partner');
                     return _cinemaInviteCardFragment(msg);
                 }
                 return origFn.apply(this, arguments);
@@ -1361,17 +1368,19 @@
     _hookCreateMessageFragment();
 
     // 真正把卡片发到主聊天（跟 envelope.js 一样直接裸调用 addMessage，不用改 core.js）
+    // sender 由 state 自动决定：pending 是用户发的，countered/accepted 是梦角发的
     function _cinemaSendInviteCard(state, movieTitle, dateStr, timeStr, negoId) {
         if (typeof addMessage !== 'function') {
             console.warn('[cinema] addMessage 不可用，无法发送邀请卡');
             return;
         }
+        var sender = state === 'pending' ? 'user' : 'partner';
         addMessage({
             id: Date.now() + Math.random(),
-            sender: 'partner',
+            sender: sender,
             text: '',
             timestamp: new Date(),
-            status: 'received',
+            status: sender === 'user' ? 'sent' : 'received',
             type: 'cinema-invite',
             cinemaInviteData: { state: state, movieTitle: movieTitle, dateStr: dateStr, timeStr: timeStr, negoId: negoId },
             favorited: false,

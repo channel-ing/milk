@@ -927,10 +927,21 @@
                 <i class="fas fa-cog"></i><span>情侣空间设置</span>
             </div>
 
-            <!-- 壁纸（占位） -->
+            <!-- 壁纸 -->
             <div class="settings-section">
-                <div class="settings-section-title"><i class="fas fa-image"></i> 壁纸</div>
-                <div class="cs-settings-coming">即将推出</div>
+                <div class="settings-section-title">
+                    <i class="fas fa-image"></i> 壁纸
+                    <input type="file" id="cs-bg-input" accept="image/*" style="display:none;">
+                </div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;opacity:0.75;line-height:1.5;">
+                    支持图片及 GIF 动图。点击 <i class="fas fa-plus" style="font-size:10px;"></i> 添加，点击项目应用。
+                </div>
+                <div class="bg-gallery" id="cs-bg-gallery-list"></div>
+                <div style="text-align:center;margin-top:10px;">
+                    <button class="modal-btn modal-btn-secondary" id="cs-reset-bg" style="font-size:12px;padding:6px 12px;">
+                        <i class="fas fa-undo"></i> 恢复默认壁纸
+                    </button>
+                </div>
             </div>
 
             <!-- 梦角互动速度 -->

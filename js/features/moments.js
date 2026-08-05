@@ -11,8 +11,16 @@ const _M_CD_MAX  = 72 * 60 * 60 * 1000;
 const _M_PROB    = 0.40;
 const _M_DLY_MIN = 5  * 60 * 1000;
 const _M_DLY_MAX = 20 * 60 * 1000;
+const _CS_SETTINGS_KEY = 'csSpaceSettings';
 
-const _mDly   = () => _M_DLY_MIN + Math.random() * (_M_DLY_MAX - _M_DLY_MIN);
+// 情侣空间设置（默认值）
+let _csSettings = { dlyMin: 5, dlyMax: 20, savePartnerImg: false, notifPopup: true };
+
+const _mDly   = () => {
+    const minMs = (_csSettings.dlyMin || 5) * 60000;
+    const maxMs = (_csSettings.dlyMax || 20) * 60000;
+    return minMs + Math.random() * Math.max(0, maxMs - minMs);
+};
 const _mToday = () => new Date().toISOString().slice(0, 10);
 const _mUid   = p  => (p||'id') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
 const _mPName = () => (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
@@ -67,6 +75,7 @@ function _pushNotif(type, postId) {
 }
 function _drainN(){if(_nBusy||!_nQ.length)return;_nBusy=true;_showN(_nQ.shift());}
 function _showN({type,postId}){
+    if (!_csSettings.notifPopup) { window._mND(); return; }
     const el=document.getElementById('moments-notif-popup');if(el)el.remove();
     const name=_mPName(),C={newPost:{icon:'📸',title:`${name}发了新动态`,sub:'快去看看 Ta 的动态~'},liked:{icon:'❤️',title:`${name}为你的动态点了赞`,sub:''},commented:{icon:'💬',title:`${name}评论了你的动态`,sub:'去看看 Ta 说了什么~'},replied:{icon:'💬',title:`${name}回复了你`,sub:'去看看 Ta 说了什么~'}};
     const c=C[type]||C.newPost, p=document.createElement('div'); p.id='moments-notif-popup';
@@ -655,6 +664,61 @@ window._openMomentsPost=function(postId){window.openCoupleSpace();setTimeout(()=
 
 // ─── 暴露 ───
 window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;window.checkMomentsStatus=checkMomentsStatus;window.generatePartnerMoment=generatePartnerMoment;window.onUserPostCreated=onUserPostCreated;window.onUserCommented=onUserCommented;window.getMomentsUnreadCount=getMomentsUnreadCount;window.markPostRead=markPostRead;window._updateMomentsBadge=_updateBadge;
+
+// ── 情侣空间设置读写 ──────────────────────────────────────────────────────
+async function _loadCsSettings() {
+    try {
+        const key = getStorageKey(_CS_SETTINGS_KEY);
+        const saved = await localforage.getItem(key);
+        if (saved) _csSettings = Object.assign({}, _csSettings, saved);
+    } catch(e) { console.warn('[cs-settings] 读取失败', e); }
+}
+async function _saveCsSettings() {
+    try { await localforage.setItem(getStorageKey(_CS_SETTINGS_KEY), _csSettings); }
+    catch(e) { console.warn('[cs-settings] 保存失败', e); }
+}
+
+window.openCsSettings = async function () {
+    await _loadCsSettings();
+    const minSlider  = document.getElementById('cs-dly-min-slider');
+    const maxSlider  = document.getElementById('cs-dly-max-slider');
+    const minVal     = document.getElementById('cs-dly-min-val');
+    const maxVal     = document.getElementById('cs-dly-max-val');
+    const saveToggle = document.getElementById('cs-save-img-toggle');
+    const notifToggle= document.getElementById('cs-notif-popup-toggle');
+
+    function updateSliderUI() {
+        minSlider.value = _csSettings.dlyMin;
+        maxSlider.value = _csSettings.dlyMax;
+        maxSlider.min   = _csSettings.dlyMin;
+        minSlider.max   = _csSettings.dlyMax;
+        minVal.textContent = _csSettings.dlyMin + '分钟';
+        maxVal.textContent = _csSettings.dlyMax + '分钟';
+    }
+
+    if (minSlider && maxSlider) {
+        updateSliderUI();
+        // 避免重复绑定
+        minSlider.oninput = () => {
+            _csSettings.dlyMin = parseInt(minSlider.value, 10);
+            if (_csSettings.dlyMin > _csSettings.dlyMax) _csSettings.dlyMax = _csSettings.dlyMin;
+            updateSliderUI(); _saveCsSettings();
+        };
+        maxSlider.oninput = () => {
+            _csSettings.dlyMax = parseInt(maxSlider.value, 10);
+            if (_csSettings.dlyMax < _csSettings.dlyMin) _csSettings.dlyMin = _csSettings.dlyMax;
+            updateSliderUI(); _saveCsSettings();
+        };
+    }
+    if (saveToggle)  { saveToggle.checked  = !!_csSettings.savePartnerImg;  saveToggle.onchange  = () => { _csSettings.savePartnerImg = saveToggle.checked;  _saveCsSettings(); }; }
+    if (notifToggle) { notifToggle.checked = !!_csSettings.notifPopup;       notifToggle.onchange = () => { _csSettings.notifPopup    = notifToggle.checked;  _saveCsSettings(); }; }
+
+    const modal = document.getElementById('cs-settings-modal');
+    if (modal && typeof showModal === 'function') showModal(modal);
+};
+
+// 页面加载时预读设置
+_loadCsSettings();
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 

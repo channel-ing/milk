@@ -13454,12 +13454,32 @@ body #user-sticker-picker .empty-sticker-tip {
 
 
 
-/* ── 情侣空间顶部：天数文字跟随系统明暗 + 加粗 + 主体色描边 ── */
+/* ── 情侣空间顶部：天数文字跟随系统明暗 + 加粗 + 主体色描边 + 视觉放大 ── */
+/* 四个选择器：anniversary.js 用 .cs-days-title / .cs-days-line .cs-days-unit
+              moments.js   用 .cs-days-label / .cs-days-unit
+   .cs-days-line .cs-days-unit 必须显式列出，否则原有同类规则优先级更高会盖掉颜色 */
 .cs-days-title,
-.cs-days-line .cs-days-unit,
-.cs-days-label {
+.cs-days-label,
+.cs-days-unit,
+.cs-days-line .cs-days-unit {
     color: var(--text-primary);
     font-weight: 700;
-    -webkit-text-stroke: 0.4px var(--accent-color);
+    -webkit-text-stroke: 1.0px var(--accent-color);
     paint-order: stroke fill;
+}
+/* transform: scale 只改视觉尺寸，layout box 不变，其他元素位置不受影响 */
+.cs-days-title {
+    transform: scale(1.4);
+}
+.cs-days-label,
+.cs-days-unit,
+.cs-days-line .cs-days-unit {
+    display: inline-block;  /* span 需要 inline-block 才能应用 transform */
+    transform: scale(1.4);
+}
+
+/* ── 情侣空间顶栏：返回键/设置icon 圆形半透明底 + 颜色跟系统走 ── */
+.cs-topbar .cs-icon-btn {
+    background: rgba(var(--secondary-bg-rgb), 0.55);
+    color: var(--text-primary);
 }

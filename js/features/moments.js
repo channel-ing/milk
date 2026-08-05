@@ -14,7 +14,7 @@ const _M_DLY_MAX = 20 * 60 * 1000;
 const _CS_SETTINGS_KEY = 'csSpaceSettings';
 
 // 情侣空间设置（默认值）
-let _csSettings = { dlyMin: 5, dlyMax: 20, savePartnerImg: false, notifPopup: true };
+let _csSettings = { dlyMin: 5, dlyMax: 20, savePartnerImg: false };
 
 const _mDly   = () => {
     const minMs = (_csSettings.dlyMin || 5) * 60000;
@@ -75,7 +75,6 @@ function _pushNotif(type, postId) {
 }
 function _drainN(){if(_nBusy||!_nQ.length)return;_nBusy=true;_showN(_nQ.shift());}
 function _showN({type,postId}){
-    if (!_csSettings.notifPopup) { window._mND(); return; }
     const el=document.getElementById('moments-notif-popup');if(el)el.remove();
     const name=_mPName(),C={newPost:{icon:'📸',title:`${name}发了新动态`,sub:'快去看看 Ta 的动态~'},liked:{icon:'❤️',title:`${name}为你的动态点了赞`,sub:''},commented:{icon:'💬',title:`${name}评论了你的动态`,sub:'去看看 Ta 说了什么~'},replied:{icon:'💬',title:`${name}回复了你`,sub:'去看看 Ta 说了什么~'}};
     const c=C[type]||C.newPost, p=document.createElement('div'); p.id='moments-notif-popup';
@@ -686,7 +685,6 @@ window.openCsSettings = async function () {
     const minVal     = document.getElementById('cs-dly-min-val');
     const maxVal     = document.getElementById('cs-dly-max-val');
     const saveToggle = document.getElementById('cs-save-img-toggle');
-    const notifToggle= document.getElementById('cs-notif-popup-toggle');
 
     function updateSliderUI() {
         minSlider.value = _csSettings.dlyMin;
@@ -725,8 +723,7 @@ window.openCsSettings = async function () {
         });
         maxSlider.addEventListener('change', _saveCsSettings);
     }
-    if (saveToggle)  { saveToggle.checked  = !!_csSettings.savePartnerImg;  saveToggle.onchange  = () => { _csSettings.savePartnerImg = saveToggle.checked;  _saveCsSettings(); }; }
-    if (notifToggle) { notifToggle.checked = !!_csSettings.notifPopup;       notifToggle.onchange = () => { _csSettings.notifPopup    = notifToggle.checked;  _saveCsSettings(); }; }
+    if (saveToggle) { saveToggle.checked = !!_csSettings.savePartnerImg; saveToggle.onchange = () => { _csSettings.savePartnerImg = saveToggle.checked; _saveCsSettings(); }; }
 
     const modal = document.getElementById('cs-settings-modal');
     if (modal && typeof showModal === 'function') showModal(modal);

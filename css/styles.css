@@ -13431,3 +13431,12 @@ body #user-sticker-picker .empty-sticker-tip {
     height: 0;
     position: absolute;
 }
+
+/* ── 情侣空间壁纸 ── */
+#couple-space-page {
+    background-image: var(--cs-bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: local;
+}

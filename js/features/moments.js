@@ -670,7 +670,7 @@ async function _loadCsSettings() {
     try {
         const key = getStorageKey(_CS_SETTINGS_KEY);
         const saved = await localforage.getItem(key);
-        if (saved) _csSettings = Object.assign({}, _csSettings, saved);
+        if (saved) Object.assign(_csSettings, saved);
     } catch(e) { console.warn('[cs-settings] 读取失败', e); }
 }
 async function _saveCsSettings() {
@@ -680,6 +680,7 @@ async function _saveCsSettings() {
 
 window.openCsSettings = async function () {
     await _loadCsSettings();
+    window._csSettings = _csSettings; // 确保 window 引用始终是最新的
     const minSlider  = document.getElementById('cs-dly-min-slider');
     const maxSlider  = document.getElementById('cs-dly-max-slider');
     const minVal     = document.getElementById('cs-dly-min-val');
@@ -731,8 +732,10 @@ window.openCsSettings = async function () {
     if (modal && typeof showModal === 'function') showModal(modal);
 };
 
-// 页面加载时预读设置
-_loadCsSettings().then(() => { window._csSettings = _csSettings; });
+// 页面加载时预读设置（延迟等 SESSION_ID 初始化完成）
+setTimeout(() => {
+    _loadCsSettings().then(() => { window._csSettings = _csSettings; });
+}, 2000);
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 

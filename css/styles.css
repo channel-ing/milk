@@ -13440,3 +13440,14 @@ body #user-sticker-picker .empty-sticker-tip {
     background-repeat: no-repeat;
     background-attachment: local;
 }
+
+/* ── 情侣空间壁纸：动态页卡片半透明 ── */
+#couple-space-page.cs-with-bg .cs-pills {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+#couple-space-page.cs-with-bg .cs-compose-row {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+#couple-space-page.cs-with-bg .cs-post {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}

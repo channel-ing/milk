@@ -61,6 +61,14 @@
     // 退回到 'waiting'（约定还在，只是要重新选一次片），而不是清空到 'empty'。
     var _apptLoaded = false;
     var _apptStorageKey = null;
+    // ── App 数据加载完成标志（防止开机时 _negoResolveReply 与 loadData 产生竞态）──
+    // 场景：iOS Safari 将后台 tab 杀掉 → 用户返回时页面重载
+    // → _negoBootCheck(setTimeout 0) 可能在 loadData 完成前触发
+    // → addMessage 把卡片写入空的 messages[] → loadData 覆盖 messages → 卡片消失
+    // 解决方案：钩住 window.renderMessages（loadData 完成后必然调用），
+    //          以它的首次触发作为「数据已就绪」信号，再延迟触发 _negoResolveReply。
+    var _appDataLoaded = false;
+    var _pendingBootResolve = false;
     async function _apptGetKey() {
         if (_apptStorageKey) return _apptStorageKey;
         try {
@@ -1797,6 +1805,27 @@
     }
     _hookCreateMessageFragment();
 
+    // ── 钩住 window.renderMessages：检测 app 数据初始化完成时机 ──────────────
+    // loadData → updateUI → renderMessages 是 app 初始化的收尾信号。
+    // 只检测第一次：一旦触发就把 _appDataLoaded 置 true，
+    // 并驱动 _pendingBootResolve（如果之前已经检测到了到期回复）。
+    (function _hookRenderMessagesForInit() {
+        var origFn = window.renderMessages;
+        if (typeof origFn !== 'function') return; // core.js 未加载时的兜底，实际不会发生
+        window.renderMessages = function () {
+            if (!_appDataLoaded) {
+                _appDataLoaded = true;
+                if (_pendingBootResolve) {
+                    _pendingBootResolve = false;
+                    // 用 setTimeout(0) 确保在本次 renderMessages 渲染完 messages 后再触发，
+                    // 不要在 renderMessages 执行中途插入 addMessage（会导致 DOM 混乱）。
+                    setTimeout(_negoResolveReply, 0);
+                }
+            }
+            return origFn.apply(this, arguments);
+        };
+    })();
+
     // 真正把卡片发到主聊天（跟 envelope.js 一样直接裸调用 addMessage，不用改 core.js）
     // sender 由 state 自动决定：pending 是用户发的，countered/accepted 是梦角发的
     function _cinemaSendInviteCard(state, movieTitle, dateStr, timeStr, negoId) {
@@ -1999,7 +2028,16 @@
         if (_negoReplyTimer) { clearTimeout(_negoReplyTimer); _negoReplyTimer = null; }
         if (!_negoState || !_negoState.active) return;
         var delay = _negoState.replyDueAt - Date.now();
-        if (delay <= 0) { _negoResolveReply(); return; }
+        if (delay <= 0) {
+            // 回复已到期。如果是开机重载场景（messages 尚未加载），
+            // 先挂起到 renderMessages 首次调用后再触发，避免被 loadData 覆盖。
+            if (_appDataLoaded) {
+                _negoResolveReply();
+            } else {
+                _pendingBootResolve = true; // _hookRenderMessagesForInit 会接手
+            }
+            return;
+        }
         _negoReplyTimer = setTimeout(_negoResolveReply, delay);
     }
 

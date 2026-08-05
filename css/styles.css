@@ -13662,3 +13662,12 @@ body #user-sticker-picker .empty-sticker-tip {
 #couple-space-page.cs-with-bg .ann-pinned-card {
     background: rgba(var(--secondary-bg-rgb), 0.75) !important;
 }
+
+/* ── ann 列表卡片透明度改回90%，gap 2px ── */
+#couple-space-page.cs-with-bg .ann-list-row,
+#couple-space-page.cs-with-bg .ann-pinned-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9) !important;
+}
+.ann-list-container {
+    gap: 2px;
+}

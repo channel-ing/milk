@@ -217,7 +217,7 @@ function _fmtDate(d){if(!d)return'';if(d===_mToday())return'今天';const dt=new
 
 // ─── 头像 ───
 function _getAvSrc(isPartner){const c=window._avatarCache||{};if(isPartner){if(c.partner)return c.partner;const e=document.getElementById('partner-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}else{if(c.me)return c.me;const e=document.getElementById('my-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}}
-function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36;return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;flex-shrink:0;">`:`<span style="width:${s}px;height:${s}px;border-radius:50%;background:var(--border-color,#d0d0d0);display:inline-block;flex-shrink:0;"></span>`;}
+function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36;return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;flex-shrink:0;">`:`<span style="width:${s}px;height:${s}px;border-radius:50%;background:var(--border-color,#d0d0d0);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-user" style="font-size:${Math.round(s*0.48)}px;color:var(--text-secondary,#aaa);"></i></span>`;}
 
 // ─── 贴纸选择器（用户自己的 stickerLibrary） ───
 window._mToggleSticker=function(postId){
@@ -446,7 +446,12 @@ function _updateDaysCounter() {
     render('相识', '---');
 }
 window._updateDaysCounter = _updateDaysCounter;
-function _updateBigAvatars(){const ptEl=document.getElementById('cs-bav-partner'),meEl=document.getElementById('cs-bav-me');if(ptEl){const s=_getAvSrc(true);ptEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🌸';}if(meEl){const s=_getAvSrc(false);meEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`: '🙂';}}
+function _updateBigAvatars(){
+    const dflt='<i class="fas fa-user" style="font-size:36px;color:var(--text-secondary,#aaa);"></i>';
+    const ptEl=document.getElementById('cs-bav-partner'),meEl=document.getElementById('cs-bav-me');
+    if(ptEl){const s=_getAvSrc(true);ptEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`:dflt;}
+    if(meEl){const s=_getAvSrc(false);meEl.innerHTML=s?`<img src="${s}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`:dflt;}
+}
 
 // ─── 主入口 ───
 window.openCoupleSpace=window.openMomentsModal=function(scrollToPostId){

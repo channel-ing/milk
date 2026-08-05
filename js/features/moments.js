@@ -20,7 +20,7 @@ const _mMName = () => (typeof settings !== 'undefined' && settings.myName)      
 
 function _mPostText() {
     const pool = [...(window._customReplies || customReplies || [])];
-    if (!pool.length) return '想着你呢。';
+    if (!pool.length) return null;
     let t = ''; const n = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < n; i++) { const s = pool[Math.floor(Math.random()*pool.length)]; t += s + (Math.random()<.2?'！':Math.random()<.2?'……':'。'); }
     return t;
@@ -98,7 +98,7 @@ function _mPostContent() {
     const randText    = () => _mPostText();
     const randImgs    = () => { const n=1+Math.floor(Math.random()*3); return stickerPool.sort(()=>Math.random()-.5).slice(0,Math.min(n,stickerPool.length)); };
 
-    if (!hasText && !hasSticker) return { text:'想着你呢。', images:[] };
+    if (!hasText && !hasSticker) return null;
     if (!hasSticker) return { text:randText(), images:[] };
     if (!hasText)    return { text:'', images:randImgs() };
 
@@ -110,7 +110,7 @@ function _mPostContent() {
 
 async function generatePartnerMoment() {
     const now=Date.now();
-    const c=_mPostContent();const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
+    const c=_mPostContent(); if(!c) return;const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
     if(Math.random()<0.10){const c=_mCmtContent();if(c)post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);

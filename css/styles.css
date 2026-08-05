@@ -13638,3 +13638,27 @@ body #user-sticker-picker .empty-sticker-tip {
 .ann-list-container {
     gap: 4px;
 }
+
+/* ── ann-item-card 透明度修正：0.9 在浅色主题下近似纯白看不出，改为 0.75 ── */
+#couple-space-page.cs-with-bg .ann-item-card {
+    background: rgba(var(--secondary-bg-rgb), 0.75) !important;
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-past {
+    background: linear-gradient(135deg, rgba(255,154,158,0.06) 0%, rgba(var(--secondary-bg-rgb), 0.75) 60%) !important;
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-future {
+    background: linear-gradient(135deg, rgba(118,75,162,0.07) 0%, rgba(var(--secondary-bg-rgb), 0.75) 60%) !important;
+}
+
+/* ── 列表间距 2px ── */
+.ann-list-container {
+    gap: 2px;
+}
+
+/* ── 纪念日列表卡片透明度终极修复：
+   实际类名是 ann-list-row 和 ann-pinned-card（不是 ann-item-card）
+   且背景写在 inline style，必须用 !important 覆盖 ── */
+#couple-space-page.cs-with-bg .ann-list-row,
+#couple-space-page.cs-with-bg .ann-pinned-card {
+    background: rgba(var(--secondary-bg-rgb), 0.75) !important;
+}

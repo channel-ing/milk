@@ -13599,3 +13599,42 @@ body #user-sticker-picker .empty-sticker-tip {
 .ann-list-container {
     gap: 6px;
 }
+
+/* ══════════════════════════════════════════
+   纪念日细节修复
+   ══════════════════════════════════════════ */
+
+/* issue2: 黑边修复——只在 .active 时给背景，inactive 时不影响列表视图 */
+#couple-space-page.cs-with-bg .ann-detail-page {
+    background: transparent;
+}
+#couple-space-page.cs-with-bg .ann-detail-page.active {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+
+/* issue1: topbar 按钮横向 padding 加大，别太靠边 */
+#couple-space-page.cs-with-bg .ann-detail-topbar {
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+/* issue1b: 图卡再小一点点 */
+#couple-space-page.cs-with-bg .ann-detail-card {
+    max-width: calc(100% - 64px);
+}
+
+/* issue3: 列表卡片90%透明度，加 !important 确保覆盖（含渐变变体）*/
+#couple-space-page.cs-with-bg .ann-item-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9) !important;
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-past {
+    background: linear-gradient(135deg, rgba(255,154,158,0.06) 0%, rgba(var(--secondary-bg-rgb), 0.9) 60%) !important;
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-future {
+    background: linear-gradient(135deg, rgba(118,75,162,0.07) 0%, rgba(var(--secondary-bg-rgb), 0.9) 60%) !important;
+}
+
+/* issue4: 列表卡片间距再缩小（6px → 4px）*/
+.ann-list-container {
+    gap: 4px;
+}

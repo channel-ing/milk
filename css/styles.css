@@ -13454,16 +13454,12 @@ body #user-sticker-picker .empty-sticker-tip {
 
 
 
-/* ── 情侣空间顶部：天数文字跟随系统明暗（不走强调色）── */
-/* anniversary.js 渲染用 .cs-days-title，原值 text-secondary（灰），改为跟系统走 */
-.cs-days-title {
-    color: var(--text-primary);
-}
-/* anniversary.js 渲染的「天」单位，同上 */
-.cs-days-line .cs-days-unit {
-    color: var(--text-primary);
-}
-/* moments.js 渲染用 .cs-days-label，显式声明防止被自定义主题覆盖 */
+/* ── 情侣空间顶部：天数文字跟随系统明暗 + 加粗 + 主体色描边 ── */
+.cs-days-title,
+.cs-days-line .cs-days-unit,
 .cs-days-label {
     color: var(--text-primary);
+    font-weight: 700;
+    -webkit-text-stroke: 0.4px var(--accent-color);
+    paint-order: stroke fill;
 }

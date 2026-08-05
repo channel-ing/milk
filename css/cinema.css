@@ -1692,3 +1692,27 @@ html[data-theme="dark"] .cinema-invite-card-status--declined {
     color: rgba(255,255,255,0.7);
     font-weight: 500;
 }
+
+/* ══════════════════════════════════════════
+   情侣空间背景图模式下的电影院适配
+   ══════════════════════════════════════════ */
+
+/* 1. 档案页（影评/心愿单）：90% 透明底色 */
+#couple-space-page.cs-with-bg .cinema-archive-page {
+    background: rgba(var(--primary-bg-rgb), 0.9);
+}
+
+/* 2a. 等待状态：screen-wrap 与 appt-card 之间的间距缩短一半（去掉 appt-card 上边距）*/
+.cinema-appt-card {
+    margin-top: 0;
+}
+/* 2b. 约定卡片：90% 透明底色（上面的幕布黑框不动）*/
+#couple-space-page.cs-with-bg .cinema-appt-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+
+/* 3. 嵌入观影模式（非沉浸）：工具栏 + 聊天区加 90% 黑底，保证可读性 */
+#couple-space-page.cs-with-bg:not(.cinema-theater-mode) .cinema-watch-toolbar,
+#couple-space-page.cs-with-bg:not(.cinema-theater-mode) .cinema-body-watch {
+    background: rgba(0, 0, 0, 0.9);
+}

@@ -920,6 +920,7 @@ function _renderCsBgGallery() {
             delBtn.className = 'bg-delete-btn';
             delBtn.innerHTML = '<i class="fas fa-trash"></i>';
             delBtn.title = '删除此壁纸';
+            delBtn.style.cssText = 'opacity:1;transform:scale(1);'; // 手机无 hover，始终显示
             delBtn.onclick = async (e) => {
                 e.stopPropagation();
                 const doDelete = async () => {
@@ -933,7 +934,7 @@ function _renderCsBgGallery() {
                     _renderCsBgGallery();
                 };
                 if (typeof _alShowConfirm === 'function') {
-                    _alShowConfirm('确定删除这张壁纸吗？', doDelete);
+                    _alShowConfirm('删除壁纸', '删除后无法恢复，确定吗？', '删除', true, doDelete);
                 } else if (confirm('确定删除这张壁纸吗？')) {
                     doDelete();
                 }

@@ -1644,6 +1644,9 @@
     function _openArchive() {
         var page = document.getElementById('cinema-archive-page');
         if (page) page.classList.add('cinema-archive-open');
+        // 隐藏主面板，防止透明档案页时内容从后面漏出
+        var panel = document.getElementById('cs-panel-cinema');
+        if (panel) panel.style.visibility = 'hidden';
         _bindArchiveTabsOnce();
         Promise.all([_wlLoad(), _histLoad()]).then(function () {
             _renderArchiveContent();
@@ -1652,6 +1655,9 @@
     window._cinemaCloseArchive = function () {
         var page = document.getElementById('cinema-archive-page');
         if (page) page.classList.remove('cinema-archive-open');
+        // 恢复主面板可见性
+        var panel = document.getElementById('cs-panel-cinema');
+        if (panel) panel.style.visibility = '';
     };
 
     // ── 调试专用：跳过邀请/倒计时，直接切状态（浏览器控制台里手动调用）──

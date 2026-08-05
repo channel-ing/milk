@@ -453,6 +453,27 @@
 
     // ── 开场前 2 分钟提醒：黑色蒙层，仿照"梦角邀请陪伴"那套视觉，
     //    但完全是 cinema.js 自己独立实现的，不调用 companion.js 的任何函数 ──
+    // 等欢迎加载动画结束后再执行 callback（避免提醒弹窗压在 loading 画面上）
+    // 欢迎画面：3500ms 后加 .hidden 类开始淡出，再过 800ms 才 display:none
+    function _waitForWelcomeDone(callback) {
+        var el = document.getElementById('welcome-animation');
+        // 没有欢迎画面 / 已经 display:none → 直接执行
+        if (!el || el.style.display === 'none') { callback(); return; }
+        // 已经在淡出（.hidden 已挂），等淡出动画跑完再执行
+        if (el.classList.contains('hidden')) { setTimeout(callback, 900); return; }
+        // loading 还在转：轮询，最多等 12 秒（超时兜底，防止 loading 因某种原因卡住）
+        var deadline = Date.now() + 12000;
+        var tid = setInterval(function () {
+            if (!el || el.style.display === 'none' || Date.now() >= deadline) {
+                clearInterval(tid);
+                callback();
+            } else if (el.classList.contains('hidden')) {
+                clearInterval(tid);
+                setTimeout(callback, 900); // 等淡出完成
+            }
+        }, 200);
+    }
+
     function _scheduleShowtimeReminder() {
         if (_showtimeReminderTimer) { clearTimeout(_showtimeReminderTimer); _showtimeReminderTimer = null; }
         if (_uiState !== 'waiting' || _fakeAppt.reminderShown) return;
@@ -462,7 +483,8 @@
         var reminderAt = d.getTime() - 2 * 60000;
         // 不管是"快到点了"还是"已经过点了"，只要还没提醒过、也还没开始看，
         // 一打开网站/切到电影院 tab 就该立刻提醒——不能因为时间已经过了就跳过。
-        if (now >= reminderAt) { _showShowtimeReminder(); return; }
+        // 等欢迎动画结束后再弹出，避免压在 loading 画面上。
+        if (now >= reminderAt) { _waitForWelcomeDone(_showShowtimeReminder); return; }
         _showtimeReminderTimer = setTimeout(_showShowtimeReminder, reminderAt - now);
     }
     function _showShowtimeReminder() {

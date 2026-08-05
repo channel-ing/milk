@@ -732,7 +732,7 @@ window.openCsSettings = async function () {
 };
 
 // 页面加载时预读设置
-_loadCsSettings();
+_loadCsSettings().then(() => { window._csSettings = _csSettings; });
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 

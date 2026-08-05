@@ -157,13 +157,10 @@ async function _checkAction(){
         const KEY=getStorageKey(_M_COOLDOWN_KEY),now=Date.now();
         const next=await localforage.getItem(KEY);if(next!==null&&now<next)return;
         await localforage.setItem(KEY,now+_M_CD_MIN+Math.random()*(_M_CD_MAX-_M_CD_MIN));
-        if(Math.random()>=_M_PROB)return;
-        if(Math.random()<0.5){if(typeof window._generatePartnerLetter==='function')window._generatePartnerLetter();}
-        else{await generatePartnerMoment();}
+        if(Math.random()<0.40){if(typeof window._generatePartnerLetter==='function')window._generatePartnerLetter();}
+        if(Math.random()<0.70){await generatePartnerMoment();}
     }catch(e){console.warn('[Moments] _checkAction 失败',e);}
 }
-
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkMomentsStatus().catch(e=>console.warn('[Moments] visibility check 失败',e));});
 
 function getMomentsUnreadCount(){let n=0;for(const p of momentsData.posts){if(p.isNewForUser)n++;for(const c of p.comments)if(c.authorType==='partner'&&c.isNew)n++;}return n;}
 function markPostRead(postId){const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;p.isNewForUser=false;p.comments.forEach(c=>{c.isNew=false;});saveMomentsData();_updateBadge();}

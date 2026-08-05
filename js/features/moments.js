@@ -725,6 +725,20 @@ window.openCsSettings = async function () {
     }
     if (saveToggle) { saveToggle.checked = !!_csSettings.savePartnerImg; saveToggle.onchange = () => { _csSettings.savePartnerImg = saveToggle.checked; _saveCsSettings(); }; }
 
+    // ── 壁纸画廊 ──
+    await _loadCsBgGallery();
+    _renderCsBgGallery();
+
+    const bgInput = document.getElementById('cs-bg-input');
+    if (bgInput && !bgInput._csBound) {
+        bgInput._csBound = true;
+        bgInput.addEventListener('change', _handleCsBgUpload);
+    }
+    const resetBgBtn = document.getElementById('cs-reset-bg');
+    if (resetBgBtn) {
+        resetBgBtn.onclick = () => { _removeCsBackground(); _renderCsBgGallery(); };
+    }
+
     const modal = document.getElementById('cs-settings-modal');
     if (modal && typeof showModal === 'function') showModal(modal);
 };
@@ -732,6 +746,7 @@ window.openCsSettings = async function () {
 // 页面加载时预读设置（延迟等 SESSION_ID 初始化完成）
 setTimeout(() => {
     _loadCsSettings().then(() => { window._csSettings = _csSettings; });
+    _restoreCsBackground();
 }, 2000);
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
@@ -800,4 +815,159 @@ function _csSetupFeedScroll() {
             }
         });
     }
+}
+
+// ── 情侣空间壁纸 ─────────────────────────────────────────────────────────────
+const _CS_WALLPAPER_KEY         = 'csWallpaper';
+const _CS_WALLPAPER_GALLERY_KEY = 'csWallpaperGallery';
+var _csBgGallery       = [];
+var _csBgGalleryLoaded = false;
+
+async function _loadCsBgGallery() {
+    if (_csBgGalleryLoaded) return;
+    _csBgGalleryLoaded = true;
+    try {
+        const saved = await localforage.getItem(getStorageKey(_CS_WALLPAPER_GALLERY_KEY));
+        if (Array.isArray(saved)) _csBgGallery = saved;
+    } catch(e) { console.warn('[cs-wallpaper] 画廊读取失败', e); }
+}
+
+function _saveCsBgGallery() {
+    try { localforage.setItem(getStorageKey(_CS_WALLPAPER_GALLERY_KEY), _csBgGallery); }
+    catch(e) { console.warn('[cs-wallpaper] 画廊保存失败', e); }
+}
+
+function _applyCsBackground(value) {
+    if (!value || typeof value !== 'string') return;
+    const cssValue = value.startsWith('url(') ? value : `url(${value})`;
+    document.documentElement.style.setProperty('--cs-bg-image', cssValue);
+    const page = document.getElementById('couple-space-page');
+    if (page) page.classList.add('cs-with-bg');
+    try { localforage.setItem(getStorageKey(_CS_WALLPAPER_KEY), value); } catch(e) {}
+    try { if (typeof safeSetItem === 'function') safeSetItem(getStorageKey(_CS_WALLPAPER_KEY), value); } catch(e) {}
+}
+
+function _removeCsBackground() {
+    document.documentElement.style.removeProperty('--cs-bg-image');
+    const page = document.getElementById('couple-space-page');
+    if (page) page.classList.remove('cs-with-bg');
+    try { localforage.removeItem(getStorageKey(_CS_WALLPAPER_KEY)); } catch(e) {}
+    try { if (typeof safeRemoveItem === 'function') safeRemoveItem(getStorageKey(_CS_WALLPAPER_KEY)); } catch(e) {}
+    if (typeof showNotification === 'function') showNotification('壁纸已移除', 'success');
+}
+
+function _renderCsBgGallery() {
+    const list = document.getElementById('cs-bg-gallery-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // + 按钮
+    const addBtn = document.createElement('div');
+    addBtn.className = 'bg-item bg-add-btn';
+    addBtn.innerHTML = '<i class="fas fa-plus"></i><span></span>';
+    addBtn.onclick = () => document.getElementById('cs-bg-input').click();
+    list.appendChild(addBtn);
+
+    const currentBg = (typeof safeGetItem === 'function') ? safeGetItem(getStorageKey(_CS_WALLPAPER_KEY)) : null;
+
+    _csBgGallery.forEach((bg, index) => {
+        const item = document.createElement('div');
+        const isActive = currentBg && (
+            currentBg === bg.value ||
+            (typeof currentBg === 'string' && currentBg.indexOf('oss://') === 0 && bg.cloudUrl === currentBg)
+        );
+        item.className = `bg-item${isActive ? ' active' : ''}`;
+
+        if (bg.type === 'image' || bg.type === 'gif') {
+            item.innerHTML = `<img src="${bg.thumbnail || bg.value}" loading="lazy" alt="wallpaper">`;
+        }
+
+        item.onclick = async (e) => {
+            if (e.target.closest('.bg-delete-btn')) return;
+            _applyCsBackground(bg.value);
+            _renderCsBgGallery();
+            if (typeof showNotification === 'function') showNotification('壁纸已切换', 'success');
+        };
+
+        if (bg.id.startsWith('user-')) {
+            const delBtn = document.createElement('div');
+            delBtn.className = 'bg-delete-btn';
+            delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            delBtn.title = '删除此壁纸';
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const doDelete = async () => {
+                    if (window.CloudMedia && bg.cloudKey) {
+                        try { await window.CloudMedia.delete(bg.cloudKey); }
+                        catch(err) { console.warn('[cs-wallpaper] 云端删除失败', err); }
+                    }
+                    _csBgGallery.splice(index, 1);
+                    _saveCsBgGallery();
+                    if (isActive) _removeCsBackground();
+                    _renderCsBgGallery();
+                };
+                if (typeof _alShowConfirm === 'function') {
+                    _alShowConfirm('确定删除这张壁纸吗？', doDelete);
+                } else if (confirm('确定删除这张壁纸吗？')) {
+                    doDelete();
+                }
+            };
+            item.appendChild(delBtn);
+        }
+
+        list.appendChild(item);
+    });
+}
+
+async function _handleCsBgUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+        if (typeof showNotification === 'function') showNotification('壁纸图片不能超过10MB', 'error');
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        if (typeof showNotification === 'function') showNotification('文件较大，正在处理中...', 'info', 2000);
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+        const base64 = ev.target.result;
+        const bgType = file.type === 'image/gif' ? 'gif' : 'image';
+        const bgId   = `user-${Date.now()}`;
+        let stored   = { id: bgId, type: bgType, value: base64 };
+
+        if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+            if (typeof showNotification === 'function') showNotification('正在上传到云端...', 'info', 2000);
+            try {
+                const uploadResult = await window.CloudMedia.upload(base64, 'cs-wallpapers', bgId);
+                let thumb = null;
+                try { thumb = await window.CloudMedia.makeThumbnail(base64, 200); }
+                catch(thumbErr) { console.warn('[cs-wallpaper] 缩略图生成失败', thumbErr); }
+                stored = { id: bgId, type: bgType, value: base64, thumbnail: thumb, cloudKey: uploadResult.key, cloudUrl: uploadResult.url };
+            } catch(err) {
+                console.warn('[cs-wallpaper] 背景上传失败，仅本地存储', err);
+                if (typeof showNotification === 'function') showNotification('云端上传失败，暂存本地', 'error', 2500);
+            }
+        }
+
+        _csBgGallery.push(stored);
+        _saveCsBgGallery();
+        if (typeof safeSetItem === 'function') {
+            try { safeSetItem(getStorageKey(_CS_WALLPAPER_KEY), base64); } catch(ex) {}
+        }
+        _renderCsBgGallery();
+        _applyCsBackground(base64);
+        if (typeof showNotification === 'function') showNotification('壁纸已添加并应用', 'success');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+}
+
+async function _restoreCsBackground() {
+    await _loadCsBgGallery();
+    try {
+        let bg = (typeof safeGetItem === 'function') ? safeGetItem(getStorageKey(_CS_WALLPAPER_KEY)) : null;
+        if (!bg) bg = await localforage.getItem(getStorageKey(_CS_WALLPAPER_KEY));
+        if (bg) _applyCsBackground(bg);
+    } catch(e) { console.warn('[cs-wallpaper] 壁纸恢复失败', e); }
 }

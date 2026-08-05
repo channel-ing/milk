@@ -13484,3 +13484,19 @@ body #user-sticker-picker .empty-sticker-tip {
     position: relative;
     z-index: 1;
 }
+
+/* ── 情侣空间壁纸：放弃 ::before 遮罩（布局破坏），改用背景叠色 ── */
+#couple-space-page.cs-with-bg::before {
+    display: none;
+    content: none;
+}
+#couple-space-page.cs-with-bg > * {
+    position: revert;
+    z-index: revert;
+}
+/* 壁纸上叠一层淡色（原 0.25 减 1/3 ≈ 0.17） */
+#couple-space-page.cs-with-bg {
+    background-image:
+        linear-gradient(rgba(var(--secondary-bg-rgb), 0.17), rgba(var(--secondary-bg-rgb), 0.17)),
+        var(--cs-bg-image);
+}

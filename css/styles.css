@@ -13452,11 +13452,8 @@ body #user-sticker-picker .empty-sticker-tip {
     background: rgba(var(--secondary-bg-rgb), 0.9);
 }
 
-/* ── 情侣空间壁纸：动态 header 文字双层阴影（深+浅，任意底色可读）── */
-#couple-space-page.cs-with-bg .cs-feed-hd-title,
-#couple-space-page.cs-with-bg .cs-bell-btn {
-    text-shadow:
-        0 1px 4px rgba(0, 0, 0, 0.55),
-        0 0 10px rgba(0, 0, 0, 0.35),
-        0 -1px 3px rgba(255, 255, 255, 0.3);
+
+/* ── 情侣空间：天数计数器文字跟随系统主题色（白天黑/夜间白）── */
+.cs-days-text {
+    color: var(--text-primary);
 }

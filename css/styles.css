@@ -13500,3 +13500,8 @@ body #user-sticker-picker .empty-sticker-tip {
         linear-gradient(rgba(var(--secondary-bg-rgb), 0.17), rgba(var(--secondary-bg-rgb), 0.17)),
         var(--cs-bg-image);
 }
+
+/* ── 回退：移除背景叠色，恢复纯壁纸 ── */
+#couple-space-page.cs-with-bg {
+    background-image: var(--cs-bg-image);
+}

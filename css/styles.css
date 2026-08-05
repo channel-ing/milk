@@ -13567,3 +13567,35 @@ body #user-sticker-picker .empty-sticker-tip {
     margin-left: 8px;
     margin-right: 8px;
 }
+
+/* ── 纪念日详情页：外框升级到 ann-detail-page（覆盖前面规则）── */
+/* 外框改为 ann-detail-page 本身，left/right 缩进 10px，包含 topbar+body */
+#couple-space-page.cs-with-bg .ann-detail-page {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+    left: 10px;
+    right: 10px;
+    border-radius: 16px 16px 0 0;
+}
+/* body 重置：不再承担外框角色 */
+#couple-space-page.cs-with-bg .ann-detail-body {
+    background: transparent;
+    border-radius: 0;
+    margin: 0;
+    padding: 4px 14px 20px;
+}
+/* 图卡：比备注窄（calc(100%-48px) vs 备注 8px margin → 差 32px）*/
+#couple-space-page.cs-with-bg .ann-detail-card {
+    max-width: calc(100% - 48px);
+    background-color: rgba(var(--accent-color-rgb), 0.9);
+}
+/* 备注框：8px margin，宽于图卡，窄于外框 */
+#couple-space-page.cs-with-bg .ann-detail-remark {
+    background: rgba(var(--primary-bg-rgb), 0.9);
+    margin-left: 8px;
+    margin-right: 8px;
+}
+
+/* ── 纪念日列表：卡片间距缩小（10px → 6px）── */
+.ann-list-container {
+    gap: 6px;
+}

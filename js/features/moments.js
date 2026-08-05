@@ -822,6 +822,7 @@ const _CS_WALLPAPER_KEY         = 'csWallpaper';
 const _CS_WALLPAPER_GALLERY_KEY = 'csWallpaperGallery';
 var _csBgGallery       = [];
 var _csBgGalleryLoaded = false;
+var _csActiveBg        = null; // 内存中追踪当前激活的壁纸值（避免走 localStorage）
 
 async function _loadCsBgGallery() {
     if (_csBgGalleryLoaded) return;
@@ -839,20 +840,45 @@ function _saveCsBgGallery() {
 
 function _applyCsBackground(value) {
     if (!value || typeof value !== 'string') return;
+    _csActiveBg = value;
+    try { localforage.setItem(getStorageKey(_CS_WALLPAPER_KEY), value); } catch(e) {}
+
+    const page = document.getElementById('couple-space-page');
+
+    function _setVar(cssVal) {
+        document.documentElement.style.setProperty('--cs-bg-image', `url(${cssVal})`);
+        if (page) page.classList.add('cs-with-bg');
+    }
+
+    if (value.indexOf('oss://') === 0) {
+        // 换设备恢复时 value 可能是 oss:// 引用，先找本地画廊有没有对应的 base64
+        const local = _csBgGallery.find(bg => bg && (bg.cloudUrl === value || bg.value === value));
+        if (local && local.value && local.value.indexOf('data:image') === 0) {
+            _setVar(local.value);
+            return;
+        }
+        // 本地没有，从云端拉
+        if (window.CloudMedia) {
+            if (local && local.thumbnail) _setVar(local.thumbnail); // 先用缩略图垫底
+            window.CloudMedia.fetchUrl(value).then(blobUrl => {
+                document.documentElement.style.setProperty('--cs-bg-image', `url(${blobUrl})`);
+                if (page) page.classList.add('cs-with-bg');
+            }).catch(e => console.warn('[cs-wallpaper] 云端壁纸加载失败', e));
+        }
+        return;
+    }
+
     const cssValue = value.startsWith('url(') ? value : `url(${value})`;
     document.documentElement.style.setProperty('--cs-bg-image', cssValue);
-    const page = document.getElementById('couple-space-page');
     if (page) page.classList.add('cs-with-bg');
-    try { localforage.setItem(getStorageKey(_CS_WALLPAPER_KEY), value); } catch(e) {}
-    try { if (typeof safeSetItem === 'function') safeSetItem(getStorageKey(_CS_WALLPAPER_KEY), value); } catch(e) {}
 }
 
 function _removeCsBackground() {
     document.documentElement.style.removeProperty('--cs-bg-image');
     const page = document.getElementById('couple-space-page');
     if (page) page.classList.remove('cs-with-bg');
+    _csActiveBg = null;
     try { localforage.removeItem(getStorageKey(_CS_WALLPAPER_KEY)); } catch(e) {}
-    try { if (typeof safeRemoveItem === 'function') safeRemoveItem(getStorageKey(_CS_WALLPAPER_KEY)); } catch(e) {}
     if (typeof showNotification === 'function') showNotification('壁纸已移除', 'success');
 }
 
@@ -868,7 +894,7 @@ function _renderCsBgGallery() {
     addBtn.onclick = () => document.getElementById('cs-bg-input').click();
     list.appendChild(addBtn);
 
-    const currentBg = (typeof safeGetItem === 'function') ? safeGetItem(getStorageKey(_CS_WALLPAPER_KEY)) : null;
+    const currentBg = _csActiveBg;
 
     _csBgGallery.forEach((bg, index) => {
         const item = document.createElement('div');
@@ -952,9 +978,6 @@ async function _handleCsBgUpload(e) {
 
         _csBgGallery.push(stored);
         _saveCsBgGallery();
-        if (typeof safeSetItem === 'function') {
-            try { safeSetItem(getStorageKey(_CS_WALLPAPER_KEY), base64); } catch(ex) {}
-        }
         _renderCsBgGallery();
         _applyCsBackground(base64);
         if (typeof showNotification === 'function') showNotification('壁纸已添加并应用', 'success');
@@ -966,8 +989,7 @@ async function _handleCsBgUpload(e) {
 async function _restoreCsBackground() {
     await _loadCsBgGallery();
     try {
-        let bg = (typeof safeGetItem === 'function') ? safeGetItem(getStorageKey(_CS_WALLPAPER_KEY)) : null;
-        if (!bg) bg = await localforage.getItem(getStorageKey(_CS_WALLPAPER_KEY));
+        const bg = await localforage.getItem(getStorageKey(_CS_WALLPAPER_KEY));
         if (bg) _applyCsBackground(bg);
     } catch(e) { console.warn('[cs-wallpaper] 壁纸恢复失败', e); }
 }

@@ -698,16 +698,27 @@ window.openCsSettings = async function () {
 
     if (minSlider && maxSlider) {
         updateSliderUI();
-        // 避免重复绑定
         minSlider.oninput = () => {
             _csSettings.dlyMin = parseInt(minSlider.value, 10);
-            if (_csSettings.dlyMin > _csSettings.dlyMax) _csSettings.dlyMax = _csSettings.dlyMin;
-            updateSliderUI(); _saveCsSettings();
+            minVal.textContent = _csSettings.dlyMin + '分钟';
+            maxSlider.min = _csSettings.dlyMin;
+            if (_csSettings.dlyMin > _csSettings.dlyMax) {
+                _csSettings.dlyMax = _csSettings.dlyMin;
+                maxSlider.value = _csSettings.dlyMax;
+                maxVal.textContent = _csSettings.dlyMax + '分钟';
+            }
+            _saveCsSettings();
         };
         maxSlider.oninput = () => {
             _csSettings.dlyMax = parseInt(maxSlider.value, 10);
-            if (_csSettings.dlyMax < _csSettings.dlyMin) _csSettings.dlyMin = _csSettings.dlyMax;
-            updateSliderUI(); _saveCsSettings();
+            maxVal.textContent = _csSettings.dlyMax + '分钟';
+            minSlider.max = _csSettings.dlyMax;
+            if (_csSettings.dlyMax < _csSettings.dlyMin) {
+                _csSettings.dlyMin = _csSettings.dlyMax;
+                minSlider.value = _csSettings.dlyMin;
+                minVal.textContent = _csSettings.dlyMin + '分钟';
+            }
+            _saveCsSettings();
         };
     }
     if (saveToggle)  { saveToggle.checked  = !!_csSettings.savePartnerImg;  saveToggle.onchange  = () => { _csSettings.savePartnerImg = saveToggle.checked;  _saveCsSettings(); }; }

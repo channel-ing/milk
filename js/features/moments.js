@@ -89,7 +89,7 @@ window._mOpenBell=function(){
 };
 
 // ─── 逻辑 ───
-// 梦角发动态内容：纯文字 60% / 文字+图片 20% / 纯图片 20%
+// 梦角发动态内容：纯文字 40% / 文字+贴纸 40% / 纯贴纸 20%
 function _mPostContent() {
     const textPool    = [...(window._customReplies || customReplies || [])];
     const stickerPool = [...(stickerLibrary || [])];
@@ -104,8 +104,8 @@ function _mPostContent() {
 
     const r = Math.random();
     if (r < 0.40) return { text:randText(), images:[] };           // 40% 纯文字
-    if (r < 0.70) return { text:'', images:randImgs() };           // 30% 纯图片
-    return { text:randText(), images:randImgs() };                 // 30% 文字+图片
+    if (r < 0.60) return { text:'', images:randImgs() };           // 20% 纯贴纸
+    return { text:randText(), images:randImgs() };                 // 40% 文字+贴纸
 }
 
 async function generatePartnerMoment() {

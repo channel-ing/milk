@@ -13498,13 +13498,7 @@ body #user-sticker-picker .empty-sticker-tip {
    相册 tab：背景图模式下的可见性修复
    ══════════════════════════════════════════ */
 
-/* 1. 未配置 OSS 时的提示块——加卡片底（90%不透明）*/
-#couple-space-page.cs-with-bg .al-no-oss {
-    background: rgba(var(--secondary-bg-rgb), 0.9);
-    border-radius: 14px;
-}
-
-/* 2. 已配置 OSS 时，整个相册面板加底，让「相册/回收站」subtab 清晰可见 */
+/* 1. 相册面板加底，让「相册/回收站」subtab 清晰可见（无 OSS 时也生效，面板底色已够用）*/
 #couple-space-page.cs-with-bg #cs-panel-album {
     background: rgba(var(--secondary-bg-rgb), 0.9);
 }
@@ -13512,4 +13506,13 @@ body #user-sticker-picker .empty-sticker-tip {
 /* 3. 「新建相册」卡片 background 原值几乎透明（accent 3%），改为90%系统色 */
 #couple-space-page.cs-with-bg .al-new-card {
     background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+
+/* ── 心情手账：背景图模式下所有卡片90%透明度 ── */
+#couple-space-page.cs-with-bg .cs-mood-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+/* 日历卡片单独用 primary-bg-rgb（与原值保持一致，只加透明度）*/
+#couple-space-page.cs-with-bg #cs-mood-cal-card {
+    background: rgba(var(--primary-bg-rgb), 0.9);
 }

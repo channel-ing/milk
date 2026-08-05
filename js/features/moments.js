@@ -217,7 +217,7 @@ function _fmtDate(d){if(!d)return'';if(d===_mToday())return'今天';const dt=new
 
 // ─── 头像 ───
 function _getAvSrc(isPartner){const c=window._avatarCache||{};if(isPartner){if(c.partner)return c.partner;const e=document.getElementById('partner-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}else{if(c.me)return c.me;const e=document.getElementById('my-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}}
-function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36,fb=isPartner?'🌸':'🙂';return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;">`:`<span style="font-size:${Math.round(s*0.5)}px;display:block;text-align:center;line-height:${s}px;">${fb}</span>`;}
+function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36;return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;flex-shrink:0;">`:`<span style="width:${s}px;height:${s}px;border-radius:50%;background:var(--border-color,#d0d0d0);display:inline-block;flex-shrink:0;"></span>`;}
 
 // ─── 贴纸选择器（用户自己的 stickerLibrary） ───
 window._mToggleSticker=function(postId){

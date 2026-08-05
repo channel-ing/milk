@@ -11702,7 +11702,7 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .cs-hb-svg { width: 100%; height: 100%; }
 .cs-days-text {
-    font-size: 14px; color: var(--text-secondary);
+    font-size: 14px; color: var(--text-primary);
     margin-top: 10px;
 }
 .cs-days-num {
@@ -13453,8 +13453,3 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 
 
-/* ── 情侣空间：天数计数器文字跟随系统主题色（白天黑/夜间白）── */
-#cs-outer-header .cs-days-text,
-.cs-days-text {
-    color: var(--text-primary);
-}

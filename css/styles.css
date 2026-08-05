@@ -13451,3 +13451,13 @@ body #user-sticker-picker .empty-sticker-tip {
 #couple-space-page.cs-with-bg .cs-post {
     background: rgba(var(--secondary-bg-rgb), 0.9);
 }
+
+/* ── 情侣空间壁纸：动态 header 毛玻璃 ── */
+#couple-space-page.cs-with-bg .cs-feed-hd {
+    background: rgba(var(--secondary-bg-rgb), 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 6px 10px 10px;
+    margin-bottom: 2px;
+}

@@ -13441,23 +13441,46 @@ body #user-sticker-picker .empty-sticker-tip {
     background-attachment: local;
 }
 
-/* ── 情侣空间壁纸：动态页卡片半透明 ── */
+/* ── 情侣空间壁纸：动态页卡片毛玻璃 ── */
 #couple-space-page.cs-with-bg .cs-pills {
-    background: rgba(var(--secondary-bg-rgb), 0.9);
-}
-#couple-space-page.cs-with-bg .cs-compose-row {
-    background: rgba(var(--secondary-bg-rgb), 0.9);
-}
-#couple-space-page.cs-with-bg .cs-post {
-    background: rgba(var(--secondary-bg-rgb), 0.9);
-}
-
-/* ── 情侣空间壁纸：动态 header 毛玻璃 ── */
-#couple-space-page.cs-with-bg .cs-feed-hd {
     background: rgba(var(--secondary-bg-rgb), 0.7);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border-radius: 12px;
-    padding: 6px 10px 10px;
-    margin-bottom: 2px;
+}
+#couple-space-page.cs-with-bg .cs-compose-row {
+    background: rgba(var(--secondary-bg-rgb), 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+#couple-space-page.cs-with-bg .cs-post {
+    background: rgba(var(--secondary-bg-rgb), 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── 情侣空间壁纸：全局毛玻璃遮罩（替代 header-specific 方案）── */
+/* 重置之前加的 header 毛玻璃 */
+#couple-space-page.cs-with-bg .cs-feed-hd {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+    padding: 4px 4px 10px;
+    margin-bottom: 0;
+}
+/* 壁纸上铺一层半透明毛玻璃 */
+#couple-space-page.cs-with-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    background: rgba(var(--secondary-bg-rgb), 0.25);
+    z-index: 0;
+    pointer-events: none;
+}
+/* 内容层在遮罩上方 */
+#couple-space-page.cs-with-bg > * {
+    position: relative;
+    z-index: 1;
 }

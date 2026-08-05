@@ -13493,3 +13493,23 @@ body #user-sticker-picker .empty-sticker-tip {
 .cs-couple-row {
     max-width: 248px; /* 原300px；配合头像缩小，心跳线也随之变窄 */
 }
+
+/* ══════════════════════════════════════════
+   相册 tab：背景图模式下的可见性修复
+   ══════════════════════════════════════════ */
+
+/* 1. 未配置 OSS 时的提示块——加卡片底（90%不透明）*/
+#couple-space-page.cs-with-bg .al-no-oss {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+    border-radius: 14px;
+}
+
+/* 2. 已配置 OSS 时，整个相册面板加底，让「相册/回收站」subtab 清晰可见 */
+#couple-space-page.cs-with-bg #cs-panel-album {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+
+/* 3. 「新建相册」卡片 background 原值几乎透明（accent 3%），改为90%系统色 */
+#couple-space-page.cs-with-bg .al-new-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}

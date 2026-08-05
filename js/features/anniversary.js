@@ -613,6 +613,11 @@ window.openAnnDetail = function(annId) {
 
     var page = document.getElementById('ann-detail-page');
     if (page) page.classList.add('active');
+    // 隐藏列表和标题，防止透明详情页时列表从下方漏出
+    var listEl = document.getElementById('ann-list-container');
+    if (listEl) listEl.style.visibility = 'hidden';
+    var hdEl = document.querySelector('#cs-panel-ann .cs-ann-hd');
+    if (hdEl) hdEl.style.visibility = 'hidden';
 };
 
 function _annDetailHTML(name, label, days, dateStr, remark) {
@@ -637,6 +642,11 @@ window.closeAnnDetail = function() {
     var page = document.getElementById('ann-detail-page');
     if (page) page.classList.remove('active');
     _annDetailCurrentId = null;
+    // 恢复列表和标题可见性
+    var listEl = document.getElementById('ann-list-container');
+    if (listEl) listEl.style.visibility = '';
+    var hdEl = document.querySelector('#cs-panel-ann .cs-ann-hd');
+    if (hdEl) hdEl.style.visibility = '';
 };
 
 window._annEditFromDetail = function() {

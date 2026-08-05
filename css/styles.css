@@ -13453,3 +13453,14 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 
 
+
+/* ── 情侣空间顶部：天数文字跟随系统明暗（不走强调色）── */
+.cs-days-label {
+    color: var(--text-primary);
+}
+.cs-days-num {
+    color: var(--text-primary);
+}
+.cs-days-unit {
+    color: var(--text-primary);
+}

@@ -689,7 +689,11 @@ window._annInit = async function() {
         var orig = window.csSwitchTab;
         window.csSwitchTab = function(tab) {
             orig.call(this, tab);
-            if (tab === 'ann' && typeof window._annInit === 'function') window._annInit();
+            if (tab === 'ann') {
+                // 切回 ann tab 时强制回到列表页
+                if (typeof window.closeAnnDetail === 'function') window.closeAnnDetail();
+                if (typeof window._annInit === 'function') window._annInit();
+            }
             _annUpdateHeaderDays();
         };
     }

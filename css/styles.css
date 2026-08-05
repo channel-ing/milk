@@ -13516,3 +13516,33 @@ body #user-sticker-picker .empty-sticker-tip {
 #couple-space-page.cs-with-bg #cs-mood-cal-card {
     background: rgba(var(--primary-bg-rgb), 0.9);
 }
+
+/* ══════════════════════════════════════════
+   纪念日 tab：背景图模式下的可见性修复
+   ══════════════════════════════════════════ */
+
+/* 图一：列表卡片 90%（含两种类型的渐变变体）*/
+#couple-space-page.cs-with-bg .ann-item-card {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-past {
+    background: linear-gradient(135deg, rgba(255,154,158,0.06) 0%, rgba(var(--secondary-bg-rgb), 0.9) 60%);
+}
+#couple-space-page.cs-with-bg .ann-item-card.type-future {
+    background: linear-gradient(135deg, rgba(118,75,162,0.07) 0%, rgba(var(--secondary-bg-rgb), 0.9) 60%);
+}
+
+/* 图二：detail 面板去掉实底，让背景图透出 */
+#couple-space-page.cs-with-bg .ann-detail-page {
+    background: transparent;
+}
+/* 外框（大图卡）90% —— 已有 max-width:calc(100%-64px) 居中，左右自带留白 */
+#couple-space-page.cs-with-bg .ann-detail-card {
+    background-color: rgba(var(--accent-color-rgb), 0.9);
+}
+/* 备注框：90% + 左右再加 36px margin，使其比外框（32px margin）窄 */
+#couple-space-page.cs-with-bg .ann-detail-remark {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+    margin-left: 36px;
+    margin-right: 36px;
+}

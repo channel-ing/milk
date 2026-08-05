@@ -697,29 +697,32 @@ window.openCsSettings = async function () {
     }
 
     if (minSlider && maxSlider) {
-        updateSliderUI();
-        minSlider.oninput = () => {
-            _csSettings.dlyMin = parseInt(minSlider.value, 10);
+        function updateCsDlyUI() {
+            minSlider.value = _csSettings.dlyMin;
             minVal.textContent = _csSettings.dlyMin + '分钟';
+            maxSlider.value = _csSettings.dlyMax;
+            maxVal.textContent = _csSettings.dlyMax + '分钟';
             maxSlider.min = _csSettings.dlyMin;
+        }
+        updateCsDlyUI();
+
+        minSlider.addEventListener('input', (e) => {
+            _csSettings.dlyMin = parseInt(e.target.value, 10);
             if (_csSettings.dlyMin > _csSettings.dlyMax) {
                 _csSettings.dlyMax = _csSettings.dlyMin;
-                maxSlider.value = _csSettings.dlyMax;
-                maxVal.textContent = _csSettings.dlyMax + '分钟';
             }
-            _saveCsSettings();
-        };
-        maxSlider.oninput = () => {
-            _csSettings.dlyMax = parseInt(maxSlider.value, 10);
-            maxVal.textContent = _csSettings.dlyMax + '分钟';
-            minSlider.max = _csSettings.dlyMax;
+            updateCsDlyUI();
+        });
+        minSlider.addEventListener('change', _saveCsSettings);
+
+        maxSlider.addEventListener('input', (e) => {
+            _csSettings.dlyMax = parseInt(e.target.value, 10);
             if (_csSettings.dlyMax < _csSettings.dlyMin) {
                 _csSettings.dlyMin = _csSettings.dlyMax;
-                minSlider.value = _csSettings.dlyMin;
-                minVal.textContent = _csSettings.dlyMin + '分钟';
             }
-            _saveCsSettings();
-        };
+            updateCsDlyUI();
+        });
+        maxSlider.addEventListener('change', _saveCsSettings);
     }
     if (saveToggle)  { saveToggle.checked  = !!_csSettings.savePartnerImg;  saveToggle.onchange  = () => { _csSettings.savePartnerImg = saveToggle.checked;  _saveCsSettings(); }; }
     if (notifToggle) { notifToggle.checked = !!_csSettings.notifPopup;       notifToggle.onchange = () => { _csSettings.notifPopup    = notifToggle.checked;  _saveCsSettings(); }; }

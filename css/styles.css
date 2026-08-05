@@ -13546,3 +13546,24 @@ body #user-sticker-picker .empty-sticker-tip {
     margin-left: 36px;
     margin-right: 36px;
 }
+
+/* ── 纪念日详情页重设计：三层宽度层次（覆盖前面的规则）── */
+/* 外框：ann-detail-body 作为容器，圆角 + 左右 10px 边距 */
+#couple-space-page.cs-with-bg .ann-detail-body {
+    background: rgba(var(--secondary-bg-rgb), 0.9);
+    border-radius: 20px;
+    margin: 0 10px 16px;
+    padding: 16px 14px 20px;
+}
+/* 图卡：在 body 内容区再缩 32px（居中），比备注窄 */
+#couple-space-page.cs-with-bg .ann-detail-card {
+    max-width: calc(100% - 32px);
+    background-color: rgba(var(--accent-color-rgb), 0.9);
+}
+/* 备注框：在 body 内容区左右各 8px margin，介于外框和图卡之间
+   用 primary-bg 与外框 secondary-bg 形成轻微区分 */
+#couple-space-page.cs-with-bg .ann-detail-remark {
+    background: rgba(var(--primary-bg-rgb), 0.9);
+    margin-left: 8px;
+    margin-right: 8px;
+}

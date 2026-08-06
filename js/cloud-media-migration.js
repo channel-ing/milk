@@ -411,6 +411,40 @@
         }
     }
 
+    // ==== 纪念日封面迁移（annCoverBg_* 每条纪念日各自一个 key，需先枚举）====
+    async function _migrateAnnCovers(sid) {
+        var prefix = APP_PREFIX_STR + sid + '_annCoverBg_';
+        var allKeys;
+        try {
+            allKeys = await localforage.keys();
+        } catch (e) {
+            console.warn('[migration] 纪念日封面：枚举 key 失败，跳过', e);
+            return;
+        }
+        var coverKeys = allKeys.filter(function (k) { return k.indexOf(prefix) === 0; });
+        for (var i = 0; i < coverKeys.length; i++) {
+            var key = coverKeys[i];
+            var val;
+            try {
+                val = await localforage.getItem(key);
+            } catch (e2) { continue; }
+            if (!_isBase64Image(val)) continue;
+
+            _state.currentTask = '纪念日封面 ' + (i + 1) + '/' + coverKeys.length;
+            _notify();
+            try {
+                var r = await window.CloudMedia.upload(val, 'ann-covers');
+                await localforage.setItem(key, r.url);
+                _state.completed++;
+            } catch (e3) {
+                console.warn('[migration] 纪念日封面上传失败 key=' + key, e3);
+                _state.failed++;
+            }
+            _state.progress++;
+            _notify();
+        }
+    }
+
     // ==== 动态图片迁移（momentsData 里贴文配图 + 评论图片 base64 → oss://）====
     //
     // 分批处理，每批完成后立即写回 localforage 并同步内存变量（momentsData）。
@@ -587,6 +621,19 @@
             console.warn('[migration] 无法统计聊天图片数量（数据过大？），将在迁移时尝试处理', e);
         }
 
+        // 纪念日封面：每条各自一个 key，需先枚举
+        try {
+            var annKeys = await localforage.keys();
+            var annPrefix = APP_PREFIX_STR + sid + '_annCoverBg_';
+            for (var aki = 0; aki < annKeys.length; aki++) {
+                if (annKeys[aki].indexOf(annPrefix) !== 0) continue;
+                var annVal = await localforage.getItem(annKeys[aki]);
+                if (_isBase64Image(annVal)) count++;
+            }
+        } catch (eAnn) {
+            console.warn('[migration] 无法统计纪念日封面数量', eAnn);
+        }
+
         // 动态图片：贴文配图 + 评论图片
         try {
             var md = await localforage.getItem(APP_PREFIX_STR + sid + '_momentsData');
@@ -647,6 +694,9 @@
             // 日记背景
             await _migrateObjectGallery(sid, 'companionDiaryBgGallery', 'diary-backgrounds', '日记背景图库');
             await _migrateSingleImage(sid, 'companionDiaryBg', 'diary-backgrounds', '当前日记背景');
+
+            // 纪念日封面（枚举所有 annCoverBg_* key）
+            await _migrateAnnCovers(sid);
 
             // 贴纸（写 localforage 后同步内存变量）
             await _migrateStickerArray(sid, 'stickerLibrary', 'stickers', '对方表情库');

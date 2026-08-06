@@ -1250,6 +1250,11 @@
                 _inputBarHTML() +
             '</div>';
 
+        // 聊天区域刚重新画出来，里面可能有新的云端图片占位标签（比如切换沉浸/嵌入模式、
+        // 换片时整个面板都会重画一次）——这里直接绑一次，不依赖调用方记得手动补这一步，
+        // 避免"图片一直卡在空白占位、没有任何加载痕迹"这种问题。
+        _bindCinemaCloudImages(panel);
+
         if (_immersive) {
             _bindTheaterHdListeners();
         } else {

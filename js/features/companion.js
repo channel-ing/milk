@@ -240,7 +240,7 @@
             'background:rgba(0,0,0,0.5)',
             'display:flex', 'align-items:center', 'justify-content:center',
             'opacity:1', 'pointer-events:all',
-            'animation:companionFadeIn 0.25s ease'
+            'animation:companionFadeIn 0.25s ease','backdrop-filter:blur(8px)','-webkit-backdrop-filter:blur(8px)'
         ].join(';'));
 
         modal.innerHTML = `
@@ -390,7 +390,7 @@
         partnerInviteReject: ['好，下次见……', '好，你先忙……', '下次再见……'],   // 5
         userRejectExtend: ['好，下次见……', '好，你先忙……', '下次再见……'],      // 6
         userExit: ['那下次再见……', '那这次先到这里……'],                          // 7
-        timeUp: ['时间到了……', '时间过得真快……'],                                // 9
+        timeUp: ['时间到了……', '时间过得好快……'],                                // 9
         partnerEarlyLeave: ['我先走了……', '下次再与你一起……'],                   // 10
         partnerGoodbye: ['该起床啦……', '天亮了，新的一天开始了……'],              // 11
     };
@@ -2665,7 +2665,7 @@
 
     // ─── 倒计时归零后：梦角先发起延长 ──────────────────────────────────────
     const EXTEND_INVITE_LINES = [
-        '时间过得好快，再陪我一会儿？',
+        '时间过得好看，再陪我一会儿？',
         '舍不得你走，再来一会儿？',
         '刚刚状态正好，可以继续？',
         '我还想你陪着我，再一会儿可以吗？'

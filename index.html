@@ -3262,16 +3262,18 @@ function openMomentsWithTransition(){
   requestAnimationFrame(function(){requestAnimationFrame(function(){ov.classList.add('cs-trans-visible');});});
   setTimeout(function(){
     var page=document.getElementById('couple-space-page');
-    if(page){
-      page.style.transition='none';
-      page.style.transform='translateY(0)';
-    }
+    if(page){page.style.transition='none';}
     openMomentsModal();
     setTimeout(function(){
-      if(page){page.style.transition='';page.style.transform='';}
-    },200);
-    ov.classList.remove('cs-trans-visible');
-    setTimeout(function(){ov.classList.remove('cs-trans-show');},600);
+      if(page){page.style.transition='';}
+      ov.style.transition='none';
+      ov.style.opacity='0';
+      setTimeout(function(){
+        ov.classList.remove('cs-trans-show','cs-trans-visible');
+        ov.style.transition='';
+        ov.style.opacity='';
+      },50);
+    },150);
   },4000);
 }
 </script>

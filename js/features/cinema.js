@@ -290,12 +290,11 @@
                     '<div class="cinema-bili-help-text">在B站App里找到视频 → 点"分享" → 点"复制链接"，这时候复制到的是一个短链接，还不能直接用。打开手机浏览器（比如Safari、Chrome、Edge），把这个短链接粘贴进地址栏打开，等它跳转完，把地址栏里变成的新链接复制出来，再粘贴到这里。</div>' +
                 '</div>' +
                 '<div class="cinema-bili-help-warn">' +
-                    '<div class="cinema-bili-help-warn-title">⚠️ 有两个限制要提前知道：</div>' +
-                    '<div class="cinema-bili-help-warn-item">· 只能看不需要登录也能看的普通清晰度内容，高清、大会员专享的内容看不了</div>' +
-                    '<div class="cinema-bili-help-warn-item">· 如果你在里面点了"登录"，会直接跳出这个页面去登录，边看边聊会被打断</div>' +
+                    '<div class="cinema-bili-help-warn-title">⚠️ 有一个限制要提前知道：</div>' +
+                    '<div class="cinema-bili-help-warn-item">· 无法选择清晰度，只能看默认画质；大会员专享的内容看不了</div>' +
                 '</div>' +
                 '<div class="cinema-bili-help-why">' +
-                    '❓为什么：因为这个视频窗口是"借用"哔哩哔哩自己的播放器嵌进来的，不是网站的播放器，所以要遵守哔站自己设的规矩（要登录、清晰度限制）' +
+                    '❓为什么：这个视频窗口是"借用"哔哩哔哩自己的播放器嵌进来的，不是完整的网站播放器，所以清晰度选择和会员内容这些功能会受到限制。' +
                 '</div>' +
                 '<div class="cinema-invite-actions">' +
                     '<button class="cinema-invite-confirm" id="cinema-bili-help-ok" style="width:100%;">知道了</button>' +

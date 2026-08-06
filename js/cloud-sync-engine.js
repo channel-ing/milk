@@ -56,6 +56,8 @@
         'customReplyGroups', 'customPokeGroups', 'customStatusGroups',
         // 纪念日
         'anniversaries',
+        // 相册（相册列表/照片归属/收藏/回收站，图片本身是 oss:// 引用，体积小）
+        'albumData',
         // 心情手账（不含图片）
         'moodCalendar', 'customMoodOptions', 'moodTrash',
         // 主题人设

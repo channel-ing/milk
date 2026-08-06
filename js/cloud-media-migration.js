@@ -411,6 +411,92 @@
         }
     }
 
+    // ==== 情侣空间壁纸迁移（csWallpaperGallery 存量 base64 → oss:// + 缩略图）====
+    //
+    // 跟其它迁移不太一样：壁纸库条目本来就可能已经有 cloudUrl（旧逻辑是"两份都存"），
+    // 这种情况不用重新上传，直接把 value 换成 cloudUrl 就行；只有真正没上传过的
+    // 纯本地 base64，才需要真正调用 CloudMedia.upload。同时要检查"当前壁纸"这个单值
+    // key，如果它跟某个刚迁移的条目内容一致，也要一起换成新地址。
+    async function _migrateCsWallpaper(sid) {
+        var galleryKey = APP_PREFIX_STR + sid + '_csWallpaperGallery';
+        var gallery;
+        try {
+            gallery = await localforage.getItem(galleryKey);
+        } catch (e) {
+            console.warn('[migration] 壁纸库：加载失败，跳过', e);
+            return;
+        }
+        if (!Array.isArray(gallery) || gallery.length === 0) return;
+
+        var currentKey = APP_PREFIX_STR + sid + '_csWallpaper';
+        var currentVal;
+        try { currentVal = await localforage.getItem(currentKey); } catch (e2) { currentVal = null; }
+
+        var changed = false;
+        for (var i = 0; i < gallery.length; i++) {
+            var bg = gallery[i];
+            if (!bg || typeof bg.value !== 'string') continue;
+            if (bg.value.indexOf('oss://') === 0) continue; // 已经是新格式
+
+            _state.currentTask = '情侣空间壁纸 ' + (i + 1) + '/' + gallery.length;
+            _notify();
+
+            var oldValue = bg.value;
+            var newUrl = null;
+
+            if (bg.cloudUrl && bg.cloudUrl.indexOf('oss://') === 0) {
+                // 旧逻辑已经上传过，只是本地还留着大图：不用重新传，直接切换引用
+                newUrl = bg.cloudUrl;
+                gallery[i] = { id: bg.id, type: bg.type, value: newUrl, thumbnail: bg.thumbnail || null, cloudKey: bg.cloudKey, cloudUrl: bg.cloudUrl };
+                changed = true;
+                _state.completed++;
+            } else if (_isBase64Image(bg.value)) {
+                // 从没上传过：真正传一次云端 + 补一张缩略图
+                try {
+                    var r = await window.CloudMedia.upload(bg.value, 'cs-wallpapers', bg.id);
+                    var thumb = bg.thumbnail || null;
+                    if (!thumb) {
+                        try { thumb = await window.CloudMedia.makeThumbnail(oldValue, 200); } catch (e3) {}
+                    }
+                    newUrl = r.url;
+                    gallery[i] = { id: bg.id, type: bg.type, value: newUrl, thumbnail: thumb, cloudKey: r.key, cloudUrl: r.url };
+                    changed = true;
+                    _state.completed++;
+                } catch (e4) {
+                    console.warn('[migration] 壁纸上传失败 id=' + bg.id, e4);
+                    _state.failed++;
+                }
+            }
+
+            // 当前壁纸如果正好是这一条，同步换成新地址
+            if (newUrl && typeof currentVal === 'string' && currentVal === oldValue) {
+                currentVal = newUrl;
+            }
+
+            _state.progress++;
+            _notify();
+        }
+
+        if (changed) {
+            try { await localforage.setItem(galleryKey, gallery); }
+            catch (e5) { console.error('[migration] 壁纸库写回失败', e5); throw e5; }
+            try { await localforage.setItem(currentKey, currentVal); }
+            catch (e6) { /* 当前壁纸写回失败不影响壁纸库本身，静默跳过 */ }
+
+            // 同步内存变量，防止旧逻辑把 base64 重新写回 localforage
+            try {
+                /* global _csBgGallery */
+                if (typeof _csBgGallery !== 'undefined' && Array.isArray(_csBgGallery)) {
+                    for (var gi = 0; gi < gallery.length; gi++) {
+                        if (_csBgGallery[gi] && gallery[gi] && gallery[gi].value.indexOf('oss://') === 0) {
+                            _csBgGallery[gi] = gallery[gi];
+                        }
+                    }
+                }
+            } catch (memErr) { /* 内存同步失败不影响 localforage 写入，静默跳过 */ }
+        }
+    }
+
     // ==== 纪念日封面迁移（annCoverBg_* 每条纪念日各自一个 key，需先枚举）====
     async function _migrateAnnCovers(sid) {
         var prefix = APP_PREFIX_STR + sid + '_annCoverBg_';
@@ -621,6 +707,20 @@
             console.warn('[migration] 无法统计聊天图片数量（数据过大？），将在迁移时尝试处理', e);
         }
 
+        // 情侣空间壁纸库：value 还是 base64、或者有 cloudUrl 但本地还留着大图的，都算一条
+        try {
+            var wpGallery = await localforage.getItem(APP_PREFIX_STR + sid + '_csWallpaperGallery');
+            if (Array.isArray(wpGallery)) {
+                wpGallery.forEach(function (bg) {
+                    if (!bg || typeof bg.value !== 'string') return;
+                    if (bg.value.indexOf('oss://') === 0) return;
+                    if (_isBase64Image(bg.value) || (bg.cloudUrl && bg.cloudUrl.indexOf('oss://') === 0)) count++;
+                });
+            }
+        } catch (eWp) {
+            console.warn('[migration] 无法统计壁纸库数量', eWp);
+        }
+
         // 纪念日封面：每条各自一个 key，需先枚举
         try {
             var annKeys = await localforage.keys();
@@ -694,6 +794,9 @@
             // 日记背景
             await _migrateObjectGallery(sid, 'companionDiaryBgGallery', 'diary-backgrounds', '日记背景图库');
             await _migrateSingleImage(sid, 'companionDiaryBg', 'diary-backgrounds', '当前日记背景');
+
+            // 情侣空间壁纸（存量大图搬去云端，本地只留缩略图）
+            await _migrateCsWallpaper(sid);
 
             // 纪念日封面（枚举所有 annCoverBg_* key）
             await _migrateAnnCovers(sid);

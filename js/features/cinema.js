@@ -922,6 +922,14 @@
             // 只在电影院面板真的开着、且处于观影中才镜像，避免面板不存在时报错/无意义操作
             if (_uiState !== 'watching' || !_getPanel()) return;
             var isShown = ti.style.display !== 'none' && ti.style.display !== '';
+            var slot = document.getElementById('cinema-typing-fixed');
+            if (!slot) return;
+            // 已经是同一个状态就不重复操作——主聊天提示条位置会跟着输入框大小实时调整，
+            // 每次调整都会触发这个回调，如果不做这层判断，会一直重建"正在输入"这段 DOM，
+            // 动画被反复打断重启，看起来就像一直在闪。直接查电影院自己 DOM 当前状态判断，
+            // 不用额外的 JS 变量记状态，避免离开/回到观影中之后状态不同步的问题
+            var alreadyShown = slot.style.display === 'block';
+            if (isShown === alreadyShown) return;
             if (isShown) { _cinemaShowTyping(); } else { _cinemaHideTyping(); }
         });
         observer.observe(ti, { attributes: true, attributeFilter: ['style'] });

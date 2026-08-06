@@ -35,7 +35,7 @@
         }
     </style>
 <style id="cs-transition-styles">
-#cs-transition-overlay{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 36%,rgba(255,255,255,.95),rgba(255,250,246,.82) 30%,rgba(245,238,232,.96) 72%),#f4eee8;opacity:0;transition:opacity 0.45s ease;pointer-events:none;}
+#cs-transition-overlay{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 36%,rgba(255,255,255,.95),rgba(255,250,246,.82) 30%,rgba(245,238,232,.96) 72%),#f4eee8;opacity:0;transition:opacity 0.5s ease;pointer-events:none;}
 #cs-transition-overlay.cs-trans-show{display:flex;pointer-events:all;}
 #cs-transition-overlay.cs-trans-visible{opacity:1;}
 #cs-transition-overlay .cs-trans-inner{width:min(480px,88vw);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;}
@@ -3264,16 +3264,11 @@ function openMomentsWithTransition(){
     var page=document.getElementById('couple-space-page');
     if(page){page.style.transition='none';}
     openMomentsModal();
-    setTimeout(function(){
-      if(page){page.style.transition='';}
-      ov.style.transition='none';
-      ov.style.opacity='0';
-      setTimeout(function(){
-        ov.classList.remove('cs-trans-show','cs-trans-visible');
-        ov.style.transition='';
-        ov.style.opacity='';
-      },50);
-    },150);
+    setTimeout(function(){if(page){page.style.transition='';} },150);
+  },3700);
+  setTimeout(function(){
+    ov.classList.remove('cs-trans-visible');
+    setTimeout(function(){ov.classList.remove('cs-trans-show');},500);
   },4000);
 }
 </script>

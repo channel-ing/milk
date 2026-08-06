@@ -37,9 +37,9 @@
     var _immersive = true;
 
     var _fakeAppt = {
-        movieTitle: '阿嫚的情书',
-        dateStr: '2026年8月3日',
-        timeStr: '20:30'
+        movieTitle: '',
+        dateStr: '',
+        timeStr: ''
     };
 
     // 观影中：当前视频信息（从 waiting 跳转过来时写入）
@@ -844,7 +844,6 @@
         _appendMsgToDOM(msg);
         _cinemaSyncToMainChat(msg);
         if (msg.sender === 'user' && typeof window._triggerDelayedReply === 'function') {
-            console.log('[cinema-debug] 用户发消息，调用 _triggerDelayedReply(true) @', new Date().toISOString().slice(11,23));
             _cinemaAwaitingReply = true;
             window._triggerDelayedReply(true);
         }
@@ -857,7 +856,6 @@
     var _cinemaAwaitingReplyTimer = null;
 
     function _cinemaShowTyping() {
-        console.log('[cinema-debug] _cinemaShowTyping 被调用 @', new Date().toISOString().slice(11,23), new Error().stack.split('\n').slice(1,3).join(' | '));
         var slot = document.getElementById('cinema-typing-fixed');
         if (!slot) return;
         var name = (typeof settings !== 'undefined' && settings.partnerName) || '梦角';
@@ -874,7 +872,6 @@
         slot.style.display = 'block';
     }
     function _cinemaHideTyping() {
-        console.log('[cinema-debug] _cinemaHideTyping 被调用 @', new Date().toISOString().slice(11,23), new Error().stack.split('\n').slice(1,3).join(' | '));
         var slot = document.getElementById('cinema-typing-fixed');
         if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }
     }
@@ -922,20 +919,16 @@
         }
         _cinemaTypingObserverBound = true;
         var observer = new MutationObserver(function () {
+            // 只在电影院面板真的开着、且处于观影中才镜像，避免面板不存在时报错/无意义操作
+            if (_uiState !== 'watching' || !_getPanel()) return;
             var isShown = ti.style.display !== 'none' && ti.style.display !== '';
-            console.log('[cinema-debug] observer 触发 @', new Date().toISOString().slice(11,23),
-                '主聊天ti.style.display=', JSON.stringify(ti.style.display),
-                'isShown=', isShown,
-                '_uiState=', _uiState, 'panel存在=', !!_getPanel());
-            if (_uiState !== 'watching' || !_getPanel()) { console.log('[cinema-debug]   → 跳过(不在观影中或面板不存在)'); return; }
             var slot = document.getElementById('cinema-typing-fixed');
-            if (!slot) { console.log('[cinema-debug]   → 跳过(找不到 cinema-typing-fixed)'); return; }
+            if (!slot) return;
             // 已经是同一个状态就不重复操作——主聊天提示条位置会跟着输入框大小实时调整，
             // 每次调整都会触发这个回调，如果不做这层判断，会一直重建"正在输入"这段 DOM，
             // 动画被反复打断重启，看起来就像一直在闪。直接查电影院自己 DOM 当前状态判断，
             // 不用额外的 JS 变量记状态，避免离开/回到观影中之后状态不同步的问题
             var alreadyShown = slot.style.display === 'block';
-            console.log('[cinema-debug]   → alreadyShown=', alreadyShown, 'isShown=', isShown, alreadyShown === isShown ? '(相同,跳过)' : '(不同,执行)');
             if (isShown === alreadyShown) return;
             if (isShown) { _cinemaShowTyping(); } else { _cinemaHideTyping(); }
         });

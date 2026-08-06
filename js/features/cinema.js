@@ -583,8 +583,6 @@
         if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
         _currentVideo = { src: '', title: '' };
         _cinemaMessages = [];
-        if (_cinemaAwaitingReplyTimer) { clearTimeout(_cinemaAwaitingReplyTimer); _cinemaAwaitingReplyTimer = null; }
-        _cinemaAwaitingReply = false;
         _cinemaHideTyping();
         _clearWatchAutoEnd();
         window._cinemaWatching = false;
@@ -846,16 +844,11 @@
         _appendMsgToDOM(msg);
         if (!skipMainChatSync) _cinemaSyncToMainChat(msg);
         if (msg.sender === 'user' && typeof window._triggerDelayedReply === 'function') {
-            _cinemaAwaitingReply = true;
             window._triggerDelayedReply(true);
         }
     }
 
     // ── 梦角自动回复：复用主聊天"字卡"回复库(customReplies)的选取/过滤逻辑 ──
-    // 是否正在等待"这次电影院发消息"触发的回复——避免把跟电影院无关的主聊天/
-    // 陪伴模式消息误插进电影院聊天区。发消息时置 true，收到回复或超时后置回 false。
-    var _cinemaAwaitingReply = false;
-    var _cinemaAwaitingReplyTimer = null;
 
     function _cinemaShowTyping() {
         var slot = document.getElementById('cinema-typing-fixed');
@@ -940,8 +933,9 @@
 
     if (typeof window._registerPartnerMessageListener === 'function') {
         window._registerPartnerMessageListener(function (message) {
-            // 不是电影院这次发消息触发的回复（比如陪伴模式/主聊天自己产生的），不插进电影院聊天区
-            if (!_cinemaAwaitingReply) return;
+            // 只看"电影院现在是不是正在观影中"——跟陪伴模式判断"陪伴页面开不开"是同一个思路。
+            // 观影时梦角自己主动发起的邀请/来电已经在源头被 _cinemaShouldBlockInterruptions 拦住，
+            // 所以这里不需要再额外判断"是不是这次发消息触发的回复"，观影中收到的梦角消息直接镶进来即可。
             if (_uiState !== 'watching' || !_getPanel()) return;
             var mirrored = {
                 sender: 'partner',
@@ -951,10 +945,6 @@
             if (!mirrored.content) return;
             _pushMessage(mirrored, true);
             if (typeof playSound === 'function') { try { playSound('message'); } catch (e) {} }
-            // 收到一条就先当作这轮已经有回应了；主聊天多条回复(1~3条)时后面几条如果还在
-            // 等待窗口内到达，同样会被镶进来，超时之后才彻底关闭这次的"等待"标记
-            if (_cinemaAwaitingReplyTimer) clearTimeout(_cinemaAwaitingReplyTimer);
-            _cinemaAwaitingReplyTimer = setTimeout(function () { _cinemaAwaitingReply = false; }, 6000);
         });
     }
 
@@ -1713,7 +1703,6 @@
         } else {
             console.log('[cinema] 样例字卡:', pool.slice(0, 3));
             console.log('[cinema] 正在强制触发一次回复（复用主聊天 _triggerDelayedReply）...');
-            _cinemaAwaitingReply = true;
             if (typeof window._triggerDelayedReply === 'function') window._triggerDelayedReply(true);
         }
         return pool;

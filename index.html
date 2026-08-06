@@ -40,17 +40,17 @@
 #cs-transition-overlay.cs-trans-visible{opacity:1;}
 #cs-transition-overlay .cs-trans-inner{width:min(480px,88vw);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;}
 #cs-transition-overlay svg{width:82%;height:auto;overflow:visible;}
-#cs-transition-overlay .cs-lp{transform-origin:220px 240px;animation:csLeftMove 4.2s cubic-bezier(.2,.75,.2,1) infinite;}
-#cs-transition-overlay .cs-rp{transform-origin:580px 240px;animation:csRightMove 4.2s cubic-bezier(.2,.75,.2,1) infinite;}
-#cs-transition-overlay .cs-lf,#cs-transition-overlay .cs-rf{transform-box:fill-box;transform-origin:center;animation:csSquash 4.2s ease-in-out infinite;}
-#cs-transition-overlay .cs-heart{transform-box:fill-box;transform-origin:center;opacity:0;animation:csHeartPop 4.2s cubic-bezier(.2,.9,.25,1.25) infinite;}
-#cs-transition-overlay .cs-spark{transform-box:fill-box;transform-origin:center;opacity:0;animation:csSparkle 4.2s ease-out infinite;}
+#cs-transition-overlay .cs-lp{transform-origin:220px 240px;animation:csLeftMove 6s cubic-bezier(.2,.75,.2,1) infinite;}
+#cs-transition-overlay .cs-rp{transform-origin:580px 240px;animation:csRightMove 6s cubic-bezier(.2,.75,.2,1) infinite;}
+#cs-transition-overlay .cs-lf,#cs-transition-overlay .cs-rf{transform-box:fill-box;transform-origin:center;animation:csSquash 6s ease-in-out infinite;}
+#cs-transition-overlay .cs-heart{transform-box:fill-box;transform-origin:center;opacity:0;animation:csHeartPop 6s cubic-bezier(.2,.9,.25,1.25) infinite;}
+#cs-transition-overlay .cs-spark{transform-box:fill-box;transform-origin:center;opacity:0;animation:csSparkle 6s ease-out infinite;}
 #cs-transition-overlay .cs-spark.s2{animation-delay:.06s;}
 #cs-transition-overlay .cs-spark.s3{animation-delay:.12s;}
 #cs-transition-overlay .cs-spark.s4{animation-delay:.18s;}
-#cs-transition-overlay .cs-blush{opacity:0;animation:csBlush 4.2s ease-in-out infinite;}
-#cs-transition-overlay .cs-eyes{animation:csBlink 4.2s linear infinite;transform-origin:center;}
-#cs-transition-overlay .cs-halo{opacity:0;transform-box:fill-box;transform-origin:center;animation:csHalo 4.2s ease-out infinite;}
+#cs-transition-overlay .cs-blush{opacity:0;animation:csBlush 6s ease-in-out infinite;}
+#cs-transition-overlay .cs-eyes{animation:csBlink 6s linear infinite;transform-origin:center;}
+#cs-transition-overlay .cs-halo{opacity:0;transform-box:fill-box;transform-origin:center;animation:csHalo 6s ease-out infinite;}
 @keyframes csLeftMove{0%,12%{transform:translateX(-190px);}38%{transform:translateX(-26px);}45%{transform:translateX(-10px) scaleX(1.06) scaleY(.95);}51%{transform:translateX(-25px);}62%,82%{transform:translateX(-18px);}100%{transform:translateX(-190px);}}
 @keyframes csRightMove{0%,12%{transform:translateX(190px);}38%{transform:translateX(26px);}45%{transform:translateX(10px) scaleX(1.06) scaleY(.95);}51%{transform:translateX(25px);}62%,82%{transform:translateX(18px);}100%{transform:translateX(190px);}}
 @keyframes csSquash{0%,38%,100%{transform:scale(1);}45%{transform:scaleX(1.08) scaleY(.94);}52%{transform:scaleX(.98) scaleY(1.03);}62%,82%{transform:scale(1);}}
@@ -3261,10 +3261,18 @@ function openMomentsWithTransition(){
   ov.classList.add('cs-trans-show');
   requestAnimationFrame(function(){requestAnimationFrame(function(){ov.classList.add('cs-trans-visible');});});
   setTimeout(function(){
+    var page=document.getElementById('couple-space-page');
+    if(page){
+      page.style.transition='none';
+      page.style.transform='translateY(0)';
+    }
     openMomentsModal();
+    setTimeout(function(){
+      if(page){page.style.transition='';page.style.transform='';}
+    },200);
     ov.classList.remove('cs-trans-visible');
-    setTimeout(function(){ov.classList.remove('cs-trans-show');},500);
-  },2400);
+    setTimeout(function(){ov.classList.remove('cs-trans-show');},600);
+  },4000);
 }
 </script>
 </body>

@@ -60,6 +60,8 @@
         'albumData',
         // 动态（贴文/评论/点赞，图片有清洗逻辑见下方 _collectTextData）
         'momentsData',
+        // 电影院（约定/待看清单/观看历史/协商/梦角主动邀请，全是文字数字，没有图片）
+        '_cinemaAppt', '_cinemaWatchlist', '_cinemaHistory', '_cinemaNego', '_cinemaPartnerInvite',
         // 心情手账（不含图片）
         'moodCalendar', 'customMoodOptions', 'moodTrash',
         // 主题人设

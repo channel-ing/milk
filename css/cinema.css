@@ -404,6 +404,11 @@
 .cinema-msg-avatar {
     flex-shrink: 0;
 }
+/* 连续同一个人发的消息，"每条消息都显示头像"关闭时，除第一条外头像位置还留着，
+   只是不显示——跟主聊天 .message-avatar.hidden 是同一个思路，保持左右对齐不跳动 */
+.cinema-msg-avatar-invisible {
+    visibility: hidden;
+}
 .cinema-msg-bubble {
     max-width: 68%;
     background: var(--accent-color, #7BC8A4);

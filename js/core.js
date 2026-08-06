@@ -1,5 +1,13 @@
 /*核心应用逻辑：数据加载保存、消息渲染、会话管理等*/
 
+// 梦角回复消息的多监听通道（跟 window._onPartnerMessage 单函数钩子并行，互不覆盖）
+// 需要监听"梦角发了消息"这个事件的新模块，用 window._registerPartnerMessageListener(fn) 注册，
+// 不要直接赋值 window._onPartnerMessage，那个是给旧模块（陪伴模块）用的，赋值会覆盖掉它。
+window._partnerMessageListeners = window._partnerMessageListeners || [];
+window._registerPartnerMessageListener = window._registerPartnerMessageListener || function (fn) {
+    if (typeof fn === 'function') window._partnerMessageListeners.push(fn);
+};
+
         function clearAllAppData() {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
@@ -1372,8 +1380,15 @@ const addMessage = (message) => {
 
     // 钩子：通知陪伴模块"梦角刚说了一句话"，让陪伴页可以同步显示气泡
     // 只对梦角的普通消息触发（不是用户消息、不是 system call-event 等）
+    // 保留原有的单函数赋值方式（陪伴模块在用，不改动，避免影响它）
     if (message.sender !== 'user' && message.type === 'normal' && typeof window._onPartnerMessage === 'function') {
         try { window._onPartnerMessage(message); } catch (e) { console.warn('[onPartnerMessage]', e); }
+    }
+    // 新增：多监听通道，供电影院等新模块注册，跟上面那个单函数钩子并行、互不覆盖
+    if (message.sender !== 'user' && message.type === 'normal' && Array.isArray(window._partnerMessageListeners)) {
+        window._partnerMessageListeners.forEach(function (fn) {
+            try { fn(message); } catch (e) { console.warn('[onPartnerMessage:listener]', e); }
+        });
     }
     // 钩子：通知陪伴模块"用户刚发了一条消息"，让陪伴页气泡同步显示
     if (message.sender === 'user' && message.type === 'normal' && typeof window._onUserMessage === 'function') {

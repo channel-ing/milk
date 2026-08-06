@@ -411,6 +411,111 @@
         }
     }
 
+    // ==== 动态图片迁移（momentsData 里贴文配图 + 评论图片 base64 → oss://）====
+    //
+    // 分批处理，每批完成后立即写回 localforage 并同步内存变量（momentsData）。
+    // 逻辑跟聊天图片迁移一致：只搬"贴文的 images 数组"和"评论的 image 字段"，
+    // video/videoCover 发的时候就要求联网上传（失败直接置 null），本身不会是 base64，不用扫。
+    async function _migrateMomentsImages(sid) {
+        var key = APP_PREFIX_STR + sid + '_momentsData';
+        var data;
+        try {
+            data = await localforage.getItem(key);
+        } catch (loadErr) {
+            console.warn('[migration] 动态图片：加载 momentsData 失败，跳过', loadErr);
+            return;
+        }
+        if (!data || !Array.isArray(data.posts) || data.posts.length === 0) return;
+
+        // 找出所有需要迁移的图片位置：{ postIdx, kind: 'post'|'comment', imgIdx?, commentIdx? }
+        var toMigrate = [];
+        for (var pi = 0; pi < data.posts.length; pi++) {
+            var post = data.posts[pi];
+            if (!post) continue;
+            if (Array.isArray(post.images)) {
+                for (var ii = 0; ii < post.images.length; ii++) {
+                    if (_isBase64Image(post.images[ii])) {
+                        toMigrate.push({ postIdx: pi, kind: 'post', imgIdx: ii });
+                    }
+                }
+            }
+            if (Array.isArray(post.comments)) {
+                for (var ci = 0; ci < post.comments.length; ci++) {
+                    var cmt = post.comments[ci];
+                    if (cmt && _isBase64Image(cmt.image)) {
+                        toMigrate.push({ postIdx: pi, kind: 'comment', commentIdx: ci });
+                    }
+                }
+            }
+        }
+        if (toMigrate.length === 0) return;
+
+        for (var batchStart = 0; batchStart < toMigrate.length; batchStart += CHAT_IMAGE_BATCH_SIZE) {
+            var batchEnd = Math.min(batchStart + CHAT_IMAGE_BATCH_SIZE, toMigrate.length);
+            var batchChanged = false;
+
+            for (var j = batchStart; j < batchEnd; j++) {
+                var loc = toMigrate[j];
+                var post2 = data.posts[loc.postIdx];
+                _state.currentTask = '动态图片 ' + (j + 1) + '/' + toMigrate.length;
+                _notify();
+                try {
+                    if (loc.kind === 'post') {
+                        var srcImg = post2.images[loc.imgIdx];
+                        var r1 = await window.CloudMedia.upload(srcImg, 'moments-img');
+                        post2.images[loc.imgIdx] = r1.url;
+                    } else {
+                        var cmt2 = post2.comments[loc.commentIdx];
+                        var r2 = await window.CloudMedia.upload(cmt2.image, 'moments-comment-img');
+                        cmt2.image = r2.url;
+                    }
+                    batchChanged = true;
+                    _state.completed++;
+                } catch (e) {
+                    console.warn('[migration] 动态图片上传失败 postIdx=' + loc.postIdx, e);
+                    _state.failed++;
+                }
+                _state.progress++;
+                _notify();
+            }
+
+            if (batchChanged) {
+                try {
+                    await localforage.setItem(key, data);
+                } catch (saveErr) {
+                    console.error('[migration] 动态图片写回失败（第 ' + Math.floor(batchStart / CHAT_IMAGE_BATCH_SIZE + 1) + ' 批）', saveErr);
+                    throw saveErr;
+                }
+
+                // 同步内存变量 momentsData，防止 saveMomentsData() 把旧 base64 重新写回 localforage
+                try {
+                    /* global momentsData */
+                    if (typeof momentsData !== 'undefined' && momentsData && Array.isArray(momentsData.posts)) {
+                        for (var si = batchStart; si < batchEnd; si++) {
+                            var loc2 = toMigrate[si];
+                            var freshPost = data.posts[loc2.postIdx];
+                            var memPost = momentsData.posts[loc2.postIdx];
+                            if (!freshPost || !memPost) continue;
+                            if (loc2.kind === 'post') {
+                                if (freshPost.images && freshPost.images[loc2.imgIdx] && freshPost.images[loc2.imgIdx].indexOf('oss://') === 0) {
+                                    if (memPost.images) memPost.images[loc2.imgIdx] = freshPost.images[loc2.imgIdx];
+                                }
+                            } else {
+                                var freshCmt = freshPost.comments && freshPost.comments[loc2.commentIdx];
+                                var memCmt = memPost.comments && memPost.comments[loc2.commentIdx];
+                                if (freshCmt && memCmt && freshCmt.image && freshCmt.image.indexOf('oss://') === 0) {
+                                    memCmt.image = freshCmt.image;
+                                }
+                            }
+                        }
+                    }
+                } catch (memErr) {
+                    // 内存同步失败不影响 localforage 写入，静默跳过
+                }
+            }
+        }
+    }
+
     // ==== 扫描：计算总项数 ====
     async function _countTasks(sid) {
         var count = 0;
@@ -482,6 +587,24 @@
             console.warn('[migration] 无法统计聊天图片数量（数据过大？），将在迁移时尝试处理', e);
         }
 
+        // 动态图片：贴文配图 + 评论图片
+        try {
+            var md = await localforage.getItem(APP_PREFIX_STR + sid + '_momentsData');
+            if (md && Array.isArray(md.posts)) {
+                md.posts.forEach(function (post) {
+                    if (!post) return;
+                    if (Array.isArray(post.images)) {
+                        post.images.forEach(function (img) { if (_isBase64Image(img)) count++; });
+                    }
+                    if (Array.isArray(post.comments)) {
+                        post.comments.forEach(function (cmt) { if (cmt && _isBase64Image(cmt.image)) count++; });
+                    }
+                });
+            }
+        } catch (e2) {
+            console.warn('[migration] 无法统计动态图片数量（数据过大？），将在迁移时尝试处理', e2);
+        }
+
         return count;
     }
 
@@ -537,6 +660,9 @@
 
             // 聊天图片（分批，每批同步内存变量）
             await _migrateChatImages(sid);
+
+            // 动态图片（贴文配图 + 评论图片，分批，每批同步内存变量）
+            await _migrateMomentsImages(sid);
 
             _state.currentTask = '完成';
             _notify();

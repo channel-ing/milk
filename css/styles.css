@@ -11652,7 +11652,7 @@ body #user-sticker-picker .empty-sticker-tip {
 /* ── 全屏页面入场 ── */
 #couple-space-page {
     position: fixed; inset: 0; z-index: 1500;
-    display: flex; flex-direction: column;
+    display: none; flex-direction: column;
     background: var(--primary-bg);
     opacity: 0;
     transition: opacity 0.28s ease;

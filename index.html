@@ -34,6 +34,33 @@
             margin: 0;
         }
     </style>
+<style id="cs-transition-styles">
+#cs-transition-overlay{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 36%,rgba(255,255,255,.95),rgba(255,250,246,.82) 30%,rgba(245,238,232,.96) 72%),#f4eee8;opacity:0;transition:opacity 0.45s ease;pointer-events:none;}
+#cs-transition-overlay.cs-trans-show{display:flex;pointer-events:all;}
+#cs-transition-overlay.cs-trans-visible{opacity:1;}
+#cs-transition-overlay .cs-trans-inner{width:min(480px,88vw);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;}
+#cs-transition-overlay svg{width:82%;height:auto;overflow:visible;}
+#cs-transition-overlay .cs-lp{transform-origin:220px 240px;animation:csLeftMove 4.2s cubic-bezier(.2,.75,.2,1) infinite;}
+#cs-transition-overlay .cs-rp{transform-origin:580px 240px;animation:csRightMove 4.2s cubic-bezier(.2,.75,.2,1) infinite;}
+#cs-transition-overlay .cs-lf,#cs-transition-overlay .cs-rf{transform-box:fill-box;transform-origin:center;animation:csSquash 4.2s ease-in-out infinite;}
+#cs-transition-overlay .cs-heart{transform-box:fill-box;transform-origin:center;opacity:0;animation:csHeartPop 4.2s cubic-bezier(.2,.9,.25,1.25) infinite;}
+#cs-transition-overlay .cs-spark{transform-box:fill-box;transform-origin:center;opacity:0;animation:csSparkle 4.2s ease-out infinite;}
+#cs-transition-overlay .cs-spark.s2{animation-delay:.06s;}
+#cs-transition-overlay .cs-spark.s3{animation-delay:.12s;}
+#cs-transition-overlay .cs-spark.s4{animation-delay:.18s;}
+#cs-transition-overlay .cs-blush{opacity:0;animation:csBlush 4.2s ease-in-out infinite;}
+#cs-transition-overlay .cs-eyes{animation:csBlink 4.2s linear infinite;transform-origin:center;}
+#cs-transition-overlay .cs-halo{opacity:0;transform-box:fill-box;transform-origin:center;animation:csHalo 4.2s ease-out infinite;}
+@keyframes csLeftMove{0%,12%{transform:translateX(-190px);}38%{transform:translateX(-26px);}45%{transform:translateX(-10px) scaleX(1.06) scaleY(.95);}51%{transform:translateX(-25px);}62%,82%{transform:translateX(-18px);}100%{transform:translateX(-190px);}}
+@keyframes csRightMove{0%,12%{transform:translateX(190px);}38%{transform:translateX(26px);}45%{transform:translateX(10px) scaleX(1.06) scaleY(.95);}51%{transform:translateX(25px);}62%,82%{transform:translateX(18px);}100%{transform:translateX(190px);}}
+@keyframes csSquash{0%,38%,100%{transform:scale(1);}45%{transform:scaleX(1.08) scaleY(.94);}52%{transform:scaleX(.98) scaleY(1.03);}62%,82%{transform:scale(1);}}
+@keyframes csHeartPop{0%,39%{opacity:0;transform:scale(.1) translateY(18px) rotate(-7deg);}47%{opacity:1;transform:scale(1.28) translateY(-2px) rotate(3deg);}54%{transform:scale(.92) translateY(0) rotate(-1deg);}61%{transform:scale(1.08);}68%,82%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(.65) translateY(-22px);}}
+@keyframes csSparkle{0%,43%{opacity:0;transform:translate(0,8px) scale(.2) rotate(0deg);}53%{opacity:1;transform:translate(0,0) scale(1.2) rotate(18deg);}66%{opacity:.9;transform:translate(0,-6px) scale(.9) rotate(38deg);}78%,100%{opacity:0;transform:translate(0,-18px) scale(.35) rotate(70deg);}}
+@keyframes csBlush{0%,40%,100%{opacity:0;}51%,82%{opacity:.75;}}
+@keyframes csBlink{0%,27%,31%,72%,76%,100%{transform:scaleY(1);}29%,74%{transform:scaleY(.12);}}
+@keyframes csHalo{0%,40%{opacity:0;transform:scale(.4);}50%{opacity:.5;transform:scale(1);}67%,100%{opacity:0;transform:scale(1.55);}}
+@media(prefers-reduced-motion:reduce){#cs-transition-overlay *{animation-play-state:paused!important;}}
+</style>
 </head>
 <body>
 <div id="splash-declaration">
@@ -210,7 +237,7 @@
                 <button id="group-chat-btn" class="action-btn" title="群聊设置"><i class="fas fa-users"></i></button>
                 <button id="envelope-header-btn" class="action-btn" title="信箱"><i class="fas fa-envelope-open-text"></i></button>
                 <button id="companion-btn" class="action-btn" title="陪伴"><i class="fas fa-hand-holding-heart"></i></button>
-                <button id="moments-header-btn" class="action-btn" title="情侣空间" onclick="openMomentsModal()" style="position:relative;">
+                <button id="moments-header-btn" class="action-btn" title="情侣空间" onclick="openMomentsWithTransition()" style="position:relative;">
                     <i class="ti ti-home-heart" style="font-size:19px;"></i>
                     <span id="moments-header-badge" style="display:none;position:absolute;top:3px;right:3px;width:7px;height:7px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
                 </button>
@@ -438,6 +465,48 @@
 <!-- ═══════════════════════════════════════
      情侣空间：全屏页面
 ═══════════════════════════════════════ -->
+<div id="cs-transition-overlay">
+  <div class="cs-trans-inner">
+    <svg viewBox="0 0 800 480" role="img" aria-label="两个圆相遇并出现爱心">
+      <defs>
+        <linearGradient id="csGLeft" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd9d2"/><stop offset="1" stop-color="#ff9f9d"/></linearGradient>
+        <linearGradient id="csGRight" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9e8ff"/><stop offset="1" stop-color="#a8c4ff"/></linearGradient>
+        <linearGradient id="csGHeart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7e91"/><stop offset="1" stop-color="#ff4f72"/></linearGradient>
+        <filter id="csShadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="13" stdDeviation="13" flood-color="#8f6a62" flood-opacity=".18"/></filter>
+      </defs>
+      <ellipse cx="400" cy="364" rx="205" ry="28" fill="#c6aba2" opacity=".12"/>
+      <circle class="cs-halo" cx="400" cy="222" r="92" fill="none" stroke="#ff9aad" stroke-width="8" opacity="0"/>
+      <g class="cs-lp" filter="url(#csShadow)">
+        <g class="cs-lf">
+          <circle cx="300" cy="240" r="90" fill="url(#csGLeft)"/>
+          <circle cx="271" cy="230" r="8" fill="#624e4e" class="cs-eyes"/><circle cx="329" cy="230" r="8" fill="#624e4e" class="cs-eyes"/>
+          <path d="M285 265 Q300 278 315 265" fill="none" stroke="#624e4e" stroke-width="7" stroke-linecap="round"/>
+          <ellipse class="cs-blush" cx="253" cy="257" rx="18" ry="10" fill="#ff6f88" opacity="0"/><ellipse class="cs-blush" cx="347" cy="257" rx="18" ry="10" fill="#ff6f88" opacity="0"/>
+          <circle cx="267" cy="209" r="12" fill="#fff" opacity=".23"/>
+        </g>
+      </g>
+      <g class="cs-rp" filter="url(#csShadow)">
+        <g class="cs-rf">
+          <circle cx="500" cy="240" r="90" fill="url(#csGRight)"/>
+          <circle cx="471" cy="230" r="8" fill="#4e5870" class="cs-eyes"/><circle cx="529" cy="230" r="8" fill="#4e5870" class="cs-eyes"/>
+          <path d="M485 265 Q500 278 515 265" fill="none" stroke="#4e5870" stroke-width="7" stroke-linecap="round"/>
+          <ellipse class="cs-blush" cx="453" cy="257" rx="18" ry="10" fill="#ff7f9a" opacity="0"/><ellipse class="cs-blush" cx="547" cy="257" rx="18" ry="10" fill="#ff7f9a" opacity="0"/>
+          <circle cx="467" cy="209" r="12" fill="#fff" opacity=".28"/>
+        </g>
+      </g>
+      <g class="cs-heart" filter="url(#csShadow)">
+        <path d="M400 306 C370 283 344 258 344 224 C344 194 366 175 391 175 C408 175 421 184 430 198 C439 184 452 175 469 175 C494 175 516 194 516 224 C516 258 490 283 460 306 L430 332 Z" fill="url(#csGHeart)" transform="translate(-30,-4) scale(.7)"/>
+        <circle cx="385" cy="196" r="9" fill="#fff" opacity=".3"/>
+      </g>
+      <g fill="#ff8da1">
+        <path class="cs-spark s1" d="M400 115 l7 15 16 7-16 7-7 16-7-16-16-7 16-7z"/>
+        <path class="cs-spark s2" d="M310 150 l5 11 11 5-11 5-5 11-5-11-11-5 11-5z"/>
+        <path class="cs-spark s3" d="M490 150 l5 11 11 5-11 5-5 11-5-11-11-5 11-5z"/>
+        <path class="cs-spark s4" d="M400 360 l5 11 11 5-11 5-5 11-5-11-11-5 11-5z"/>
+      </g>
+    </svg>
+  </div>
+</div>
 <div id="couple-space-page">
 
     <!-- 顶部操作栏 -->
@@ -3185,5 +3254,18 @@
     <button onclick="closeCsVideoPlayer()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
     <video id="cs-video-player" controls playsinline style="max-width:100%;max-height:90vh;border-radius:8px;"></video>
 </div>
+<script>
+function openMomentsWithTransition(){
+  var ov=document.getElementById('cs-transition-overlay');
+  if(!ov){openMomentsModal();return;}
+  ov.classList.add('cs-trans-show');
+  requestAnimationFrame(function(){requestAnimationFrame(function(){ov.classList.add('cs-trans-visible');});});
+  setTimeout(function(){
+    openMomentsModal();
+    ov.classList.remove('cs-trans-visible');
+    setTimeout(function(){ov.classList.remove('cs-trans-show');},500);
+  },2400);
+}
+</script>
 </body>
 </html>

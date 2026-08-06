@@ -8,6 +8,7 @@
 var _annEditingId    = null;
 var _annPinnedId     = null;   // null/'meet'=相遇；Number=具体条目
 var _annCoverDataUrl = null;
+var _annCoverOriginalUrl = null; // 打开编辑面板时加载到的原始封面值，用来判断保存时要不要清理旧的云端文件
 var _annCoverChanged = false;
 var _annMeetOverride = null;   // 用户编辑相遇后的覆盖数据：{name, date} 或 null
 
@@ -163,8 +164,14 @@ function _annCloseAllSwipesExcept(exceptWrap) {
 function _annShowCoverPreview(url) {
     var img   = document.getElementById('cs-ann-cover-img');
     var thumb = document.getElementById('cs-ann-cover-thumb');
-    if (img)   img.src = url || '';
     if (thumb) thumb.style.display = url ? '' : 'none';
+    if (!img) return;
+    if (url && url.indexOf('oss://') === 0 && window.CloudMedia) {
+        window.CloudMedia.fetchUrl(url).then(function(blobUrl) { img.src = blobUrl; })
+            .catch(function() { img.src = ''; });
+    } else {
+        img.src = url || '';
+    }
 }
 window._annOnCoverSelected = function(input) {
     var file = input.files && input.files[0];
@@ -216,6 +223,7 @@ window.openAnnSheet = function(mode, annId) {
     if (typeLabel)    typeLabel.style.display    = isMeetEdit ? 'none' : '';
 
     _annCoverDataUrl = null;
+    _annCoverOriginalUrl = null;
     _annCoverChanged = false;
     _annShowCoverPreview(null);
 
@@ -236,7 +244,7 @@ window.openAnnSheet = function(mode, annId) {
         // 加载相遇的封面
         try {
             localforage.getItem(getStorageKey('annCoverBg_meet')).then(function(url) {
-                if (url) { _annCoverDataUrl = url; _annShowCoverPreview(url); }
+                if (url) { _annCoverDataUrl = url; _annCoverOriginalUrl = url; _annShowCoverPreview(url); }
             });
         } catch(e) {}
     } else if (_annEditingId) {
@@ -249,7 +257,7 @@ window.openAnnSheet = function(mode, annId) {
         }
         try {
             localforage.getItem(getStorageKey('annCoverBg_' + _annEditingId)).then(function(url) {
-                if (url) { _annCoverDataUrl = url; _annShowCoverPreview(url); }
+                if (url) { _annCoverDataUrl = url; _annCoverOriginalUrl = url; _annShowCoverPreview(url); }
             });
         } catch(e) {}
     } else {
@@ -276,7 +284,7 @@ window.closeAnnSheet = function() {
 };
 
 // ── 保存 ─────────────────────────────────────────────────
-window.saveAnnFromSheet = function() {
+window.saveAnnFromSheet = async function() {
     var nameInput = document.getElementById('cs-ann-input-name');
     var dateInput = document.getElementById('cs-ann-input-date');
     var remarkEditor = document.getElementById('cs-ann-remark-editor');
@@ -320,8 +328,28 @@ window.saveAnnFromSheet = function() {
     if (_annCoverChanged) {
         try {
             var coverKey = getStorageKey('annCoverBg_' + savedId);
-            if (_annCoverDataUrl) localforage.setItem(coverKey, _annCoverDataUrl);
-            else                  localforage.removeItem(coverKey);
+            // 旧封面如果是云端引用，且这次有变化（换图或删除），先清理掉云端旧文件，避免堆积孤儿文件
+            if (_annCoverOriginalUrl && _annCoverOriginalUrl.indexOf('oss://') === 0 && window.CloudMedia) {
+                try { await window.CloudMedia.delete(_annCoverOriginalUrl); } catch(e) { /* 删除失败不影响保存，静默跳过 */ }
+            }
+            if (!_annCoverDataUrl) {
+                localforage.removeItem(coverKey);
+            } else if (_annCoverDataUrl.indexOf('oss://') === 0) {
+                // 已经是云端引用（没换图，只是重新触发了保存），原样存
+                localforage.setItem(coverKey, _annCoverDataUrl);
+            } else if (window.CloudSync && window.CloudSync.isConnected() && window.CloudMedia) {
+                // 配置了 OSS：传云端，本地只留地址，不留照片本身
+                try {
+                    var coverUpload = await window.CloudMedia.upload(_annCoverDataUrl, 'ann-covers');
+                    localforage.setItem(coverKey, (coverUpload && coverUpload.url) || _annCoverDataUrl);
+                } catch(e) {
+                    // 上传失败：退回存本地，保证功能不中断
+                    localforage.setItem(coverKey, _annCoverDataUrl);
+                }
+            } else {
+                // 没配置 OSS：存本地
+                localforage.setItem(coverKey, _annCoverDataUrl);
+            }
         } catch(e) {}
     }
 
@@ -342,7 +370,16 @@ window.deleteCurrentAnn = function() {
     if (!confirm('确定要删除这条纪念日吗？')) return;
     anniversaries = anniversaries.filter(function(a) { return a.id !== _annEditingId; });
     if (_annPinnedId === _annEditingId) _annSavePinnedId(null);
-    try { localforage.removeItem(getStorageKey('annCoverBg_' + _annEditingId)); } catch(e) {}
+    (async function() {
+        try {
+            var delCoverKey = getStorageKey('annCoverBg_' + _annEditingId);
+            var oldCover = await localforage.getItem(delCoverKey);
+            if (oldCover && oldCover.indexOf('oss://') === 0 && window.CloudMedia) {
+                try { await window.CloudMedia.delete(oldCover); } catch(e) { /* 静默跳过 */ }
+            }
+            await localforage.removeItem(delCoverKey);
+        } catch(e) {}
+    })();
     if (typeof throttledSaveData === 'function') throttledSaveData();
     renderAnniversariesList();
     _annUpdateHeaderDays();
@@ -596,13 +633,20 @@ window.openAnnDetail = function(annId) {
         var coverKey = isMeet ? 'annCoverBg_meet' : ('annCoverBg_' + annId);
         localforage.getItem(getStorageKey(coverKey)).then(function(url) {
             console.log('[ann-detail] cover loaded, id=', annId, 'has url:', !!url);
-            if (url && _annDetailCurrentId === annId) {
-                var el = document.querySelector('#ann-detail-body .ann-detail-card');
-                if (el) {
-                    el.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")';
-                    el.style.backgroundSize = 'cover';
-                    el.style.backgroundPosition = 'center';
-                }
+            if (!url || _annDetailCurrentId !== annId) return;
+            var el = document.querySelector('#ann-detail-body .ann-detail-card');
+            if (!el) return;
+            function applyBg(finalUrl) {
+                el.style.backgroundImage = 'url("' + finalUrl.replace(/"/g, '\\"') + '")';
+                el.style.backgroundSize = 'cover';
+                el.style.backgroundPosition = 'center';
+            }
+            if (url.indexOf('oss://') === 0 && window.CloudMedia) {
+                window.CloudMedia.fetchUrl(url).then(applyBg).catch(function(e) {
+                    console.warn('[ann-detail] cover fetchUrl failed:', e);
+                });
+            } else {
+                applyBg(url);
             }
         }).catch(function(e) { console.warn('[ann-detail] cover load failed:', e); });
     } catch(e) { console.warn('[ann-detail] cover load exception:', e); }

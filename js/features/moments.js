@@ -961,7 +961,8 @@ async function _handleCsBgUpload(e) {
         const base64 = ev.target.result;
         const bgType = file.type === 'image/gif' ? 'gif' : 'image';
         const bgId   = `user-${Date.now()}`;
-        let stored   = { id: bgId, type: bgType, value: base64 };
+        let stored     = { id: bgId, type: bgType, value: base64 }; // 兜底：没配置 OSS 或上传失败时，本地存完整大图
+        let applyValue = base64;
 
         if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
             if (typeof showNotification === 'function') showNotification('正在上传到云端...', 'info', 2000);
@@ -970,7 +971,10 @@ async function _handleCsBgUpload(e) {
                 let thumb = null;
                 try { thumb = await window.CloudMedia.makeThumbnail(base64, 200); }
                 catch(thumbErr) { console.warn('[cs-wallpaper] 缩略图生成失败', thumbErr); }
-                stored = { id: bgId, type: bgType, value: base64, thumbnail: thumb, cloudKey: uploadResult.key, cloudUrl: uploadResult.url };
+                // 配置了 OSS：本地只留一张小缩略图（方便选择器快速显示），完整大图不落本地，
+                // value 直接换成云端地址，应用/展示时都从云端拉
+                stored = { id: bgId, type: bgType, value: uploadResult.url, thumbnail: thumb, cloudKey: uploadResult.key, cloudUrl: uploadResult.url };
+                applyValue = uploadResult.url;
             } catch(err) {
                 console.warn('[cs-wallpaper] 背景上传失败，仅本地存储', err);
                 if (typeof showNotification === 'function') showNotification('云端上传失败，暂存本地', 'error', 2500);
@@ -980,7 +984,7 @@ async function _handleCsBgUpload(e) {
         _csBgGallery.push(stored);
         _saveCsBgGallery();
         _renderCsBgGallery();
-        _applyCsBackground(base64);
+        _applyCsBackground(applyValue);
         if (typeof showNotification === 'function') showNotification('壁纸已添加并应用', 'success');
     };
     reader.readAsDataURL(file);

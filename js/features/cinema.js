@@ -836,13 +836,15 @@
         }
         addMessage(payload);
     }
-    function _pushMessage(msg) {
+    // skipMainChatSync：true 表示这条消息本来就是从主聊天镶过来的（比如梦角的回复），
+    // 不需要再同步回主聊天一次，否则会导致"同步→触发钩子→再镶一份→再同步"的死循环
+    function _pushMessage(msg, skipMainChatSync) {
         msg.id = Date.now() + Math.random();
         msg.ts = Date.now();
         msg.sender = msg.sender || 'user';
         _cinemaMessages.push(msg);
         _appendMsgToDOM(msg);
-        _cinemaSyncToMainChat(msg);
+        if (!skipMainChatSync) _cinemaSyncToMainChat(msg);
         if (msg.sender === 'user' && typeof window._triggerDelayedReply === 'function') {
             _cinemaAwaitingReply = true;
             window._triggerDelayedReply(true);
@@ -947,7 +949,7 @@
                 content: (message && (message.image || message.text)) || ''
             };
             if (!mirrored.content) return;
-            _pushMessage(mirrored);
+            _pushMessage(mirrored, true);
             if (typeof playSound === 'function') { try { playSound('message'); } catch (e) {} }
             // 收到一条就先当作这轮已经有回应了；主聊天多条回复(1~3条)时后面几条如果还在
             // 等待窗口内到达，同样会被镶进来，超时之后才彻底关闭这次的"等待"标记

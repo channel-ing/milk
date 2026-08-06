@@ -1191,12 +1191,14 @@
             'background:rgba(0,0,0,0.5)',
             'display:flex', 'align-items:center', 'justify-content:center',
             'opacity:1', 'pointer-events:all',
-            'animation:companionFadeIn 0.25s ease'
+            'animation:companionFadeIn 0.25s ease',
+            'backdrop-filter:blur(8px)',
+            '-webkit-backdrop-filter:blur(8px)'
         ].join(';'));
 
         modal.innerHTML = `
             <div style="
-                background:#fff;border-radius:20px;padding:28px 24px 20px;
+                background:var(--secondary-bg, #fff);border-radius:20px;padding:28px 24px 20px;
                 width:min(92vw, 460px);max-height:85vh;overflow-y:auto;
                 box-shadow:0 20px 60px rgba(0,0,0,0.18);
                 animation:companionPopIn 0.3s cubic-bezier(0.34,1.56,0.64,1);

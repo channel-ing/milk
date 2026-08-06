@@ -583,7 +583,8 @@
         if (video && video.src && video.src.indexOf('blob:') === 0) URL.revokeObjectURL(video.src);
         _currentVideo = { src: '', title: '' };
         _cinemaMessages = [];
-        if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); _cinemaPendingReplyTimer = null; }
+        if (_cinemaAwaitingReplyTimer) { clearTimeout(_cinemaAwaitingReplyTimer); _cinemaAwaitingReplyTimer = null; }
+        _cinemaAwaitingReply = false;
         _cinemaHideTyping();
         _clearWatchAutoEnd();
         window._cinemaWatching = false;
@@ -842,11 +843,17 @@
         _cinemaMessages.push(msg);
         _appendMsgToDOM(msg);
         _cinemaSyncToMainChat(msg);
-        if (msg.sender === 'user') _cinemaScheduleReply();
+        if (msg.sender === 'user' && typeof window._triggerDelayedReply === 'function') {
+            _cinemaAwaitingReply = true;
+            window._triggerDelayedReply(true);
+        }
     }
 
     // ── 梦角自动回复：复用主聊天"字卡"回复库(customReplies)的选取/过滤逻辑 ──
-    var _cinemaPendingReplyTimer = null;
+    // 是否正在等待"这次电影院发消息"触发的回复——避免把跟电影院无关的主聊天/
+    // 陪伴模式消息误插进电影院聊天区。发消息时置 true，收到回复或超时后置回 false。
+    var _cinemaAwaitingReply = false;
+    var _cinemaAwaitingReplyTimer = null;
 
     function _cinemaShowTyping() {
         var slot = document.getElementById('cinema-typing-fixed');
@@ -869,6 +876,8 @@
         if (slot) { slot.innerHTML = ''; slot.style.display = 'none'; }
     }
     // 跟主聊天 simulateReply() 里一样：按 disabledReplyItems / 禁用分组 过滤 customReplies
+    // 注意：这个函数现在只给"观影结束后梦角自动评价"（_cinemaGeneratePartnerReview）用，
+    // 发消息触发回复已经改成直接调用主聊天的 window._triggerDelayedReply，不再自己排队/模拟回复
     function _cinemaBuildReplyPool() {
         var replies = (typeof customReplies !== 'undefined' && customReplies) ? customReplies : [];
         if (!replies.length) return [];
@@ -889,63 +898,54 @@
             .map(function (r) { return String(r || '').trim(); })
             .filter(Boolean);
     }
-    function _cinemaScheduleReply() {
-        if (_cinemaPendingReplyTimer) { clearTimeout(_cinemaPendingReplyTimer); }
-        // 短暂 debounce：用户连续快速发几条消息时，只在最后一条之后触发一次回复
-        _cinemaPendingReplyTimer = setTimeout(function () {
-            _cinemaPendingReplyTimer = null;
-            _cinemaSimulateReply();
-        }, 300);
-    }
-    function _cinemaSimulateReply() {
-        var pool = _cinemaBuildReplyPool();
-        if (!pool.length) return; // 字卡回复库为空/被禁用完，静默跳过
 
-        if (typeof settings !== 'undefined' && settings.typingIndicatorEnabled === false) {
-            // 关闭了"正在输入"提示，直接跳过 typing 展示
-        } else {
-            _cinemaShowTyping();
+    // ── 复用主聊天的"正在输入"和自动回复逻辑（跟陪伴模式是同一个思路）──────
+    // 1. 发消息触发回复：直接调用主聊天真实的 window._triggerDelayedReply(true)，
+    //    已读不回/拍一拍/人设切换/多条回复 这些主聊天有的分支，电影院自动全部一致
+    // 2. "正在输入"展示：不自己判断，而是监视主聊天的提示条(#typing-indicator-wrapper)
+    //    的显示/隐藏，同步镜像到电影院自己的提示位，跟陪伴模式的 watchTypingIndicator 一样
+    // 3. 回复到达：主聊天 simulateReply() 最终还是把消息插进主聊天的 messages/DOM，
+    //    电影院这边通过 window._registerPartnerMessageListener 注册一个监听，
+    //    把这条消息也镶一份进电影院自己的聊天区（跟电影院发消息"同步一份到主聊天"是反方向的镜像）
+    var _cinemaTypingObserverBound = false;
+    function _cinemaWatchTypingIndicator() {
+        if (_cinemaTypingObserverBound) return;
+        var ti = document.getElementById('typing-indicator-wrapper');
+        if (!ti) {
+            if ((_cinemaWatchTypingIndicator._retries = (_cinemaWatchTypingIndicator._retries || 0) + 1) < 10) {
+                setTimeout(_cinemaWatchTypingIndicator, 500);
+            }
+            return;
         }
+        _cinemaTypingObserverBound = true;
+        var observer = new MutationObserver(function () {
+            // 只在电影院面板真的开着、且处于观影中才镜像，避免面板不存在时报错/无意义操作
+            if (_uiState !== 'watching' || !_getPanel()) return;
+            var isShown = ti.style.display !== 'none' && ti.style.display !== '';
+            if (isShown) { _cinemaShowTyping(); } else { _cinemaHideTyping(); }
+        });
+        observer.observe(ti, { attributes: true, attributeFilter: ['style'] });
+    }
+    _cinemaWatchTypingIndicator();
 
-        var delayMin = (typeof settings !== 'undefined' && settings.replyDelayMin) || 800;
-        var delayMax = (typeof settings !== 'undefined' && settings.replyDelayMax) || 2200;
-        var delay = delayMin + Math.random() * Math.max(0, delayMax - delayMin);
-
-        setTimeout(function () {
-            _cinemaHideTyping();
-
-            var replyText = '';
-            for (var t = 0; t < 6; t++) {
-                var picked = pool[Math.floor(Math.random() * pool.length)];
-                if (picked && String(picked).trim()) { replyText = String(picked).trim(); break; }
-            }
-            if (!replyText) return;
-
-            var customs = (typeof customEmojis !== 'undefined' && customEmojis) ? customEmojis : [];
-            var finalText = replyText;
-            if (customs.length && Math.random() < 0.2) {
-                var emoji = customs[Math.floor(Math.random() * customs.length)];
-                finalText = Math.random() < 0.5 ? (emoji + ' ' + replyText) : (replyText + ' ' + emoji);
-            }
-            _pushMessage({ type: 'text', content: finalText, sender: 'partner' });
+    if (typeof window._registerPartnerMessageListener === 'function') {
+        window._registerPartnerMessageListener(function (message) {
+            // 不是电影院这次发消息触发的回复（比如陪伴模式/主聊天自己产生的），不插进电影院聊天区
+            if (!_cinemaAwaitingReply) return;
+            if (_uiState !== 'watching' || !_getPanel()) return;
+            var mirrored = {
+                sender: 'partner',
+                type: message && message.image ? 'image' : 'text',
+                content: (message && (message.image || message.text)) || ''
+            };
+            if (!mirrored.content) return;
+            _pushMessage(mirrored);
             if (typeof playSound === 'function') { try { playSound('message'); } catch (e) {} }
-
-            // 小概率附带梦角的表情包（跟主聊天一样用 stickerLibrary，不是用户自己的 myStickerLibrary）
-            var disabledStickers = (function () {
-                try {
-                    var raw = localStorage.getItem('disabledStickerItems');
-                    return raw ? new Set(JSON.parse(raw)) : new Set();
-                } catch (e) { return new Set(); }
-            })();
-            var stickerPool = ((typeof stickerLibrary !== 'undefined' && stickerLibrary) ? stickerLibrary : [])
-                .filter(function (s) { return !disabledStickers.has(s); });
-            if (stickerPool.length && Math.random() < 0.2) {
-                setTimeout(function () {
-                    var src = stickerPool[Math.floor(Math.random() * stickerPool.length)];
-                    _pushMessage({ type: 'image', content: src, sender: 'partner' });
-                }, 400 + Math.random() * 500);
-            }
-        }, delay);
+            // 收到一条就先当作这轮已经有回应了；主聊天多条回复(1~3条)时后面几条如果还在
+            // 等待窗口内到达，同样会被镶进来，超时之后才彻底关闭这次的"等待"标记
+            if (_cinemaAwaitingReplyTimer) clearTimeout(_cinemaAwaitingReplyTimer);
+            _cinemaAwaitingReplyTimer = setTimeout(function () { _cinemaAwaitingReply = false; }, 6000);
+        });
     }
 
     // ── 输入栏（只在 watching 状态渲染）───────────────────
@@ -1702,8 +1702,9 @@
             console.log('[cinema] 原因可能：① 字卡库为空 ② 字卡全部被禁用 ③ customReplies 未加载');
         } else {
             console.log('[cinema] 样例字卡:', pool.slice(0, 3));
-            console.log('[cinema] 正在强制触发一次回复...');
-            _cinemaSimulateReply();
+            console.log('[cinema] 正在强制触发一次回复（复用主聊天 _triggerDelayedReply）...');
+            _cinemaAwaitingReply = true;
+            if (typeof window._triggerDelayedReply === 'function') window._triggerDelayedReply(true);
         }
         return pool;
     };

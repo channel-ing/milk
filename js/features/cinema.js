@@ -4,7 +4,7 @@
  * 本轮改动（在 v4 基础上）：
  * 12. "返回"改回：只退出沉浸模式，回到嵌入式观影视图（图2那种：外层头像条 +
  *     电影院header都还在，视频框大小位置跟 waiting/empty 一致），不再直接结束观影/离开情侣空间
- *     — 点嵌入视图里的视频框可以重新进沉浸模式，试一下重新上传
+ *     — 点嵌入视图里的视频框可以重新进沉浸模式
  * 13. 表情面板改用独立类名（不复用主聊天 .sticker-picker-popover 等一堆全局样式，
  *     之前因为规则冲突导致格子巨大），改成贴近"我的表情库"管理页那种小格子紧凑网格；
  *     数据源从 stickerLibrary 换成 myStickerLibrary（用户自己的表情库，不是梦角的）
@@ -759,7 +759,17 @@
         if (typeof _avEl === 'function') return _avEl(isPartner, s);
         return '<span style="font-size:' + Math.round(s * 0.65) + 'px;">' + (isPartner ? '🌸' : '🙂') + '</span>';
     }
-    function _msgHTML(msg) {
+    // 头像要不要显示、显示成什么样，跟主聊天"外观设置→聊天头像"里那两个开关保持一致：
+    // ① settings.inChatAvatarEnabled（显示聊天头像总开关）关了 → 'none'，完全不留头像位置
+    // ② settings.alwaysShowAvatar（每条消息都显示头像）关了、且这条跟上一条是同一个人发的
+    //    → 'invisible'，头像位置还留着（保持对齐），只是这条不露出来，跟主聊天的处理方式一样
+    // 否则 → 'visible'，正常显示
+    function _cinemaAvatarMode(msg, lastSender) {
+        if (typeof settings === 'undefined' || !settings.inChatAvatarEnabled) return 'none';
+        if (!settings.alwaysShowAvatar && msg.sender === lastSender) return 'invisible';
+        return 'visible';
+    }
+    function _msgHTML(msg, avatarMode) {
         var isPartner = msg.sender === 'partner';
         var bodyHTML;
         if (msg.type === 'image') {
@@ -773,7 +783,10 @@
         } else {
             bodyHTML = '<div class="cinema-msg-bubble">' + _escapeHtml(msg.content) + '</div>';
         }
-        var avatarHTML = '<div class="cinema-msg-avatar">' + _avatarHTML(isPartner) + '</div>';
+        var mode = avatarMode || 'visible';
+        var avatarHTML = mode === 'none'
+            ? ''
+            : '<div class="cinema-msg-avatar' + (mode === 'invisible' ? ' cinema-msg-avatar-invisible' : '') + '">' + _avatarHTML(isPartner) + '</div>';
         return '<div class="cinema-msg-row ' + (isPartner ? 'cinema-msg-partner' : 'cinema-msg-mine') + '">' +
             (isPartner ? avatarHTML + bodyHTML : bodyHTML + avatarHTML) +
         '</div>';
@@ -796,8 +809,14 @@
                     '</div>' +
                 '</div>';
         }
+        var lastSender = null;
+        var rowsHTML = _cinemaMessages.map(function (msg) {
+            var mode = _cinemaAvatarMode(msg, lastSender);
+            lastSender = msg.sender;
+            return _msgHTML(msg, mode);
+        }).join('');
         return '<div class="cinema-chat-area" id="cinema-chat-area">' +
-            _cinemaMessages.map(_msgHTML).join('') +
+            rowsHTML +
         '</div>';
     }
     function _appendMsgToDOM(msg) {
@@ -805,8 +824,11 @@
         if (!area) return;
         var emptyEl = area.querySelector('.cinema-chat-empty');
         if (emptyEl) emptyEl.remove();
+        var idx = _cinemaMessages.indexOf(msg);
+        var prevMsg = idx > 0 ? _cinemaMessages[idx - 1] : null;
+        var avatarMode = _cinemaAvatarMode(msg, prevMsg ? prevMsg.sender : null);
         var tmp = document.createElement('div');
-        tmp.innerHTML = _msgHTML(msg);
+        tmp.innerHTML = _msgHTML(msg, avatarMode);
         var newEl = tmp.firstChild;
         area.appendChild(newEl);
         _bindCinemaCloudImages(newEl);

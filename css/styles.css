@@ -11654,11 +11654,11 @@ body #user-sticker-picker .empty-sticker-tip {
     position: fixed; inset: 0; z-index: 1500;
     display: flex; flex-direction: column;
     background: var(--primary-bg);
-    transform: translateY(100%);
-    transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
+    opacity: 0;
+    transition: opacity 0.28s ease;
     pointer-events: none;
 }
-#couple-space-page.cs-open { transform: translateY(0); pointer-events: all; }
+#couple-space-page.cs-open { opacity: 1; pointer-events: all; }
 
 /* ── 顶部操作栏 ── */
 .cs-topbar {

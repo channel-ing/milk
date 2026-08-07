@@ -3629,6 +3629,26 @@
                 } finally {
                     clearInterval(fakeTimer);
                 }
+            } else {
+                // 没有配置云端存储：localUrl 是 blob: 临时地址，刷新后会失效，
+                // 保存时也会被专门过滤掉——图片转成本地能长期保存的 base64；
+                // 视频体积太大不适合转成base64存本地，提前告知用户，避免刷新后静默消失
+                if (isVideo) {
+                    notify('未连接云端时，视频背景刷新后会丢失，建议先配置云端存储', 'warning', 4000);
+                } else {
+                    try {
+                        mediaData = (typeof optimizeImage === 'function')
+                            ? await optimizeImage(file)
+                            : await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(file);
+                            });
+                    } catch (convErr) {
+                        console.warn('[companion] 本地转存失败，这条背景可能刷新后会丢失', convErr);
+                    }
+                }
             }
 
             // 4. 上传完成

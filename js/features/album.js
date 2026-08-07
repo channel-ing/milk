@@ -17,6 +17,7 @@
  */
 
 let albumData = { albums: [], photos: [] };
+let _albumDataLoaded = false; // 只有loadAlbumData()成功跑完一次才会变true，saveAlbumData()靠这个判断能不能安全保存
 
 const _AL_KEY       = 'albumData';
 const _AL_TRASH_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -46,11 +47,13 @@ async function loadAlbumData() {
     try {
         const s = await localforage.getItem(getStorageKey(_AL_KEY));
         if (s) { albumData = s; if (!albumData.photos) albumData.photos=[]; if (!albumData.albums) albumData.albums=[]; }
+        _albumDataLoaded = true; // 不管读到的是真数据还是空的，这次读取本身没出错就算加载成功
     } catch(e) { console.warn('[Album] load 失败', e); }
     _ensureSystemAlbums();
     _cleanTrash();
 }
 async function saveAlbumData() {
+    if (!_albumDataLoaded) { console.warn('[Album] 本次会话还没有确认加载成功过相册数据，为了避免覆盖历史记录，跳过这次保存'); return; }
     try { await localforage.setItem(getStorageKey(_AL_KEY), albumData); } catch(e) { console.warn('[Album] save 失败', e); }
 }
 function _cleanTrash() {

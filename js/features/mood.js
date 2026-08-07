@@ -219,6 +219,7 @@ const MOOD_OPTIONS = [
 ];
 
 let moodData = {}; 
+let _moodDataLoaded = false; // 只有initMoodData()成功跑完一次才会变true，saveMoodData()靠这个判断能不能安全保存
 let moodTrash = [];
 let currentCalendarDate = new Date();
 window.selectedDateStr = null;
@@ -233,6 +234,10 @@ const CUSTOM_MOOD_COLORS = ['#FFD93D','#FF6B6B','#6BCB77','#4D96FF','#8D9EFF','#
 async function initMoodData() {
     const savedMoods = await localforage.getItem(getStorageKey('moodCalendar'));
     if (savedMoods) { moodData = savedMoods; }
+    // 不管读到的是真数据还是空的（比如新用户第一次用），只要这次读取本身没有出错，
+    // 就标记"这次会话已经确认加载成功过"——保存函数靠这个标记判断能不能安全写入，
+    // 避免读取偶发失败时，用一个空对象把之前的历史记录整个覆盖掉
+    _moodDataLoaded = true;
     const savedCustomMoods = await localforage.getItem(getStorageKey('customMoodOptions'));
     if (savedCustomMoods) { customMoodOptions = savedCustomMoods; }
     const savedTrash = await localforage.getItem(getStorageKey('moodTrash'));
@@ -274,6 +279,10 @@ function checkPartnerDailyMood() {
     }
 }
 function saveMoodData() {
+    if (!_moodDataLoaded) {
+        console.warn('[mood] 本次会话还没有确认加载成功过心情手账数据，为了避免覆盖历史记录，跳过这次保存');
+        return;
+    }
     localforage.setItem(getStorageKey('moodCalendar'), moodData);
     window.moodData = moodData;
     var moodModal = document.getElementById('mood-modal');

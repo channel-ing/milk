@@ -66,6 +66,13 @@ async function checkEnvelopeStatus() {
 
 // 生成梦角主动来信（由 moments.js 的共享触发器调用，不含冷却逻辑）
 window._generatePartnerLetter = function() {
+    // 字卡池是空的（一条有效字卡都没有），生成不出正常内容，会拼出一堆undefined——
+    // 这种情况下直接不发这封信，等用户配好字卡之后自然会恢复正常
+    const hasUsableReplies = Array.isArray(customReplies) && customReplies.some(function(r) { return typeof r === 'string' && r.trim(); });
+    if (!hasUsableReplies) {
+        console.warn('[envelope] 字卡池为空，跳过本次梦角主动来信');
+        return;
+    }
     const content = generateEnvelopeReplyText();
     const now = Date.now();
     const inboxLetter = {

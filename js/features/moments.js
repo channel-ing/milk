@@ -762,11 +762,22 @@ window.openCsSettings = async function () {
     if (modal && typeof showModal === 'function') showModal(modal);
 };
 
-// 页面加载时预读设置（延迟等 SESSION_ID 初始化完成）
-setTimeout(() => {
-    _loadCsSettings().then(() => { window._csSettings = _csSettings; });
-    _restoreCsBackground();
-}, 2000);
+// 页面加载时预读设置（等 SESSION_ID 真正初始化完成，而不是赌一个固定时间——
+// 之前固定等2秒，遇到设备/网络慢的情况2秒可能还不够，会导致读取失败）
+(function _waitSessionThenRestoreCsUI(attempt) {
+    attempt = attempt || 0;
+    if (typeof SESSION_ID !== 'undefined' && SESSION_ID) {
+        _loadCsSettings().then(() => { window._csSettings = _csSettings; });
+        _restoreCsBackground();
+        return;
+    }
+    if (attempt >= 20) {
+        // 等了10秒还没好，大概率是别的问题了，放弃重试，避免无限等下去
+        console.warn('[cs-wallpaper] 等待 SESSION_ID 超时，情侣空间设置/壁纸本次未能自动恢复');
+        return;
+    }
+    setTimeout(function () { _waitSessionThenRestoreCsUI(attempt + 1); }, 500);
+})();
 
 Object.defineProperty(window,'_momentsData',{get:()=>momentsData});
 

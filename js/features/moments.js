@@ -126,6 +126,11 @@ async function generatePartnerMoment() {
     if(Math.random()<0.10){const c=_mCmtContent();if(c)post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);
+    // "保存Ta发的图片"这个设置开着的话，把梦角这条动态里的图片也同步进相册——
+    // 跟用户自己发动态时走的是同一套同步函数，只是之前只在用户发帖时调用，梦角发帖漏掉了
+    if (_csSettings.savePartnerImg && post.images && post.images.length && typeof window._albumSyncMomentsPost === 'function') {
+        window._albumSyncMomentsPost(post.id, post.images, null, null);
+    }
 }
 
 function onUserPostCreated(postId) {

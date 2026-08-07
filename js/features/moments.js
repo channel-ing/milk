@@ -15,7 +15,15 @@ const _M_DLY_MAX = 20 * 60 * 1000;
 const _CS_SETTINGS_KEY = 'csSpaceSettings';
 
 // 情侣空间设置（默认值）
-let _csSettings = { dlyMin: 5, dlyMax: 20, savePartnerImg: false };
+let _csSettings = { dlyMin: 5, dlyMax: 20, savePartnerImg: false, allowReadNoReply: false, readNoReplyChance: 0.2 };
+
+// 情侣空间"已读不回"判定：关闭开关时必回；开启后按 readNoReplyChance 概率跳过。
+// 统一给"梦角评论新动态"和"梦角回复用户评论"这两处共用。
+function _mShouldReply() {
+    if (!_csSettings.allowReadNoReply) return true;
+    const chance = Math.max(0, Math.min(1, Number(_csSettings.readNoReplyChance) || 0));
+    return Math.random() >= chance;
+}
 
 const _mDly   = () => {
     const minMs = (_csSettings.dlyMin || 5) * 60000;
@@ -122,7 +130,7 @@ function _mPostContent() {
 
 async function generatePartnerMoment() {
     const now=Date.now();
-    const c=_mPostContent(); if(!c) return;const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:1.00};
+    const c=_mPostContent(); if(!c) return;const post={id:_mUid('partner'),type:'partner',text:c.text,images:c.images,date:_mToday(),timestamp:now,isNewForUser:true,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null};
     if(Math.random()<0.10){const c=_mCmtContent();if(c)post.pendingPartnerComment={text:c.text,image:c.image,time:now+Math.floor(_mDly()),isSelfComment:true};}
     if(Math.random()<0.10){post.pendingLikeTime=now+Math.floor(_mDly());post.pendingLikeSilent=true;}
     momentsData.posts.unshift(post); saveMomentsData(); _pushNotif('newPost',post.id);
@@ -136,17 +144,13 @@ async function generatePartnerMoment() {
 function onUserPostCreated(postId) {
     const p=momentsData.posts.find(p=>p.id===postId); if(!p||p.type!=='user')return;
     p.pendingLikeTime=Date.now()+_mDly();p.pendingLikeSilent=false;
-    if(Math.random()<0.90){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:null};p.chainProbability=0.45;}else{p.chainProbability=null;}}
-    else{p.chainProbability=null;}
+    if(_mShouldReply()){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:null};}}
     saveMomentsData();
 }
 
 function onUserCommented(postId) {
     const p=momentsData.posts.find(p=>p.id===postId);if(!p)return;
-    const prob=p.chainProbability;
-    if(prob===null||prob<0.06){p.chainProbability=null;saveMomentsData();return;}
-    if(Math.random()<prob){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};p.chainProbability=prob/2;}else{p.chainProbability=null;}}
-    else{p.chainProbability=null;}
+    if(_mShouldReply()){const c=_mCmtContent();if(c){p.pendingPartnerComment={text:c.text,image:c.image,time:Date.now()+_mDly(),replyTo:{authorName:_mMName()}};}}
     saveMomentsData();
 }
 
@@ -658,7 +662,7 @@ window.submitCsPost=async function(){
                 }else{images.push(d);}
             }
         }
-        const post={id:_mUid('user'),type:'user',text,images,video:video||null,videoCover:videoCover||null,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null,chainProbability:null};
+        const post={id:_mUid('user'),type:'user',text,images,video:video||null,videoCover:videoCover||null,date:_mToday(),timestamp:Date.now(),isNewForUser:false,userLiked:false,partnerLiked:false,pendingLikeTime:null,pendingLikeSilent:false,comments:[],pendingPartnerComment:null};
         momentsData.posts.unshift(post);saveMomentsData();onUserPostCreated(post.id);
         if(typeof window._albumSyncMomentsPost==="function")window._albumSyncMomentsPost(post.id,images,video,videoCover);
         window.closeCsCompose();_csRenderFeed();
@@ -693,6 +697,7 @@ window.openCsSettings = async function () {
     const minVal     = document.getElementById('cs-dly-min-val');
     const maxVal     = document.getElementById('cs-dly-max-val');
     const saveToggle = document.getElementById('cs-save-img-toggle');
+    const noReplyToggle = document.getElementById('cs-read-no-reply-toggle');
 
     function updateSliderUI() {
         minSlider.value = _csSettings.dlyMin;
@@ -746,6 +751,11 @@ window.openCsSettings = async function () {
             saveToggle.checked = !!_csSettings.savePartnerImg;
             saveToggle.onchange = () => { _csSettings.savePartnerImg = saveToggle.checked; _saveCsSettings(); };
         }
+    }
+
+    if (noReplyToggle) {
+        noReplyToggle.checked = !!_csSettings.allowReadNoReply;
+        noReplyToggle.onchange = () => { _csSettings.allowReadNoReply = noReplyToggle.checked; _saveCsSettings(); };
     }
 
     // ── 壁纸画廊 ──

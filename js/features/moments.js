@@ -56,7 +56,11 @@ function _mCmtContent() {
     const hasText    = textPool.length > 0;
     const hasSticker = stickerPool.length > 0;
     const randSticker = () => stickerPool[Math.floor(Math.random() * stickerPool.length)];
-    const randText   = () => textPool[Math.floor(Math.random() * textPool.length)];
+    const randText   = () => {
+        let t = ''; const n = 1 + Math.floor(Math.random() * 3); // 1~3句拼接，跟发动态的拼句逻辑一致，但句数少一点
+        for (let i = 0; i < n; i++) { const s = textPool[Math.floor(Math.random()*textPool.length)]; t += s + (Math.random()<.2?'！':Math.random()<.2?'……':'。'); }
+        return t;
+    };
 
     if (!hasText && !hasSticker) return null;  // 没有可用内容，不回复
     if (!hasSticker) return { text: randText(), image: null };

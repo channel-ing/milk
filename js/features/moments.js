@@ -3,6 +3,7 @@
  */
 
 let momentsData = { posts: [], notifications: [] };
+let _momentsDataLoaded = false; // 只有loadMomentsData()成功跑完一次才会变true，saveMomentsData()靠这个判断能不能安全保存
 
 const _M_STORAGE_KEY  = 'momentsData';
 const _M_COOLDOWN_KEY = 'partnerLetterNextTime';
@@ -60,9 +61,12 @@ function _mCmtContent() {
 }
 
 async function loadMomentsData() {
-    try { const s=await localforage.getItem(getStorageKey(_M_STORAGE_KEY)); if(s){momentsData=s;if(!momentsData.notifications)momentsData.notifications=[];} } catch(e){console.warn('[Moments] load 失败',e);}
+    try { const s=await localforage.getItem(getStorageKey(_M_STORAGE_KEY)); if(s){momentsData=s;if(!momentsData.notifications)momentsData.notifications=[];} _momentsDataLoaded=true; } catch(e){console.warn('[Moments] load 失败',e);}
 }
-async function saveMomentsData() { try{await localforage.setItem(getStorageKey(_M_STORAGE_KEY),momentsData);}catch(e){console.warn('[Moments] save 失败',e);} }
+async function saveMomentsData() {
+    if (!_momentsDataLoaded) { console.warn('[Moments] 本次会话还没有确认加载成功过动态数据，为了避免覆盖历史记录，跳过这次保存'); return; }
+    try{await localforage.setItem(getStorageKey(_M_STORAGE_KEY),momentsData);}catch(e){console.warn('[Moments] save 失败',e);}
+}
 
 // ─── 通知 ───
 let _nQ=[], _nBusy=false;

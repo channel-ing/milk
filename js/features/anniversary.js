@@ -343,7 +343,9 @@ window.saveAnnFromSheet = async function() {
                     var coverUpload = await window.CloudMedia.upload(_annCoverDataUrl, 'ann-covers');
                     localforage.setItem(coverKey, (coverUpload && coverUpload.url) || _annCoverDataUrl);
                 } catch(e) {
-                    // 上传失败：退回存本地，保证功能不中断
+                    // 上传失败：退回存本地，保证功能不中断，但打一条日志方便排查——
+                    // 之前这里完全静默，出问题了连报错内容都看不到
+                    console.warn('[anniversary] 封面上传云端失败，已退回本地保存:', e);
                     localforage.setItem(coverKey, _annCoverDataUrl);
                 }
             } else {

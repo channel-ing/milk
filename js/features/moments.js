@@ -727,7 +727,23 @@ window.openCsSettings = async function () {
         });
         maxSlider.addEventListener('change', _saveCsSettings);
     }
-    if (saveToggle) { saveToggle.checked = !!_csSettings.savePartnerImg; saveToggle.onchange = () => { _csSettings.savePartnerImg = saveToggle.checked; _saveCsSettings(); }; }
+    if (saveToggle) {
+        // 没连云端存储，这个功能实际用不了——禁用开关并给出说明，
+        // 避免用户开了这个开关却发现贴纸根本存不进相册
+        const ossConnected = !!(window.CloudSync && typeof window.CloudSync.isConnected === 'function' && window.CloudSync.isConnected());
+        const ossHint = document.getElementById('cs-save-img-oss-hint');
+        console.log('[诊断] saveToggle元素:', saveToggle, '| ossConnected:', ossConnected, '| ossHint元素:', ossHint);
+        if (!ossConnected) {
+            saveToggle.checked = false;
+            saveToggle.disabled = true;
+            if (ossHint) ossHint.style.display = 'block';
+        } else {
+            saveToggle.disabled = false;
+            if (ossHint) ossHint.style.display = 'none';
+            saveToggle.checked = !!_csSettings.savePartnerImg;
+            saveToggle.onchange = () => { _csSettings.savePartnerImg = saveToggle.checked; _saveCsSettings(); };
+        }
+    }
 
     // ── 壁纸画廊 ──
     await _loadCsBgGallery();

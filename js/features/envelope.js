@@ -1,4 +1,5 @@
 let envelopeData = { outbox: [], inbox: [] }; 
+let _envelopeDataLoaded = false; // 只有loadEnvelopeData()成功跑完一次才会变true，saveEnvelopeData()靠这个判断能不能安全保存
 let currentEnvTab = 'outbox';
 let editingEnvId = null; 
 let editingEnvSection = null; 
@@ -6,6 +7,7 @@ let editingEnvSection = null;
 async function loadEnvelopeData() {
     const saved = await localforage.getItem(getStorageKey('envelopeData'));
     if (saved) envelopeData = saved;
+    _envelopeDataLoaded = true; // 不管读到的是真数据还是空的，这次读取本身没出错就算加载成功
     const oldPending = await localforage.getItem(getStorageKey('pending_envelope'));
     if (oldPending && envelopeData.outbox.length === 0) {
         envelopeData.outbox.push({
@@ -24,6 +26,10 @@ async function loadEnvelopeData() {
 }
 
 function saveEnvelopeData() {
+    if (!_envelopeDataLoaded) {
+        console.warn('[envelope] 本次会话还没有确认加载成功过信箱数据，为了避免覆盖历史记录，跳过这次保存');
+        return;
+    }
     localforage.setItem(getStorageKey('envelopeData'), envelopeData);
 }
 

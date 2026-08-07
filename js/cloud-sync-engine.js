@@ -55,7 +55,7 @@
         'customIntros', 'customEmojis',
         'customReplyGroups', 'customPokeGroups', 'customStatusGroups',
         // 纪念日
-        'anniversaries',
+        'anniversaries', 'annCoverBg_',
         // 相册（相册列表/照片归属/收藏/回收站，图片本身是 oss:// 引用，体积小）
         'albumData',
         // 动态（贴文/评论/点赞，图片有清洗逻辑见下方 _collectTextData）

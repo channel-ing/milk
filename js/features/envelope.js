@@ -18,6 +18,9 @@ async function loadEnvelopeData() {
         await localforage.removeItem(getStorageKey('pending_envelope'));
         saveEnvelopeData();
     }
+    // 刚加载完信件数据，顺手刷新一下小红点——覆盖"上次会话就有未读信件，
+    // 这次重新打开app"的情况，不用等用户真的点开信箱才会算一次
+    if (typeof renderEnvelopeLists === 'function') { try { renderEnvelopeLists(); } catch(e) {} }
 }
 
 function saveEnvelopeData() {
@@ -55,6 +58,7 @@ async function checkEnvelopeStatus() {
     if (changed) {
         saveEnvelopeData();
         if (newReplyLetter) showEnvelopeReplyPopup(newReplyLetter);
+        if (typeof renderEnvelopeLists === 'function') { try { renderEnvelopeLists(); } catch(e) {} }
     }
 
     // 梦角主动来信检查已移至 moments.js 的共享触发器（_checkPartnerInitiatedAction）
@@ -76,6 +80,7 @@ window._generatePartnerLetter = function() {
     envelopeData.inbox.push(inboxLetter);
     saveEnvelopeData();
     showEnvelopeReplyPopup(inboxLetter);
+    if (typeof renderEnvelopeLists === 'function') { try { renderEnvelopeLists(); } catch(e) {} }
 };
 
 function showEnvelopeReplyPopup(letter) {

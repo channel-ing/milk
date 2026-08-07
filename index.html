@@ -64,6 +64,8 @@
 .cs-trans-custom-btn{width:22px;height:22px;border-radius:50%;border:1.5px dashed var(--border-color,#ddd);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);position:relative;flex-shrink:0;background:none;}
 .cs-trans-cur{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border-color,#eee);flex-shrink:0;transition:background 0.2s;}
 @media(prefers-reduced-motion:reduce){#cs-transition-overlay *{animation-play-state:paused!important;}}
+/* 深色模式下过渡动效换成深色背景，跟随系统 data-theme="dark"，不改动上面浅色模式那行原有代码 */
+html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle at 50% 36%,rgba(45,45,45,.95),rgba(30,30,30,.9) 30%,rgba(18,18,18,.98) 72%),#121212;}
 </style>
 </head>
 <body>

@@ -247,10 +247,10 @@ window._mToggleSticker=function(postId){
     const btn=document.getElementById('cs-sticker-btn-'+postId);
     const rect=btn?btn.getBoundingClientRect():{top:300,left:10};
     const picker=document.createElement('div'); picker.id='cs-sticker-picker';
-    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:16px;right:16px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:16px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.25);display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-height:320px;overflow-y:auto;`;
+    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:200px;overflow-y:auto;`;
     pool.forEach(src=>{
         const b=document.createElement('button');
-        b.style.cssText='background:var(--primary-bg);border:1px solid var(--border-color);padding:0;cursor:pointer;border-radius:8px;aspect-ratio:1/1;overflow:hidden;display:flex;align-items:center;justify-content:center;';
+        b.style.cssText='background:var(--primary-bg);border:1px solid var(--border-color);padding:0;cursor:pointer;border-radius:7px;aspect-ratio:1/1;overflow:hidden;display:flex;align-items:center;justify-content:center;';
         const isCloud=src.indexOf('oss://')===0;
         b.innerHTML=isCloud?`<img data-lazy-cloud-ref="${src}" style="width:100%;height:100%;object-fit:cover;">`:`<img src="${src}" style="width:100%;height:100%;object-fit:cover;">`;
         b.onclick=()=>window._mSelectSticker(postId,src);

@@ -732,7 +732,6 @@ window.openCsSettings = async function () {
         // 避免用户开了这个开关却发现贴纸根本存不进相册
         const ossConnected = !!(window.CloudSync && typeof window.CloudSync.isConnected === 'function' && window.CloudSync.isConnected());
         const ossHint = document.getElementById('cs-save-img-oss-hint');
-        console.log('[诊断] saveToggle元素:', saveToggle, '| ossConnected:', ossConnected, '| ossHint元素:', ossHint);
         if (!ossConnected) {
             saveToggle.checked = false;
             saveToggle.disabled = true;

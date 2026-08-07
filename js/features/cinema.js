@@ -75,8 +75,8 @@
             var allKeys = await localforage.keys();
             var found = allKeys.find(function (k) { return k.indexOf('_cinemaAppt') !== -1; });
             if (found) { _apptStorageKey = found; return found; }
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            var msgKey = allKeys.find(function (k) { return k.indexOf('chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('chatMessages', '') : 'CHAT_APP_V3_';
             _apptStorageKey = prefix + '_cinemaAppt';
         } catch (e) {
             _apptStorageKey = 'CHAT_APP_V3__cinemaAppt';
@@ -1028,7 +1028,10 @@
                 imgEl.src = src;
             }
             item.onclick = function () {
-                _pushMessage({ type: 'image', content: imgEl.src, sender: 'user' });
+                // 用 src（表情库原始存的 oss:// 云端地址，或本地 dataURL），
+                // 不能用 imgEl.src——云端表情解析后 imgEl.src 会变成临时的 blob: 地址，
+                // 不是持久地址，存进消息里下次就打不开了
+                _pushMessage({ type: 'image', content: src, sender: 'user' });
                 var picker = document.getElementById('cinema-sticker-picker');
                 if (picker) picker.classList.remove('active');
             };
@@ -1051,6 +1054,21 @@
                 if (willOpen) _renderCinemaStickerGrid();
             });
         }
+    // 发图片消息前，如果云端已连接，先传一份上去，拿到 oss:// 地址再发消息——
+    // 跟主聊天/相册/纪念日发图片是同一套做法，这样发出去的图片才是持久地址，
+    // 能被整体云同步机制带上、换设备也能看到，不会只留在这一台设备本地。
+    // 没连云端或上传失败就退回本地 dataURL 直接发，保证功能不中断。
+    function _cinemaPushImageMsg(dataUrl) {
+        if (window.CloudSync && window.CloudSync.isConnected() && window.CloudMedia) {
+            window.CloudMedia.upload(dataUrl, 'cinema-chat-img').then(function (r) {
+                _pushMessage({ type: 'image', content: (r && r.url) || dataUrl });
+            }).catch(function () {
+                _pushMessage({ type: 'image', content: dataUrl });
+            });
+        } else {
+            _pushMessage({ type: 'image', content: dataUrl });
+        }
+    }
         if (imgBtn && imgInput) {
             imgBtn.addEventListener('click', function () { imgInput.click(); });
             imgInput.addEventListener('change', function (e) {
@@ -1058,15 +1076,15 @@
                 if (!file) return;
                 if (typeof optimizeImage === 'function') {
                     optimizeImage(file).then(function (dataUrl) {
-                        _pushMessage({ type: 'image', content: dataUrl });
+                        _cinemaPushImageMsg(dataUrl);
                     }).catch(function () {
                         var reader = new FileReader();
-                        reader.onload = function (ev) { _pushMessage({ type: 'image', content: ev.target.result }); };
+                        reader.onload = function (ev) { _cinemaPushImageMsg(ev.target.result); };
                         reader.readAsDataURL(file);
                     });
                 } else {
                     var reader = new FileReader();
-                    reader.onload = function (ev) { _pushMessage({ type: 'image', content: ev.target.result }); };
+                    reader.onload = function (ev) { _cinemaPushImageMsg(ev.target.result); };
                     reader.readAsDataURL(file);
                 }
                 e.target.value = '';
@@ -1356,8 +1374,8 @@
             var allKeys = await localforage.keys();
             var found = allKeys.find(function (k) { return k.indexOf('_cinemaWatchlist') !== -1; });
             if (found) { _wlStorageKey = found; return found; }
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            var msgKey = allKeys.find(function (k) { return k.indexOf('chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('chatMessages', '') : 'CHAT_APP_V3_';
             _wlStorageKey = prefix + '_cinemaWatchlist';
         } catch (e) {
             _wlStorageKey = 'CHAT_APP_V3__cinemaWatchlist';
@@ -1481,8 +1499,8 @@
             var allKeys = await localforage.keys();
             var found = allKeys.find(function (k) { return k.indexOf('_cinemaHistory') !== -1; });
             if (found) { _histStorageKey = found; return found; }
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            var msgKey = allKeys.find(function (k) { return k.indexOf('chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('chatMessages', '') : 'CHAT_APP_V3_';
             _histStorageKey = prefix + '_cinemaHistory';
         } catch (e) {
             _histStorageKey = 'CHAT_APP_V3__cinemaHistory';
@@ -1747,8 +1765,45 @@
         return false;
     };
 
+    // ── 一次性搬家：修复"心愿单/观影历史等没有云同步"这个bug之前，
+    //    这几类数据被误存到了不带 SESSION_ID 的旧通用key下（比如
+    //    CHAT_APP_V3__cinemaWatchlist），云同步认不出这种key，导致换设备看不到。
+    //    这里检测一次，把数据原样搬到正确的、带 SESSION_ID 的key下，搬完删掉旧key。
+    //    只搬"新key还没有数据"的情况，避免覆盖掉新key下可能已经存在的数据。
+    var _cinemaLegacyMigrated = false;
+    async function _cinemaMigrateLegacyKeys() {
+        if (_cinemaLegacyMigrated) return;
+        _cinemaLegacyMigrated = true;
+        var jobs = [
+            { suffix: '_cinemaAppt', getKey: _apptGetKey },
+            { suffix: '_cinemaWatchlist', getKey: _wlGetKey },
+            { suffix: '_cinemaHistory', getKey: _histGetKey },
+            { suffix: '_cinemaNego', getKey: _negoGetKey },
+            { suffix: '_cinemaPartnerInvite', getKey: _partnerInviteGetKey }
+        ];
+        for (var i = 0; i < jobs.length; i++) {
+            var job = jobs[i];
+            try {
+                var legacyKey = 'CHAT_APP_V3_' + job.suffix; // 旧bug产生的通用格式（没有 SESSION_ID）
+                var legacyVal = await localforage.getItem(legacyKey);
+                if (legacyVal === undefined || legacyVal === null) continue; // 这台设备没踩过这个坑，跳过
+                var properKey = await job.getKey();
+                if (properKey === legacyKey) continue; // 算出来的正规key跟旧key一样，不用搬
+                var existing = await localforage.getItem(properKey);
+                if (existing === undefined || existing === null) {
+                    await localforage.setItem(properKey, legacyVal);
+                    console.log('[cinema] 已把', job.suffix, '数据从旧key搬到正规key:', properKey);
+                }
+                await localforage.removeItem(legacyKey);
+            } catch (e) {
+                console.warn('[cinema] 迁移', job.suffix, '失败:', e);
+            }
+        }
+    }
+
     window._cinemaInit = function () {
         _bindOutsideClickOnce();
+        _cinemaMigrateLegacyKeys();
         Promise.all([_apptLoad(), _negoLoad()]).then(function () {
             _cinemaRender();
         });
@@ -1914,8 +1969,8 @@
             var allKeys = await localforage.keys();
             var found = allKeys.find(function (k) { return k.indexOf('_cinemaNego') !== -1; });
             if (found) { _negoStorageKey = found; return found; }
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            var msgKey = allKeys.find(function (k) { return k.indexOf('chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('chatMessages', '') : 'CHAT_APP_V3_';
             _negoStorageKey = prefix + '_cinemaNego';
         } catch (e) {
             _negoStorageKey = 'CHAT_APP_V3__cinemaNego';
@@ -2301,8 +2356,8 @@
             var allKeys = await localforage.keys();
             var found = allKeys.find(function (k) { return k.indexOf('_cinemaPartnerInvite') !== -1; });
             if (found) { _partnerInviteStorageKey = found; return found; }
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
+            var msgKey = allKeys.find(function (k) { return k.indexOf('chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('chatMessages', '') : 'CHAT_APP_V3_';
             _partnerInviteStorageKey = prefix + '_cinemaPartnerInvite';
         } catch (e) {
             _partnerInviteStorageKey = 'CHAT_APP_V3__cinemaPartnerInvite';

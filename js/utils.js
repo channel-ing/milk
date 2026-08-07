@@ -494,7 +494,7 @@ async function importAllData(file) {
             {
                 id: 'ann',
                 label: '纪念日',
-                indexedDBNeedles: ['anniversaries'],
+                indexedDBNeedles: ['anniversaries', 'annCoverBg_', 'annMeetOverride', 'annPinnedId'],
                 localStorageNeedles: []
             },
             {
@@ -531,7 +531,7 @@ async function importAllData(file) {
             {
                 id: 'moments',
                 label: '动态',
-                indexedDBNeedles: ['momentsData', 'csSpaceSettings', 'csWallpaper'],
+                indexedDBNeedles: ['momentsData', 'csSpaceSettings', 'csWallpaper', 'csWallpaperGallery'],
                 localStorageNeedles: []
             },
             {

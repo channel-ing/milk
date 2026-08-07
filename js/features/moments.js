@@ -676,6 +676,23 @@ window._openMomentsPost=function(postId){window.openCoupleSpace();setTimeout(()=
 // ─── 暴露 ───
 window.loadMomentsData=loadMomentsData;window.saveMomentsData=saveMomentsData;window.checkMomentsStatus=checkMomentsStatus;window.generatePartnerMoment=generatePartnerMoment;window.onUserPostCreated=onUserPostCreated;window.onUserCommented=onUserCommented;window.getMomentsUnreadCount=getMomentsUnreadCount;window.markPostRead=markPostRead;window._updateMomentsBadge=_updateBadge;
 
+// ── 调试：已读不回测试用（浏览器控制台专用，跟正式功能无关）──────────────────
+// 强制设定"已读不回"开关和概率，跳过手动去设置里点的步骤
+window._mDebugSetReplyChance = function(allow, chance) {
+    _csSettings.allowReadNoReply = !!allow;
+    if (typeof chance === 'number') _csSettings.readNoReplyChance = chance;
+    console.log('[Moments Debug] allowReadNoReply=', _csSettings.allowReadNoReply, ' readNoReplyChance=', _csSettings.readNoReplyChance);
+};
+// 把某条帖子（不传就用最新一条）待发送的回复立刻"送达"，不用真的等5~20分钟
+window._mDebugForceDeliver = function(postId) {
+    const p = postId ? momentsData.posts.find(x => x.id === postId) : momentsData.posts[0];
+    if (!p) { console.warn('[Moments Debug] 没找到帖子'); return; }
+    if (!p.pendingPartnerComment) { console.warn('[Moments Debug] 这条帖子当前没有待发送的回复（可能是刚才判定为"不回"了）'); return; }
+    p.pendingPartnerComment.time = Date.now();
+    checkMomentsStatus();
+    console.log('[Moments Debug] 已强制送达，刷新一下页面看效果');
+};
+
 // ── 情侣空间设置读写 ──────────────────────────────────────────────────────
 async function _loadCsSettings() {
     try {

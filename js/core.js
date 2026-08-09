@@ -83,6 +83,64 @@ window._registerPartnerMessageListener = window._registerPartnerMessageListener 
     };
 }
 
+// 把 messages[startIdx, endIdxExclusive) 这一批更早的消息，直接插到聊天区域最上面——
+// 不清空、不重画已经显示着的内容，所以不会有"整个区域先藏起来再露出来"那种白屏闪烁
+function _prependOlderMessages(startIdx, endIdxExclusive) {
+    const container = DOMElements.chatContainer;
+    const batch = messages.slice(startIdx, endIdxExclusive);
+    if (!batch.length || !container) return;
+
+    const fragment = new DocumentFragment();
+    let lastSenderRef = { current: null };
+    batch.forEach((msg, i) => {
+        const globalIdx = startIdx + i;
+        const prevMsg = globalIdx > 0 ? messages[globalIdx - 1] : null;
+        const nextMsg = messages[globalIdx + 1] || null; // 批次内的下一条，或者已经渲染在下面的那一条，都能正确取到
+        const msgFragment = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
+        fragment.appendChild(msgFragment);
+    });
+
+    // 最上面固定有一个用来撑高度的占位div（spacer），新内容要插在它后面、原有消息前面
+    const spacer = container.querySelector('div[style*="flex: 1"]');
+    const insertBeforeNode = spacer ? spacer.nextSibling : container.firstChild;
+
+    const oldScrollHeight = container.scrollHeight;
+    if (insertBeforeNode) {
+        container.insertBefore(fragment, insertBeforeNode);
+    } else {
+        container.appendChild(fragment);
+    }
+    // 上面新插入了这么多高度，滚动条也跟着往下挪同样的距离，视觉上就像"没有动过"，用户能无缝接着往上看
+    const newScrollHeight = container.scrollHeight;
+    container.scrollTop += (newScrollHeight - oldScrollHeight);
+}
+
+// 把 messages[startIdx, endIdxExclusive) 这一批更晚的消息，直接接在聊天区域最下面——
+// 同样不清空重画，往下追加不会影响当前已经看到的内容和滚动位置，不需要额外补偿滚动条
+function _appendNewerMessages(startIdx, endIdxExclusive) {
+    const container = DOMElements.chatContainer;
+    const batch = messages.slice(startIdx, endIdxExclusive);
+    if (!batch.length || !container) return;
+
+    const fragment = new DocumentFragment();
+    // lastSenderRef 要先接上"当前已经渲染的最后一条是谁发的"，不然本来该合并显示的头像/时间会重复冒出来
+    let lastSenderRef = { current: null };
+    if (startIdx > 0) {
+        const lastRenderedMsg = messages[startIdx - 1];
+        const prevGroupMember = (lastRenderedMsg.sender !== 'user' && typeof getGroupMemberForMessage === 'function') ? getGroupMemberForMessage(lastRenderedMsg.id) : null;
+        lastSenderRef.current = prevGroupMember ? ('group_' + prevGroupMember.name) : lastRenderedMsg.sender;
+    }
+    batch.forEach((msg, i) => {
+        const globalIdx = startIdx + i;
+        const prevMsg = globalIdx > 0 ? messages[globalIdx - 1] : null;
+        const nextMsg = messages[globalIdx + 1] || null;
+        const msgFragment = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
+        fragment.appendChild(msgFragment);
+    });
+
+    container.appendChild(fragment);
+}
+
 function loadMoreHistory() {
     const historyLoader = document.getElementById('history-loader');
     const container = DOMElements && DOMElements.chatContainer;
@@ -99,54 +157,26 @@ function loadMoreHistory() {
     isLoadingHistory = true;
     if (historyLoader) historyLoader.style.display = 'flex';
 
-    const visibleWrappers = Array.from(container.querySelectorAll('.message-wrapper'));
-    const firstVisible = visibleWrappers.find(function(el) {
-        return el.offsetTop + el.offsetHeight >= container.scrollTop;
-    }) || visibleWrappers[0] || null;
-
-    const anchorId = firstVisible ? firstVisible.dataset.msgId : null;
-    const anchorTop = firstVisible ? firstVisible.getBoundingClientRect().top : 0;
-
-    const prevVisibility = container.style.visibility;
-    const prevOverflow = container.style.overflow;
-    const prevScrollBehavior = container.style.scrollBehavior;
-    const prevOpacity = container.style.opacity;
-
-    container.style.opacity = '0.015';
-    container.style.visibility = 'hidden';
-    container.style.overflow = 'hidden';
-    container.style.scrollBehavior = 'auto';
-
+    // 消息本来就已经在内存里了，不是要发网络请求，这里保留一点延迟纯粹是为了让转圈动效能被看清楚、
+    // 感觉更像"正在加载"，不会显得太突兀。真正的DOM操作只插入新增的这一批，不会有白屏闪烁。
     setTimeout(() => {
+        const oldStart = msgViewMode === 'window' ? msgWinStart : Math.max(0, messages.length - displayedMessageCount);
+        let newStart;
         if (msgViewMode === 'window') {
             msgWinStart = Math.max(0, msgWinStart - HISTORY_BATCH_SIZE);
+            newStart = msgWinStart;
         } else {
             displayedMessageCount = Math.min(messages.length, displayedMessageCount + HISTORY_BATCH_SIZE);
+            newStart = Math.max(0, messages.length - displayedMessageCount);
         }
-        renderMessages(true);
 
-        requestAnimationFrame(() => {
-            if (anchorId) {
-                const newAnchor = container.querySelector('[data-msg-id="' + anchorId + '"]');
-                if (newAnchor) {
-                    const newTop = newAnchor.getBoundingClientRect().top;
-                    container.scrollTop += (newTop - anchorTop);
-                }
-            }
+        _prependOlderMessages(newStart, oldStart);
 
-            requestAnimationFrame(() => {
-                container.style.opacity = prevOpacity || '';
-                container.style.visibility = prevVisibility || '';
-                container.style.overflow = prevOverflow || '';
-                container.style.scrollBehavior = prevScrollBehavior || '';
-
-                const stillHasMore = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
-                if (historyLoader) {
-                    historyLoader.style.display = stillHasMore ? 'flex' : 'none';
-                }
-                isLoadingHistory = false;
-            });
-        });
+        const stillHasMore = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
+        if (historyLoader) {
+            historyLoader.style.display = stillHasMore ? 'flex' : 'none';
+        }
+        isLoadingHistory = false;
     }, 120);
 }
 
@@ -167,39 +197,24 @@ function loadMoreFuture() {
     isLoadingFuture = true;
     if (futureLoader) futureLoader.style.display = 'flex';
 
-    const visibleWrappers = Array.from(container.querySelectorAll('.message-wrapper'));
-    const firstVisible = visibleWrappers.find(function(el) {
-        return el.offsetTop + el.offsetHeight >= container.scrollTop;
-    }) || visibleWrappers[0] || null;
-
-    const anchorId = firstVisible ? firstVisible.dataset.msgId : null;
-    const anchorTop = firstVisible ? firstVisible.getBoundingClientRect().top : 0;
-
     setTimeout(() => {
+        const oldEnd = msgWinEnd;
         msgWinEnd = Math.min(messages.length, msgWinEnd + HISTORY_BATCH_SIZE);
 
-        // 如果这一下已经追到最新消息了，直接切回正常模式，体验上等同于"回到最新"
+        // 如果这一下已经追到最新消息了，直接切回正常模式，体验上等同于"回到最新"——
+        // 这是一次性的模式切换，不是重复的翻页动作，用一次完整渲染没问题
         if (msgWinEnd >= messages.length) {
             window._backToLatestMessages();
             isLoadingFuture = false;
             return;
         }
 
-        renderMessages(true);
+        _appendNewerMessages(oldEnd, msgWinEnd);
 
-        requestAnimationFrame(() => {
-            if (anchorId) {
-                const newAnchor = container.querySelector('[data-msg-id="' + anchorId + '"]');
-                if (newAnchor) {
-                    const newTop = newAnchor.getBoundingClientRect().top;
-                    container.scrollTop += (newTop - anchorTop);
-                }
-            }
-            if (futureLoader) {
-                futureLoader.style.display = (msgWinEnd < messages.length) ? 'flex' : 'none';
-            }
-            isLoadingFuture = false;
-        });
+        if (futureLoader) {
+            futureLoader.style.display = (msgWinEnd < messages.length) ? 'flex' : 'none';
+        }
+        isLoadingFuture = false;
     }, 120);
 }
 

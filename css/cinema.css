@@ -515,6 +515,7 @@
     -webkit-overflow-scrolling: touch;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    align-content: start; /* 不要把多余的空白高度摊派给每一行，不然格子会被拉伸变形，不再是正方形 */
     gap: 8px;
     padding: 4px 12px 12px;
 }

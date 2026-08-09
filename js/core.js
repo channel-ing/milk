@@ -1444,11 +1444,11 @@ window._backToLatestMessages = function() {
     if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
 };
 
-// "回到最新消息"悬浮按钮的显示/隐藏——只在历史浏览模式下出现
+// "回到最新消息"悬浮按钮的显示/隐藏——判断标准跟自动滚动是同一套：只要没追上底部就显示
 window._updateBackToLatestBtn = function() {
     const btn = document.getElementById('back-to-latest-btn');
     if (!btn) return;
-    btn.style.display = (msgViewMode === 'window') ? 'flex' : 'none';
+    btn.style.display = _isCaughtUpToLatest() ? 'none' : 'flex';
 };
 
 // "有N条新消息"提示——文案套在同一个按钮上，不额外加控件
@@ -1466,6 +1466,16 @@ window._updateNewMsgIndicator = function() {
 };
 
 
+// 判断"用户现在是不是正停在聊天最底部"——不看是通过什么方式到达当前位置的（正常聊天时手指往上划了一点、
+// 还是从搜索/引用跳转过来的历史记录），只看两件事：① 当前渲染的这一段有没有已经连到最新消息；
+// ② 滚动条实际位置离底部够不够近。两个都满足才算"追上了"，新消息来的时候才会自动帮你滚下去。
+function _isCaughtUpToLatest() {
+    if (msgViewMode === 'window' && msgWinEnd < messages.length) return false; // 当前渲染的窗口本来就没到最新，不管怎么滚都不算追上
+    const c = DOMElements && DOMElements.chatContainer;
+    if (!c) return true;
+    return (c.scrollHeight - c.scrollTop - c.clientHeight) < 100;
+}
+
 const addMessage = (message) => {
     if (!(message.timestamp instanceof Date)) message.timestamp = new Date(message.timestamp);
     
@@ -1473,27 +1483,60 @@ const addMessage = (message) => {
     const wasEmpty = messages.length === 0;
 
     const prevMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    // 追没追上底部，要在"往数组里塞新消息、改动滚动高度"之前就先判断好，不然滚动高度已经变了，判断就不准了
+    const wasCaughtUp = _isCaughtUpToLatest();
     messages.push(message);
     
     if (wasEmpty) {
         DOMElements.emptyState.style.display = 'none';
     }
 
-    // 正在"历史浏览模式"（比如刚从搜索结果跳转过来，停在聊天记录中间）时：
-    // - 如果是用户自己发的新消息：不能让它发出去后自己却看不到，直接跳回最新消息（这也是所有聊天软件的通用逻辑）
-    // - 如果是对方发来的新消息：新消息不应该被硬塞进当前看到的这一小段里（跟当前窗口不连续，会显得很突兀），
-    //   也不应该强行把用户拽到最新消息去——只是悄悄计数，弹一个"有N条新消息"的提示，用户自己点了才跳过去，不打断正在看的内容。
-    if (msgViewMode === 'window') {
-        if (message.sender === 'user') {
+    // 用户自己发的新消息：不能让它发出去后自己却看不到，不管之前在不在底部，都直接跳回/滚到最新（所有聊天软件的通用逻辑）
+    if (message.sender === 'user') {
+        if (msgViewMode === 'window') {
             throttledSaveData();
-            if (typeof window._onUserMessage === 'function' && message.type === 'normal') {
+            if (message.type === 'normal' && typeof window._onUserMessage === 'function') {
                 try { window._onUserMessage(message); } catch (e) { console.warn('[onUserMessage]', e); }
             }
             if (typeof window._backToLatestMessages === 'function') window._backToLatestMessages();
             return;
         }
+        // 已经在 latest 模式，走下面正常的"追加+滚动到底"逻辑即可（wasCaughtUp 对用户自己发消息没意义，永远滚底）
+    } else if (!wasCaughtUp) {
+        // 对方发来新消息，但用户当前没有停在底部（不管是因为在翻很久以前的历史记录，
+        // 还是就是正常聊天时手指往上划了一点点）——新消息不硬塞进当前视野、也不强行拽人，只悄悄计数提示
+        if (msgViewMode === 'window' && msgWinEnd < messages.length) {
+            // 窗口本来就没连到最新，DOM里没法接着往后加，直接跳过渲染这一步
+        } else {
+            // 处于 latest 模式但没在底部：消息本身仍然要能在"滚到底"之后看到，所以还是要把DOM追加上，只是不强制滚动
+            const existingWrappers = container.querySelectorAll('.message-wrapper');
+            const lastWrapper = existingWrappers.length > 0 ? existingWrappers[existingWrappers.length - 1] : null;
+            if (lastWrapper && prevMsg) {
+                const currentTs = new Date(message.timestamp).getTime();
+                const prevTs = new Date(prevMsg.timestamp).getTime();
+                if (message.sender === prevMsg.sender && message.type === 'normal' && prevMsg.type === 'normal' && (currentTs - prevTs < 60000)) {
+                    const metaEl = lastWrapper.querySelector('.message-meta');
+                    if (metaEl) metaEl.style.display = 'none';
+                    const avatarEl = lastWrapper.querySelector('.message-avatar');
+                    if (avatarEl) avatarEl.style.marginBottom = '';
+                }
+            }
+            let lastSenderRef = { current: null };
+            if (prevMsg) {
+                const prevGroupMember = (prevMsg.sender !== 'user' && typeof getGroupMemberForMessage === 'function') ? getGroupMemberForMessage(prevMsg.id) : null;
+                lastSenderRef.current = prevGroupMember ? ('group_' + prevGroupMember.name) : prevMsg.sender;
+            }
+            const newMsgFragment = createMessageFragment(message, prevMsg, null, lastSenderRef);
+            const spacer = container.querySelector('div[style*="flex: 1"]');
+            if (spacer && spacer === container.lastElementChild) {
+                spacer.before(newMsgFragment);
+            } else {
+                container.appendChild(newMsgFragment);
+            }
+        }
         newMsgCountWhileBrowsing++;
         if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
+        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
         throttledSaveData();
         if (message.type === 'normal' && typeof window._onPartnerMessage === 'function') {
             try { window._onPartnerMessage(message); } catch (e) { console.warn('[onPartnerMessage]', e); }
@@ -1506,6 +1549,7 @@ const addMessage = (message) => {
         return;
     }
 
+    // --- 正常情况：用户自己发消息、或对方发消息时用户本来就在底部 —— 追加消息并滚动到底 ---
     // --- Update previous message if needed ---
     const existingWrappers = container.querySelectorAll('.message-wrapper');
     const lastWrapper = existingWrappers.length > 0 ? existingWrappers[existingWrappers.length - 1] : null;
@@ -1923,7 +1967,7 @@ if (!isBatchMode && type === 'normal') {
                     const partnerImg = DOMElements.partner.avatar.querySelector('img');
                     tiAvatar.innerHTML = partnerImg ? `<img src="${partnerImg.src}">` : '<i class="fas fa-user"></i>';
                 }
-                if (DOMElements.chatContainer) DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
+                if (_isCaughtUpToLatest() && DOMElements.chatContainer) DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
             }
 
             // 排队回复
@@ -1951,9 +1995,12 @@ if (!isBatchMode && type === 'normal') {
                     const partnerImg = DOMElements.partner.avatar.querySelector('img');
                     tiAvatar.innerHTML = partnerImg ? `<img src="${partnerImg.src}">` : '<i class="fas fa-user"></i>';
                 }
-                DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
+                // 判断标准不是"在不在历史浏览模式"，而是"用户现在实际有没有停在底部"——
+                // 哪怕没有搜索/跳转，正常聊天时手指往上划了一点，也一样不该被强行拽回去
+                if (_isCaughtUpToLatest()) {
+                    DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
+                }
             }
-
             let changed = false;
             messages.forEach(msg => {
                 if (msg.sender === 'user' && msg.status !== 'read') {

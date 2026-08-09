@@ -48,6 +48,9 @@ window._registerPartnerMessageListener = window._registerPartnerMessageListener 
             messages = [];
             window.messages = messages; // 双保险：同步 window 属性
             displayedMessageCount = HISTORY_BATCH_SIZE;
+            msgViewMode = 'latest'; // 清空消息了，历史浏览模式的窗口下标肯定全部失效，一并重置
+            newMsgCountWhileBrowsing = 0;
+            if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
 
             // 立即清除 localStorage 备份，防止 _tryRecoverFromBackup 在 IndexedDB 写入前恢复旧消息
             try { localStorage.removeItem('BACKUP_V1_critical'); } catch(e) {}
@@ -83,7 +86,7 @@ window._registerPartnerMessageListener = window._registerPartnerMessageListener 
 function loadMoreHistory() {
     const historyLoader = document.getElementById('history-loader');
     const container = DOMElements && DOMElements.chatContainer;
-    const currentOldestMsgIndex = messages.length - displayedMessageCount;
+    const currentOldestMsgIndex = msgViewMode === 'window' ? msgWinStart : (messages.length - displayedMessageCount);
 
     if (!container) return;
     if (isLoadingHistory) return;
@@ -115,7 +118,11 @@ function loadMoreHistory() {
     container.style.scrollBehavior = 'auto';
 
     setTimeout(() => {
-        displayedMessageCount = Math.min(messages.length, displayedMessageCount + HISTORY_BATCH_SIZE);
+        if (msgViewMode === 'window') {
+            msgWinStart = Math.max(0, msgWinStart - HISTORY_BATCH_SIZE);
+        } else {
+            displayedMessageCount = Math.min(messages.length, displayedMessageCount + HISTORY_BATCH_SIZE);
+        }
         renderMessages(true);
 
         requestAnimationFrame(() => {
@@ -133,11 +140,65 @@ function loadMoreHistory() {
                 container.style.overflow = prevOverflow || '';
                 container.style.scrollBehavior = prevScrollBehavior || '';
 
+                const stillHasMore = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
                 if (historyLoader) {
-                    historyLoader.style.display = (messages.length > displayedMessageCount) ? 'flex' : 'none';
+                    historyLoader.style.display = stillHasMore ? 'flex' : 'none';
                 }
                 isLoadingHistory = false;
             });
+        });
+    }, 120);
+}
+
+// 往下翻，加载更晚的消息——跟 loadMoreHistory 对称，只在 window（历史浏览）模式下会用到，
+// 正常的 latest 模式本来就已经渲染到最新消息了，没有"更晚"可以加载
+function loadMoreFuture() {
+    const futureLoader = document.getElementById('future-loader');
+    const container = DOMElements && DOMElements.chatContainer;
+    if (!container) return;
+    if (msgViewMode !== 'window') return;
+    if (isLoadingFuture) return;
+
+    if (msgWinEnd >= messages.length) {
+        if (futureLoader) futureLoader.style.display = 'none';
+        return;
+    }
+
+    isLoadingFuture = true;
+    if (futureLoader) futureLoader.style.display = 'flex';
+
+    const visibleWrappers = Array.from(container.querySelectorAll('.message-wrapper'));
+    const firstVisible = visibleWrappers.find(function(el) {
+        return el.offsetTop + el.offsetHeight >= container.scrollTop;
+    }) || visibleWrappers[0] || null;
+
+    const anchorId = firstVisible ? firstVisible.dataset.msgId : null;
+    const anchorTop = firstVisible ? firstVisible.getBoundingClientRect().top : 0;
+
+    setTimeout(() => {
+        msgWinEnd = Math.min(messages.length, msgWinEnd + HISTORY_BATCH_SIZE);
+
+        // 如果这一下已经追到最新消息了，直接切回正常模式，体验上等同于"回到最新"
+        if (msgWinEnd >= messages.length) {
+            window._backToLatestMessages();
+            isLoadingFuture = false;
+            return;
+        }
+
+        renderMessages(true);
+
+        requestAnimationFrame(() => {
+            if (anchorId) {
+                const newAnchor = container.querySelector('[data-msg-id="' + anchorId + '"]');
+                if (newAnchor) {
+                    const newTop = newAnchor.getBoundingClientRect().top;
+                    container.scrollTop += (newTop - anchorTop);
+                }
+            }
+            if (futureLoader) {
+                futureLoader.style.display = (msgWinEnd < messages.length) ? 'flex' : 'none';
+            }
+            isLoadingFuture = false;
         });
     }, 120);
 }
@@ -521,6 +582,9 @@ const loadData = async () => {
         try { await loadEnvelopeData(); } catch(e) { console.warn("信封数据加载失败", e); }
         
         displayedMessageCount = HISTORY_BATCH_SIZE;
+        msgViewMode = 'latest'; // 切换/加载会话时，重置掉"历史浏览模式"，避免带着上一个会话的浏览状态串过来
+        newMsgCountWhileBrowsing = 0;
+        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
         
         setTimeout(() => {
             applyAllAvatarFrames();
@@ -995,31 +1059,21 @@ function manageAutoSendTimer() {
         window.scrollToQuotedMessage = function(el) {
             const id = el.getAttribute('data-reply-id');
             if (!id) return;
-            const tryScroll = () => {
-                const target = document.querySelector(`[data-msg-id="${id}"]`);
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    target.classList.add('msg-highlight');
-                    setTimeout(() => target.classList.remove('msg-highlight'), 1500);
-                    return true;
-                }
-                return false;
-            };
-            if (!tryScroll()) {
-                const msgIndex = messages.findIndex(m => String(m.id) === String(id));
-                if (msgIndex === -1) {
-                    if (typeof showNotification === 'function') showNotification('消息可能已被删除', 'info');
-                    return;
-                }
-                const needed = messages.length - msgIndex;
-                if (needed > displayedMessageCount) {
-                    displayedMessageCount = needed;
-                    renderMessages(false);
-                    setTimeout(tryScroll, 150);
-                } else {
-                    if (typeof showNotification === 'function') showNotification('消息可能已被删除', 'info');
-                }
+            const target = document.querySelector(`[data-msg-id="${id}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('msg-highlight');
+                setTimeout(() => target.classList.remove('msg-highlight'), 1500);
+                return;
             }
+            // 当前页面上没有这条消息（可能太老了，还没渲染到），统一走"定位到某条消息"这条路，
+            // 不管这条消息有多老，只渲染它附近一小段，不会因为聊天记录长就变慢
+            if (!window._jumpToMessage(id)) return;
+            setTimeout(() => {
+                const el2 = document.querySelector(`[data-msg-id="${id}"]`);
+                if (el2) el2.classList.add('msg-highlight');
+                setTimeout(() => { if (el2) el2.classList.remove('msg-highlight'); }, 1500);
+            }, 60);
         };
 
 function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
@@ -1289,12 +1343,27 @@ function _updateReadReceiptsDOM() {
 function renderMessages(preserveScroll = false) {
     const container = DOMElements.chatContainer;
     const totalMessages = messages.length;
-    const startIndex = Math.max(0, totalMessages - displayedMessageCount);
-    const msgsToRender = messages.slice(startIndex);
+
+    let startIndex, endIndex, msgsToRender;
+    if (msgViewMode === 'window') {
+        // 历史浏览模式：只渲染 [msgWinStart, msgWinEnd) 这一小段，不管这段离最新消息有多远，
+        // 渲染量都是恒定的，不会因为聊天记录变长就跟着变慢
+        startIndex = Math.max(0, Math.min(msgWinStart, totalMessages));
+        endIndex = Math.max(startIndex, Math.min(msgWinEnd, totalMessages));
+        msgsToRender = messages.slice(startIndex, endIndex);
+    } else {
+        startIndex = Math.max(0, totalMessages - displayedMessageCount);
+        endIndex = totalMessages;
+        msgsToRender = messages.slice(startIndex);
+    }
 
     const historyLoader = document.getElementById('history-loader');
     if (historyLoader) {
         historyLoader.style.display = startIndex > 0 ? 'flex' : 'none';
+    }
+    const futureLoader = document.getElementById('future-loader');
+    if (futureLoader) {
+        futureLoader.style.display = (msgViewMode === 'window' && endIndex < totalMessages) ? 'flex' : 'none';
     }
 
     DOMElements.emptyState.style.display = totalMessages === 0 ? 'flex' : 'none';
@@ -1323,12 +1392,79 @@ function renderMessages(preserveScroll = false) {
     if (preserveScroll) {
         const newScrollHeight = container.scrollHeight;
         container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
-    } else {
+    } else if (msgViewMode !== 'window') {
         requestAnimationFrame(() => {
             container.scrollTop = container.scrollHeight;
         });
     }
+    // window模式下不自动滚动到底部/顶部，滚动位置由调用方（比如跳转定位）自己处理
 }
+
+// 跳转到某一条消息（搜索结果点击、引用消息点击都可以用这个统一入口），
+// 不管这条消息离最新消息有多远，只渲染它附近一小段，不会因为聊天记录很长就卡顿
+window._jumpToMessage = function(id) {
+    const idx = messages.findIndex(m => String(m.id) === String(id));
+    if (idx === -1) {
+        if (typeof showNotification === 'function') showNotification('这条消息可能已被删除', 'info');
+        return false;
+    }
+
+    const container = DOMElements && DOMElements.chatContainer;
+    if (!container) return false;
+
+    const HALF = 50; // 目标消息前后各带50条上下文，数量固定，不会因为消息在哪个位置而变化
+    msgViewMode = 'window';
+    msgWinStart = Math.max(0, idx - HALF);
+    msgWinEnd = Math.min(messages.length, idx + HALF + 1);
+    newMsgCountWhileBrowsing = 0;
+
+    renderMessages(false);
+
+    requestAnimationFrame(() => {
+        const el = container.querySelector('[data-msg-id="' + id + '"]');
+        if (el) {
+            el.scrollIntoView({ behavior: 'auto', block: 'center' });
+            el.style.transition = 'background .3s ease';
+            el.style.background = 'rgba(var(--accent-color-rgb),.14)';
+            setTimeout(() => { el.style.background = ''; }, 1800);
+        }
+        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
+        if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
+    });
+    return true;
+};
+
+// 从历史浏览模式回到最新消息——切回正常模式，重置成"只看最近一批"，然后自动滚到底部
+window._backToLatestMessages = function() {
+    msgViewMode = 'latest';
+    displayedMessageCount = HISTORY_BATCH_SIZE;
+    newMsgCountWhileBrowsing = 0;
+    renderMessages(false);
+    if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
+    if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
+};
+
+// "回到最新消息"悬浮按钮的显示/隐藏——只在历史浏览模式下出现
+window._updateBackToLatestBtn = function() {
+    const btn = document.getElementById('back-to-latest-btn');
+    if (!btn) return;
+    btn.style.display = (msgViewMode === 'window') ? 'flex' : 'none';
+};
+
+// "有N条新消息"提示——文案套在同一个按钮上，不额外加控件
+window._updateNewMsgIndicator = function() {
+    const btn = document.getElementById('back-to-latest-btn');
+    const label = document.getElementById('back-to-latest-label');
+    if (!btn || !label) return;
+    if (msgViewMode === 'window' && newMsgCountWhileBrowsing > 0) {
+        label.textContent = '有' + newMsgCountWhileBrowsing + '条新消息';
+        btn.classList.add('has-new-msg');
+    } else {
+        label.textContent = '';
+        btn.classList.remove('has-new-msg');
+    }
+};
+
 
 const addMessage = (message) => {
     if (!(message.timestamp instanceof Date)) message.timestamp = new Date(message.timestamp);
@@ -1341,6 +1477,33 @@ const addMessage = (message) => {
     
     if (wasEmpty) {
         DOMElements.emptyState.style.display = 'none';
+    }
+
+    // 正在"历史浏览模式"（比如刚从搜索结果跳转过来，停在聊天记录中间）时：
+    // - 如果是用户自己发的新消息：不能让它发出去后自己却看不到，直接跳回最新消息（这也是所有聊天软件的通用逻辑）
+    // - 如果是对方发来的新消息：新消息不应该被硬塞进当前看到的这一小段里（跟当前窗口不连续，会显得很突兀），
+    //   也不应该强行把用户拽到最新消息去——只是悄悄计数，弹一个"有N条新消息"的提示，用户自己点了才跳过去，不打断正在看的内容。
+    if (msgViewMode === 'window') {
+        if (message.sender === 'user') {
+            throttledSaveData();
+            if (typeof window._onUserMessage === 'function' && message.type === 'normal') {
+                try { window._onUserMessage(message); } catch (e) { console.warn('[onUserMessage]', e); }
+            }
+            if (typeof window._backToLatestMessages === 'function') window._backToLatestMessages();
+            return;
+        }
+        newMsgCountWhileBrowsing++;
+        if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
+        throttledSaveData();
+        if (message.type === 'normal' && typeof window._onPartnerMessage === 'function') {
+            try { window._onPartnerMessage(message); } catch (e) { console.warn('[onPartnerMessage]', e); }
+        }
+        if (message.type === 'normal' && Array.isArray(window._partnerMessageListeners)) {
+            window._partnerMessageListeners.forEach(function (fn) {
+                try { fn(message); } catch (e) { console.warn('[onPartnerMessage:listener]', e); }
+            });
+        }
+        return;
     }
 
     // --- Update previous message if needed ---
@@ -2595,10 +2758,12 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 document.addEventListener('DOMContentLoaded', function() {
     const chatArea = document.querySelector('.main-chat-area');
     const historyLoader = document.getElementById('history-loader');
-    
+    const futureLoader = document.getElementById('future-loader');
+
     if (chatArea && historyLoader && typeof IntersectionObserver !== 'undefined') {
         const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && messages.length > displayedMessageCount) {
+            const hasMoreOlder = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
+            if (entries[0].isIntersecting && hasMoreOlder) {
                 loadMoreHistory();
             }
         }, {
@@ -2607,5 +2772,20 @@ document.addEventListener('DOMContentLoaded', function() {
             threshold: 0.01
         });
         observer.observe(historyLoader);
+    }
+
+    // 往下翻加载更晚消息的监听——只有在"历史浏览模式"下 future-loader 才会显示出来，
+    // 正常模式下它一直是隐藏的，不会触发
+    if (chatArea && futureLoader && typeof IntersectionObserver !== 'undefined') {
+        const futureObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && msgViewMode === 'window' && msgWinEnd < messages.length) {
+                loadMoreFuture();
+            }
+        }, {
+            root: chatArea,
+            rootMargin: '0px 0px 200px 0px',
+            threshold: 0.01
+        });
+        futureObserver.observe(futureLoader);
     }
 });

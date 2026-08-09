@@ -104,6 +104,12 @@ function _prependOlderMessages(startIdx, endIdxExclusive) {
     const spacer = container.querySelector('div[style*="flex: 1"]');
     const insertBeforeNode = spacer ? spacer.nextSibling : container.firstChild;
 
+    // 聊天框本身开着"平滑滚动"效果（CSS scroll-behavior: smooth），这跟"瞬间精确挪到某个位置"是冲突的——
+    // 不临时关掉的话，下面这行补偿滚动条位置的操作会被浏览器理解成"慢慢滑过去"，
+    // 读到的中间值就会不准，视觉上也会变成"先加载、又滑到别的地方"，这正是这次要修的问题
+    const prevScrollBehavior = container.style.scrollBehavior;
+    container.style.scrollBehavior = 'auto';
+
     const oldScrollHeight = container.scrollHeight;
     if (insertBeforeNode) {
         container.insertBefore(fragment, insertBeforeNode);
@@ -113,6 +119,8 @@ function _prependOlderMessages(startIdx, endIdxExclusive) {
     // 上面新插入了这么多高度，滚动条也跟着往下挪同样的距离，视觉上就像"没有动过"，用户能无缝接着往上看
     const newScrollHeight = container.scrollHeight;
     container.scrollTop += (newScrollHeight - oldScrollHeight);
+
+    container.style.scrollBehavior = prevScrollBehavior || '';
 }
 
 // 把 messages[startIdx, endIdxExclusive) 这一批更晚的消息，直接接在聊天区域最下面——

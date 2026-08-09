@@ -2817,37 +2817,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    const chatArea = document.querySelector('.main-chat-area');
-    const historyLoader = document.getElementById('history-loader');
-    const futureLoader = document.getElementById('future-loader');
-
-    if (chatArea && historyLoader && typeof IntersectionObserver !== 'undefined') {
-        const observer = new IntersectionObserver((entries) => {
-            const hasMoreOlder = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
-            if (entries[0].isIntersecting && hasMoreOlder) {
-                loadMoreHistory();
-            }
-        }, {
-            root: chatArea,
-            rootMargin: '200px 0px 0px 0px',
-            threshold: 0.01
-        });
-        observer.observe(historyLoader);
-    }
-
-    // 往下翻加载更晚消息的监听——只有在"历史浏览模式"下 future-loader 才会显示出来，
-    // 正常模式下它一直是隐藏的，不会触发
-    if (chatArea && futureLoader && typeof IntersectionObserver !== 'undefined') {
-        const futureObserver = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && msgViewMode === 'window' && msgWinEnd < messages.length) {
-                loadMoreFuture();
-            }
-        }, {
-            root: chatArea,
-            rootMargin: '0px 0px 200px 0px',
-            threshold: 0.01
-        });
-        futureObserver.observe(futureLoader);
-    }
-});
+// 注：往上/往下翻页加载更多消息的触发，只靠 listeners.js 里那个绑定在真正可滚动容器（chat-container）
+// 上的 scroll 事件监听（检查 scrollTop 实际位置）。这里原本还有一套用 IntersectionObserver 做的重复监听，
+// 但它绑定的参照容器（.main-chat-area）本身并不会滚动，导致这套监听只要"加载提示条一显示出来"就会误触发，
+// 跟用户有没有真的滑动到顶部/底部没有关系，会引发连环自动加载、把用户拽到意料之外的位置。已确认删除，不会影响功能。

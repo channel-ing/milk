@@ -279,6 +279,12 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
 
         <div class="chat-container" id="chat-container">
     </div>
+    <div class="future-loader" id="future-loader" style="display:none;">
+        <div class="history-spinner"></div>
+    </div>
+    <button id="back-to-latest-btn" onclick="window._backToLatestMessages&&window._backToLatestMessages()">
+        <i class="fas fa-arrow-down"></i><span id="back-to-latest-label"></span>
+    </button>
     <div class="empty-state" id="empty-state" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;width:100%;pointer-events:none;z-index:1;">
             <div style="position:relative;margin-bottom:20px;">
                 <i class="fas fa-heart" style="font-size:52px;opacity:0.55;color:var(--accent-color);"></i>

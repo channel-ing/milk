@@ -2475,6 +2475,11 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                         <input type="date" id="msg-search-date-to" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:var(--primary-bg);color:var(--text-primary);outline:none;" oninput="window._runMsgSearch && window._runMsgSearch()">
                         <button onclick="document.getElementById('msg-search-input').value='';document.getElementById('msg-search-date-from').value='';document.getElementById('msg-search-date-to').value='';window._runMsgSearch&&window._runMsgSearch();" style="padding:5px 10px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:var(--secondary-bg);color:var(--text-secondary);cursor:pointer;font-family:var(--font-family);">重置</button>
                     </div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color);">
+                        <span style="font-size:11px;color:var(--text-secondary);">跳转到：</span>
+                        <input type="date" id="msg-jump-date" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:var(--primary-bg);color:var(--text-primary);outline:none;">
+                        <button onclick="window._jumpToDate && window._jumpToDate()" class="modal-btn modal-btn-primary" style="padding:5px 12px;font-size:12px;">跳转</button>
+                    </div>
                 </div>
                 <div id="msg-search-results" style="max-height:52vh;overflow-y:auto;margin-top:10px;margin-left:-4px;margin-right:-4px;"></div>
             </div>

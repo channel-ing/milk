@@ -486,14 +486,14 @@
 }
 .cinema-sticker-popover {
     position: absolute;
+    left: 12px;
     right: 12px;
-    bottom: calc(100% + 6px);
-    width: 280px;
-    max-height: 300px;
+    bottom: calc(100% + 8px);
+    max-height: 260px;
     background: var(--secondary-bg, #fff);
     border: 1px solid var(--border-color, #e0e0e0);
-    border-radius: 14px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
     display: none;
     flex-direction: column;
     overflow: hidden;

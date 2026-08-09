@@ -10812,12 +10812,12 @@
     display: none !important;
 }
 
-/* 顶部栏按钮顺序：信箱 · 陪伴 · 情侣空间 · 公告 · 设置 */
+/* 顶部栏按钮顺序：信箱 · 陪伴 · 公告 · 情侣空间 · 设置 */
 .header-actions { display: flex; }
 #envelope-header-btn  { order: 1; }
 #companion-btn        { order: 2; }
-#moments-header-btn   { order: 3; }
-#daily-greeting-btn   { order: 4; }
+#daily-greeting-btn   { order: 3; }
+#moments-header-btn   { order: 4; }
 #settings-btn         { order: 5; }
 
 /* 底部输入区：隐藏让对方继续说、批量发送、发送按钮 */

@@ -355,6 +355,26 @@
         out.innerHTML = html;
     };
 
+    // 选日期直接跳转——不看聊天内容，只看这一天有没有消息，有就跳到当天第一条
+    window._jumpToDate = function() {
+        var inp = document.getElementById('msg-jump-date');
+        if (!inp || !inp.value) {
+            if (typeof showNotification === 'function') showNotification('请先选择日期', 'info');
+            return;
+        }
+        if (typeof messages === 'undefined' || !messages || !messages.length) {
+            if (typeof showNotification === 'function') showNotification('暂无聊天记录', 'info');
+            return;
+        }
+        var targetDateStr = new Date(inp.value + 'T00:00:00').toDateString();
+        var found = messages.find(function(m) { return new Date(m.timestamp).toDateString() === targetDateStr; });
+        if (!found) {
+            if (typeof showNotification === 'function') showNotification('这天没有聊天记录', 'info');
+            return;
+        }
+        window._scrollToMsg(found.id);
+    };
+
     window._scrollToMsg = function(id) {
         var el = document.querySelector('[data-id="'+id+'"]') || document.querySelector('[data-message-id="'+id+'"]') || document.querySelector('[data-msg-id="'+id+'"]');
         function closeStatsModal() {

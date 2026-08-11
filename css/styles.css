@@ -12149,7 +12149,9 @@ body #user-sticker-picker .empty-sticker-tip {
 /* ── 相册列表 ── */
 .al-albums-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    align-content: start; /* 不要把容器多余的空白高度摊派给每一行，不然相册数量少的时候卡片会被拉高，数量一多又"压缩"回正常大小，显得忽大忽小 */
+    align-content: start; /* 不要把容器多余的空白高度摊派给每一行 */
+    align-items: start;   /* 关键：每张卡片按自己实际需要的高度显示（封面+名字），不要被拉伸/压缩成跟同一行别的卡片一样高，
+                              不然名字这部分会因为高度被压缩而跟下一行的封面叠在一起、看不见 */
     gap: 12px; padding: 14px;
 }
 .al-album-card {

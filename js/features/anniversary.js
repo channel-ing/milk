@@ -15,21 +15,28 @@ var _annMeetOverride = null;   // 用户编辑相遇后的覆盖数据：{name, 
 // ── 相遇覆盖数据的读取（供各处使用） ──────────────────────
 async function _annLoadMeetOverride() {
     try {
-        var val = await localforage.getItem(getStorageKey('annMeetOverride'));
+        var key = getStorageKey('annMeetOverride');
+        var val = await localforage.getItem(key);
         _annMeetOverride = val || null;
-    } catch(e) { _annMeetOverride = null; }
+        console.log('[诊断-相遇日期]  读取成功  key=' + key + '  读到的值=', val);
+    } catch(e) {
+        _annMeetOverride = null;
+        console.log('[诊断-相遇日期]  读取失败/报错：', e && e.message);
+    }
 }
 window._annLoadMeetOverride = _annLoadMeetOverride;
 
 // 得到当前相遇的实际数据（有 override 用 override，否则用首条消息）
 function _annGetMeetData() {
     if (_annMeetOverride && _annMeetOverride.date) {
+        console.log('[诊断-相遇日期] _annGetMeetData 使用了"手动编辑过的日期"：', _annMeetOverride.date);
         return { name: _annMeetOverride.name || '相遇', date: _annMeetOverride.date, target: new Date(_annMeetOverride.date) };
     }
     var msgs = (typeof messages !== 'undefined') ? messages : [];
     if (!msgs.length) return null;
     var start = new Date(msgs[0].timestamp);
     if (isNaN(start.getTime())) return null;
+    console.log('[诊断-相遇日期] _annGetMeetData 没有拿到手动编辑的日期，回退用了"聊天记录第一条消息"的时间：', start, '  此时_annMeetOverride=', _annMeetOverride);
     // ISO date 字符串（yyyy-mm-dd）方便 date input 用
     var iso = start.getFullYear() + '-'
         + String(start.getMonth()+1).padStart(2, '0') + '-'
@@ -724,6 +731,7 @@ window._annInit = async function() {
             return;
         }
         window._updateDaysCounter = function() { _annUpdateHeaderDays(); };
+        console.log('[诊断-相遇日期] _updateDaysCounter 接管完成');
     }
     hookUpdateCounter();
 
@@ -753,22 +761,24 @@ window._annInit = async function() {
         var orig = window.openCoupleSpace;
         window.openCoupleSpace = function() {
             orig.apply(this, arguments);
+            console.log('[诊断-相遇日期] openCoupleSpace 被调用，开始尝试刷新');
             function tryUpdate(attempt) {
                 attempt = attempt || 0;
-                // 关键：SESSION_ID 没真正就绪之前，读到的很可能是错误/默认的存储位置，
-                // 永远读不到用户真实保存过的日期——之前按"固定等几百毫秒"来猜时间的写法不够稳，
-                // 这次改成跟 SESSION_ID 就绪状态挂钩，就绪了才真正去读
                 if (typeof SESSION_ID === 'undefined' || !SESSION_ID) {
+                    console.log('[诊断-相遇日期] SESSION_ID 还没就绪，第' + attempt + '次等待中');
                     if (attempt < 20) setTimeout(function () { tryUpdate(attempt + 1); }, 300);
                     return;
                 }
                 var loads = [];
                 if (typeof window._annLoadPinned === 'function') loads.push(window._annLoadPinned());
                 if (typeof window._annLoadMeetOverride === 'function') loads.push(window._annLoadMeetOverride());
-                Promise.all(loads).then(function() { _annUpdateHeaderDays(); });
+                Promise.all(loads).then(function() {
+                    _annUpdateHeaderDays();
+                    var p = window._annGetPinned && window._annGetPinned();
+                    console.log('[诊断-相遇日期] 刷新完成，SESSION_ID=' + SESSION_ID + '  当前_annGetPinned()结果=', p, '  _annMeetOverride=', _annMeetOverride);
+                });
             }
             tryUpdate();
-            // 再多补几次刷新，覆盖各种边界情况（比如 SESSION_ID 就绪了但 localforage 读取本身还没完成）
             setTimeout(function () { tryUpdate(); }, 500);
             setTimeout(function () { tryUpdate(); }, 1200);
             setTimeout(function () { tryUpdate(); }, 2000);

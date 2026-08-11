@@ -8,7 +8,7 @@ let _momentsDataLoaded = false; // 只有loadMomentsData()成功跑完一次才�
 const _M_STORAGE_KEY  = 'momentsData';
 const _M_COOLDOWN_KEY = 'partnerLetterNextTime';
 const _M_CD_MIN  = 48 * 60 * 60 * 1000;
-const _M_CD_MAX  = 72 * 60 * 60 * 1000;
+const _M_CD_MAX  = 96 * 60 * 60 * 1000;
 const _M_PROB    = 0.40;
 const _M_DLY_MIN = 5  * 60 * 1000;
 const _M_DLY_MAX = 20 * 60 * 1000;
@@ -199,17 +199,7 @@ async function _checkAction(){
         const next=await localforage.getItem(KEY);if(next!==null&&now<next)return;
         await localforage.setItem(KEY,now+_M_CD_MIN+Math.random()*(_M_CD_MAX-_M_CD_MIN));
         if(Math.random()<0.40){if(typeof window._generatePartnerLetter==='function')window._generatePartnerLetter();}
-
-        // 发动态：70%概率，连续2次没中的话，第3次直接保底必中（跟电影院主动邀请那套保底逻辑一致）
-        const MISS_KEY='momentsMissedCount';
-        let missed=await localforage.getItem(getStorageKey(MISS_KEY)); missed=Number(missed)||0;
-        const willPost = missed>=2 ? true : Math.random()<0.70;
-        if(willPost){
-            await generatePartnerMoment();
-            await localforage.setItem(getStorageKey(MISS_KEY),0);
-        }else{
-            await localforage.setItem(getStorageKey(MISS_KEY),missed+1);
-        }
+        if(Math.random()<0.70){await generatePartnerMoment();}
     }catch(e){console.warn('[Moments] _checkAction 失败',e);}
 }
 

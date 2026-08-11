@@ -199,7 +199,17 @@ async function _checkAction(){
         const next=await localforage.getItem(KEY);if(next!==null&&now<next)return;
         await localforage.setItem(KEY,now+_M_CD_MIN+Math.random()*(_M_CD_MAX-_M_CD_MIN));
         if(Math.random()<0.40){if(typeof window._generatePartnerLetter==='function')window._generatePartnerLetter();}
-        if(Math.random()<0.70){await generatePartnerMoment();}
+
+        // 发动态：70%概率，连续2次没中的话，第3次直接保底必中（跟电影院主动邀请那套保底逻辑一致）
+        const MISS_KEY='momentsMissedCount';
+        let missed=await localforage.getItem(getStorageKey(MISS_KEY)); missed=Number(missed)||0;
+        const willPost = missed>=2 ? true : Math.random()<0.70;
+        if(willPost){
+            await generatePartnerMoment();
+            await localforage.setItem(getStorageKey(MISS_KEY),0);
+        }else{
+            await localforage.setItem(getStorageKey(MISS_KEY),missed+1);
+        }
     }catch(e){console.warn('[Moments] _checkAction 失败',e);}
 }
 

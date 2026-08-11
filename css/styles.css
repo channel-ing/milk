@@ -12150,8 +12150,10 @@ body #user-sticker-picker .empty-sticker-tip {
 .al-albums-grid {
     display: grid; grid-template-columns: 1fr 1fr;
     align-content: start; /* 不要把容器多余的空白高度摊派给每一行 */
-    align-items: start;   /* 关键：每张卡片按自己实际需要的高度显示（封面+名字），不要被拉伸/压缩成跟同一行别的卡片一样高，
-                              不然名字这部分会因为高度被压缩而跟下一行的封面叠在一起、看不见 */
+    align-items: start;   /* 每张卡片按自己实际需要的高度显示，不被拉伸/压缩成跟同一行别的卡片一样高 */
+    grid-auto-rows: min-content; /* 关键修复：这个容器之前被外层限制了总高度，导致每行被迫平分这个不够用的高度、内容溢出叠到下一行。
+                                     这行强制"每一行按内容实际需要的最小高度来算"，不会再被总高度不够而压缩，
+                                     相册数量多的话会正常触发这个容器自己的上下滚动，不影响正常使用 */
     gap: 12px; padding: 14px;
 }
 .al-album-card {

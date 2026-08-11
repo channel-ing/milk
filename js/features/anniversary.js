@@ -15,28 +15,21 @@ var _annMeetOverride = null;   // 用户编辑相遇后的覆盖数据：{name, 
 // ── 相遇覆盖数据的读取（供各处使用） ──────────────────────
 async function _annLoadMeetOverride() {
     try {
-        var key = getStorageKey('annMeetOverride');
-        var val = await localforage.getItem(key);
+        var val = await localforage.getItem(getStorageKey('annMeetOverride'));
         _annMeetOverride = val || null;
-        console.log('[诊断-相遇日期]  读取成功  key=' + key + '  读到的值=', val);
-    } catch(e) {
-        _annMeetOverride = null;
-        console.log('[诊断-相遇日期]  读取失败/报错：', e && e.message);
-    }
+    } catch(e) { _annMeetOverride = null; }
 }
 window._annLoadMeetOverride = _annLoadMeetOverride;
 
 // 得到当前相遇的实际数据（有 override 用 override，否则用首条消息）
 function _annGetMeetData() {
     if (_annMeetOverride && _annMeetOverride.date) {
-        console.log('[诊断-相遇日期] _annGetMeetData 使用了"手动编辑过的日期"：', _annMeetOverride.date);
         return { name: _annMeetOverride.name || '相遇', date: _annMeetOverride.date, target: new Date(_annMeetOverride.date) };
     }
     var msgs = (typeof messages !== 'undefined') ? messages : [];
     if (!msgs.length) return null;
     var start = new Date(msgs[0].timestamp);
     if (isNaN(start.getTime())) return null;
-    console.log('[诊断-相遇日期] _annGetMeetData 没有拿到手动编辑的日期，回退用了"聊天记录第一条消息"的时间：', start, '  此时_annMeetOverride=', _annMeetOverride);
     // ISO date 字符串（yyyy-mm-dd）方便 date input 用
     var iso = start.getFullYear() + '-'
         + String(start.getMonth()+1).padStart(2, '0') + '-'
@@ -731,7 +724,6 @@ window._annInit = async function() {
             return;
         }
         window._updateDaysCounter = function() { _annUpdateHeaderDays(); };
-        console.log('[诊断-相遇日期] _updateDaysCounter 接管完成');
     }
     hookUpdateCounter();
 
@@ -759,30 +751,34 @@ window._annInit = async function() {
             return;
         }
         var orig = window.openCoupleSpace;
-        window.openCoupleSpace = function() {
+        var wrapped = function() {
             orig.apply(this, arguments);
-            console.log('[诊断-相遇日期] openCoupleSpace 被调用，开始尝试刷新');
             function tryUpdate(attempt) {
                 attempt = attempt || 0;
+                // 关键：SESSION_ID 没真正就绪之前，读到的很可能是错误/默认的存储位置，
+                // 永远读不到用户真实保存过的日期，所以要等它就绪了才真正去读
                 if (typeof SESSION_ID === 'undefined' || !SESSION_ID) {
-                    console.log('[诊断-相遇日期] SESSION_ID 还没就绪，第' + attempt + '次等待中');
                     if (attempt < 20) setTimeout(function () { tryUpdate(attempt + 1); }, 300);
                     return;
                 }
                 var loads = [];
                 if (typeof window._annLoadPinned === 'function') loads.push(window._annLoadPinned());
                 if (typeof window._annLoadMeetOverride === 'function') loads.push(window._annLoadMeetOverride());
-                Promise.all(loads).then(function() {
-                    _annUpdateHeaderDays();
-                    var p = window._annGetPinned && window._annGetPinned();
-                    console.log('[诊断-相遇日期] 刷新完成，SESSION_ID=' + SESSION_ID + '  当前_annGetPinned()结果=', p, '  _annMeetOverride=', _annMeetOverride);
-                });
+                Promise.all(loads).then(function() { _annUpdateHeaderDays(); });
             }
             tryUpdate();
             setTimeout(function () { tryUpdate(); }, 500);
             setTimeout(function () { tryUpdate(); }, 1200);
             setTimeout(function () { tryUpdate(); }, 2000);
         };
+        // 关键修复：moments.js 里 openCoupleSpace 和 openMomentsModal 一开始是同一个函数的两个名字
+        // （window.openCoupleSpace = window.openMomentsModal = function(){...}），
+        // 但顶部"情侣空间"按钮实际点击时调用的是 openMomentsModal 这个名字（经由 openMomentsWithTransition 转发）。
+        // 之前这里只重新指向了 openCoupleSpace 这一个名字，openMomentsModal 还留在原地没同步更新，
+        // 导致按钮点击时走的其实一直是没被这里"接管"过的老版本——这就是之前两次修复都不生效的真正原因。
+        // 这次把两个名字都指向新版本，不管点击时用的是哪个名字，都会走到这个正确的新版本。
+        window.openCoupleSpace = wrapped;
+        window.openMomentsModal = wrapped;
     }
     hookOpen();
 })();

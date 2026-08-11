@@ -12163,7 +12163,15 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .al-album-card:active { transform: scale(0.97); }
 .al-new-card { border: 1.5px dashed color-mix(in srgb, var(--accent-color) 40%, transparent); background: rgba(var(--accent-color-rgb),.03); }
-.al-cover { width: 100%; aspect-ratio: 1; overflow: hidden; }
+.al-cover {
+    width: 100%; overflow: hidden; position: relative;
+}
+.al-cover::before {
+    content: ''; display: block; padding-top: 100%; /* 用百分比padding撑高度，比 aspect-ratio 更稳，避免跟网格自动算行高时产生冲突导致行与行重叠 */
+}
+.al-cover > img, .al-cover > .al-cover-empty {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+}
 .al-new-cover {
     width: 100%; aspect-ratio: 1; display: flex;
     align-items: center; justify-content: center;

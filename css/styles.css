@@ -12149,6 +12149,7 @@ body #user-sticker-picker .empty-sticker-tip {
 /* ── 相册列表 ── */
 .al-albums-grid {
     display: grid; grid-template-columns: 1fr 1fr;
+    align-content: start; /* 不要把容器多余的空白高度摊派给每一行，不然相册数量少的时候卡片会被拉高，数量一多又"压缩"回正常大小，显得忽大忽小 */
     gap: 12px; padding: 14px;
 }
 .al-album-card {

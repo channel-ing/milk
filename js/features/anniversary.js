@@ -753,20 +753,25 @@ window._annInit = async function() {
         var orig = window.openCoupleSpace;
         window.openCoupleSpace = function() {
             orig.apply(this, arguments);
-            function tryUpdate() {
+            function tryUpdate(attempt) {
+                attempt = attempt || 0;
+                // 关键：SESSION_ID 没真正就绪之前，读到的很可能是错误/默认的存储位置，
+                // 永远读不到用户真实保存过的日期——之前按"固定等几百毫秒"来猜时间的写法不够稳，
+                // 这次改成跟 SESSION_ID 就绪状态挂钩，就绪了才真正去读
+                if (typeof SESSION_ID === 'undefined' || !SESSION_ID) {
+                    if (attempt < 20) setTimeout(function () { tryUpdate(attempt + 1); }, 300);
+                    return;
+                }
                 var loads = [];
                 if (typeof window._annLoadPinned === 'function') loads.push(window._annLoadPinned());
                 if (typeof window._annLoadMeetOverride === 'function') loads.push(window._annLoadMeetOverride());
                 Promise.all(loads).then(function() { _annUpdateHeaderDays(); });
             }
-            // 固定在这几个时间点各重新读取+刷新一次，不管前一次算出来的数字看起来对不对都继续刷——
-            // 之前的写法是"算出来一个数字就不再重试"，但读取"是否手动编辑过日期"这份数据比较慢，
-            // 经常会在它还没读完时就先用默认日期算出一个（错误但非空）的数字，导致重试提前停在这个错误结果上。
-            // 现在固定刷新这几次，保证不管数据加载快慢，最终都会用上正确数据重新算一遍。
-            setTimeout(tryUpdate, 50);
-            setTimeout(tryUpdate, 300);
-            setTimeout(tryUpdate, 800);
-            setTimeout(tryUpdate, 1500);
+            tryUpdate();
+            // 再多补几次刷新，覆盖各种边界情况（比如 SESSION_ID 就绪了但 localforage 读取本身还没完成）
+            setTimeout(function () { tryUpdate(); }, 500);
+            setTimeout(function () { tryUpdate(); }, 1200);
+            setTimeout(function () { tryUpdate(); }, 2000);
         };
     }
     hookOpen();

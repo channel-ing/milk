@@ -200,6 +200,7 @@
         _audio.preload = 'auto';
         _audio.addEventListener('play',  function(){ _setUI(true);  });
         _audio.addEventListener('pause', function(){ _setUI(false); });
+        window._debugKeepaliveAudio = _audio;
         return _audio;
     }
 

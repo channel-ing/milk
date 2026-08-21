@@ -106,7 +106,10 @@
             avgDays = Math.round(total / completed.length) + '天';
         }
 
-        // 预测下次
+        // 预测下次 —— 始终给区间，不再有"波动小就给单一日期"的分支：
+        // 经期本身就有生理波动，给一个看似精确的单一日期反而是假精确。
+        // 区间宽度跟着历史波动走：波动越大区间越宽；波动很小时至少给±2天，
+        // 避免看起来像没算清楚。
         var nextDate = '暂无预测';
         var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
         if (sorted.length >= 2) {
@@ -118,15 +121,16 @@
             var lastStart = sorted[sorted.length - 1].startDate;
             var predStart = _addD(lastStart, avgCycle);
 
-            if (gaps.length >= 2 && (Math.max.apply(null, gaps) - Math.min.apply(null, gaps)) > 7) {
-                var minD = _parse(_addD(lastStart, Math.min.apply(null, gaps)));
-                var maxD = _parse(_addD(lastStart, Math.max.apply(null, gaps)));
-                nextDate = (minD.getMonth()+1) + '月' + minD.getDate() + '日 ~ ' +
-                           (maxD.getMonth()+1) + '月' + maxD.getDate() + '日';
-            } else {
-                var pd = _parse(predStart);
-                nextDate = pd.getFullYear() + '年' + (pd.getMonth()+1) + '月' + pd.getDate() + '日';
+            var swing = 2;
+            if (gaps.length >= 2) {
+                var maxGap = Math.max.apply(null, gaps);
+                var minGap = Math.min.apply(null, gaps);
+                swing = Math.max(2, Math.round((maxGap - minGap) / 2));
             }
+            var lo = _parse(_addD(predStart, -swing));
+            var hi = _parse(_addD(predStart, swing));
+            nextDate = (lo.getMonth() + 1) + '月' + lo.getDate() + '日 ~ ' +
+                       (hi.getMonth() + 1) + '月' + hi.getDate() + '日';
         }
 
         return { avgDays: avgDays, nextDate: nextDate };
@@ -147,9 +151,19 @@
             ? Math.round(completed.reduce(function (s, p) { return s + _diff(p.startDate, p.endDate) + 1; }, 0) / completed.length)
             : 5;
 
-        var predStart = _addD(sorted[sorted.length - 1].startDate, avgCycle);
+        var swing = 2;
+        if (gaps.length >= 2) {
+            var maxGap2 = Math.max.apply(null, gaps);
+            var minGap2 = Math.min.apply(null, gaps);
+            swing = Math.max(2, Math.round((maxGap2 - minGap2) / 2));
+        }
+
+        // 日历上高亮的"预测"范围，跟统计卡片显示的区间保持一致宽度
+        var predStart   = _addD(sorted[sorted.length - 1].startDate, avgCycle);
+        var rangeStart  = _addD(predStart, -swing);
+        var totalSpan   = avgDur + swing * 2;
         var dates = [];
-        for (var d = 0; d < avgDur; d++) dates.push(_addD(predStart, d));
+        for (var d = 0; d < totalSpan; d++) dates.push(_addD(rangeStart, d));
         return dates;
     }
 
@@ -168,7 +182,7 @@
     // 阈值定为10天：正常经期很少超过7天，10天已经留足余量；
     // 同时明显小于两次不同经期之间的间隔（哪怕周期很不规律，通常也不会短于10天以内），
     // 所以不容易把两次完全不同的经期误判成一条。
-    var MERGE_GAP_LIMIT = 10;
+    var MERGE_GAP_LIMIT = 5;
     function _reconcilePeriods() {
         _data.periods.sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
         for (var i = 0; i < _data.periods.length - 1; i++) {

@@ -43,7 +43,15 @@
     justify-content: flex-end;
 }
 
-/* 长按补录提示小字（常驻，不是一次性引导） */
+/* 只读日详情弹窗：缺省状态 */
+.pd-day-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 24px 0 12px;
+    color: var(--text-secondary);
+}
+.pd-day-empty i { font-size: 26px; opacity: 0.3; }
+.pd-day-empty div { font-size: 13px; opacity: 0.6; }
+
 .pd-longpress-hint {
     display: flex;
     align-items: center;

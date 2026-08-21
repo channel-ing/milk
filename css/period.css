@@ -43,6 +43,18 @@
     justify-content: flex-end;
 }
 
+/* 只读日详情弹窗：右上角❌关闭 */
+.pd-day-modal-content { position: relative; }
+.pd-day-close-x {
+    position: absolute; top: 14px; right: 14px;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: rgba(var(--accent-color-rgb), 0.08);
+    color: var(--text-secondary); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pd-day-close-x:active { background: rgba(var(--accent-color-rgb), 0.18); }
+
 /* 只读日详情弹窗：缺省状态 */
 .pd-day-empty {
     display: flex; flex-direction: column; align-items: center; gap: 8px;

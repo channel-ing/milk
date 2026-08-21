@@ -10,6 +10,16 @@
     var FLOW_LABELS      = ['', '极少', '少', '正常', '多', '极多'];
     var WEEKDAYS         = ['日', '一', '二', '三', '四', '五', '六'];
 
+    // 预测经期前一天的提醒文案——固定几条，随机挑一条，梦角口吻
+    var PREDICT_REMINDER_LINES = [
+        '算了下时间，你这两天例假应该要来了，记得多喝点热水呀',
+        '日历上看你这两天可能要来例假了，红糖姜茶记得先备好哦',
+        '提前跟你说一声，这几天大概是你的经期，照顾好自己，别太劳累',
+        '你的经期这两天应该要到了，不舒服记得告诉我，我会一直陪着你',
+        '估计这两天要来例假了，记得少吃点冷的东西',
+        '算了一下，你这几天例假快到了，出门记得带好需要的东西'
+    ];
+
     // ── 内存状态 ──────────────────────────────────────
     // _data 结构：
     // {
@@ -117,6 +127,22 @@
         return Math.min(5, Math.max(2, mad));
     }
 
+    // 预测区间——起止日期字符串，只算一次，统计卡片显示和"提前一天提醒"功能共用，
+    // 避免两处分别算一遍导致以后改公式的时候容易漏改其中一处
+    function _getPredictionWindow() {
+        var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
+        if (sorted.length < 2) return null;
+        var gaps = [];
+        for (var i = 1; i < sorted.length; i++) {
+            gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
+        }
+        var avgCycle  = _median(gaps);
+        var lastStart = sorted[sorted.length - 1].startDate;
+        var predStart = _addD(lastStart, avgCycle);
+        var swing     = _calcSwing(gaps);
+        return { lo: _addD(predStart, -swing), hi: _addD(predStart, swing) };
+    }
+
     // ── 统计 ──────────────────────────────────────────
     function _calcStats() {
         var completed = _data.periods.filter(function (p) { return p.endDate; });
@@ -133,19 +159,10 @@
         // 区间宽度跟着历史波动走：波动越大区间越宽；波动很小时至少给±2天，
         // 避免看起来像没算清楚。
         var nextDate = '暂无预测';
-        var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
-        if (sorted.length >= 2) {
-            var gaps = [];
-            for (var i = 1; i < sorted.length; i++) {
-                gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
-            }
-            var avgCycle = _median(gaps);
-            var lastStart = sorted[sorted.length - 1].startDate;
-            var predStart = _addD(lastStart, avgCycle);
-
-            var swing = _calcSwing(gaps);
-            var lo = _parse(_addD(predStart, -swing));
-            var hi = _parse(_addD(predStart, swing));
+        var win = _getPredictionWindow();
+        if (win) {
+            var lo = _parse(win.lo);
+            var hi = _parse(win.hi);
             nextDate = (lo.getMonth() + 1) + '月' + lo.getDate() + '日 ~ ' +
                        (hi.getMonth() + 1) + '月' + hi.getDate() + '日';
         }
@@ -171,16 +188,14 @@
         // 2）下一次经期的预测窗口——高亮范围跟统计卡片里显示的区间完全对齐，
         //    不再额外叠加经期时长（之前这里多加了一层，导致日历高亮的范围比
         //    文字描述的区间宽出一大截，看起来莫名其妙）
-        var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
-        if (sorted.length >= 2) {
-            var gaps = [];
-            for (var i = 1; i < sorted.length; i++) {
-                gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
+        var win = _getPredictionWindow();
+        if (win) {
+            var loD = _parse(win.lo), hiD = _parse(win.hi);
+            var cursor = loD;
+            while (cursor <= hiD) {
+                dates[_toStr(cursor)] = true;
+                cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
             }
-            var avgCycle = _median(gaps);
-            var swing = _calcSwing(gaps);
-            var predStart = _addD(sorted[sorted.length - 1].startDate, avgCycle);
-            for (var s = -swing; s <= swing; s++) dates[_addD(predStart, s)] = true;
         }
 
         return Object.keys(dates);
@@ -222,6 +237,7 @@
         var p = _getPeriodOf(dateStr);
         if (p) {
             if (p.startDate === dateStr) {
+                _cancelPendingNotifFor(p.id);
                 _data.periods = _data.periods.filter(function (x) { return x.id !== p.id; });
             } else {
                 p.endDate = _addD(dateStr, -1);
@@ -237,10 +253,21 @@
     function _scheduleNotif() {
         var active = _activePeriod();
         if (!active) return;
-        if (_data.notifyPeriodId === active.id) return;  // 已安排
-        _data.notifyAt       = Date.now() + (20 + Math.floor(Math.random() * 11)) * 60000;
+        if (_data.notifyPeriodId === active.id) return;  // 已安排过/已经用掉这次机会（含手动取消的情况）
+        var minMin = 8 * 60, maxMin = 12 * 60;  // 8~12小时
+        _data.notifyAt       = Date.now() + (minMin + Math.floor(Math.random() * (maxMin - minMin + 1))) * 60000;
         _data.notifyPeriodId = active.id;
         _save();
+    }
+
+    // 用户手动结束/撤销某条记录时调用——如果这条记录正好排着一次还没发出的留言，
+    // 取消掉这次定时（不让它到点还发）。注意 notifyPeriodId 本身不清掉：
+    // 这样万一用户之后又把这次经期重新打开（合并回同一条记录，id不变），
+    // 也不会因为"重新安排"而意外弹出一条新留言——同一次经期，机会只有一次。
+    function _cancelPendingNotifFor(periodId) {
+        if (_data.notifyPeriodId === periodId && _data.notifyAt) {
+            _data.notifyAt = null;
+        }
     }
 
     function _checkNotif() {
@@ -293,6 +320,51 @@
                     'style="flex:1;padding:8px 0;border-radius:12px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">稍后</button>' +
                 '<button onclick="window._pdGoToPeriodTab();document.getElementById(\'pd-notif-popup\').remove();" ' +
                     'style="flex:2;padding:8px 0;border-radius:12px;border:none;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">立即查看 ✦</button>' +
+            '</div>';
+        document.body.appendChild(popup);
+        setTimeout(function () { if (popup.parentNode) popup.remove(); }, 8000);
+    }
+
+    // ── 预测经期前一天提醒 ────────────────────────────
+    function _checkPredictReminder() {
+        var win = _getPredictionWindow();
+        if (!win) return;
+        if (_activePeriod()) return;  // 正在经期中就不用提醒"快到了"，没有意义
+        var triggerDay = _addD(win.lo, -1);  // 预测区间最早那天的前一天
+        if (_today() !== triggerDay) return;
+        if (_data.predictReminderFor === win.lo) return;  // 同一个预测区间只提醒一次
+
+        var line = PREDICT_REMINDER_LINES[Math.floor(Math.random() * PREDICT_REMINDER_LINES.length)];
+        _data.predictReminderFor = win.lo;
+        _save();
+        _showPredictReminderPopup(line);
+    }
+
+    function _showPredictReminderPopup(text) {
+        var existing = document.getElementById('pd-predict-notif-popup');
+        if (existing) existing.remove();
+
+        var pname = _partnerName();
+        var popup = document.createElement('div');
+        popup.id = 'pd-predict-notif-popup';
+        popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+            'background:var(--secondary-bg);border:1px solid var(--border-color);' +
+            'border-radius:20px;padding:18px 20px;z-index:9000;max-width:320px;width:88%;' +
+            'box-shadow:0 8px 32px rgba(0,0,0,0.18);display:flex;flex-direction:column;gap:12px;' +
+            'animation:_mSlideUp 0.4s cubic-bezier(0.22,1,0.36,1);';
+        popup.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+                '<span style="font-size:26px;">🗓️</span>' +
+                '<div>' +
+                    '<div style="font-size:14px;font-weight:700;color:var(--text-primary);">' + pname + ' 提醒你</div>' +
+                    '<div style="font-size:12px;color:var(--text-primary);margin-top:4px;line-height:1.5;">' + text + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+                '<button onclick="document.getElementById(\'pd-predict-notif-popup\').remove();" ' +
+                    'style="flex:1;padding:8px 0;border-radius:12px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">知道了</button>' +
+                '<button onclick="window._pdGoToPeriodTab();document.getElementById(\'pd-predict-notif-popup\').remove();" ' +
+                    'style="flex:2;padding:8px 0;border-radius:12px;border:none;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">去看看 ✦</button>' +
             '</div>';
         document.body.appendChild(popup);
         setTimeout(function () { if (popup.parentNode) popup.remove(); }, 8000);
@@ -575,6 +647,7 @@
             // 这里不区分是哪一种，统一找到"覆盖今天的那条记录"来处理。
             var p = _getPeriodOf(today);
             if (p) {
+                _cancelPendingNotifFor(p.id);  // 关闭这条记录时，顺手取消掉可能还没发出的留言
                 var newEnd = _addD(today, -1);
                 if (newEnd < p.startDate) {
                     // 缩回去的结束日期比开始日期还早，说明这条记录只覆盖今天一天，直接整条删掉
@@ -665,7 +738,16 @@
         };
     };
 
-    // 每分钟检查一次通知
-    setInterval(function () { if (_loaded) _checkNotif(); }, 60000);
+    // 每分钟检查一次通知（梦角留言 + 预测经期前一天提醒）
+    setInterval(function () {
+        if (_loaded) { _checkNotif(); _checkPredictReminder(); }
+    }, 60000);
+
+    // 脚本一加载（也就是打开网站）就先悄悄读一次数据，不用等用户点开经期记录弹窗，
+    // 这样"预测提醒"才能在用户完全没打开过经期功能的情况下也正常触发
+    _load().then(function () {
+        _checkNotif();
+        _checkPredictReminder();
+    });
 
 })();

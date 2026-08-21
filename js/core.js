@@ -450,7 +450,8 @@ const loadData = async () => {
             localforage.getItem(getStorageKey('myStickerLibrary')),
             localforage.getItem(getStorageKey('customReplyGroups')),
             localforage.getItem(getStorageKey('customPokeGroups')),
-            localforage.getItem(getStorageKey('customStatusGroups'))
+            localforage.getItem(getStorageKey('customStatusGroups')),
+            localforage.getItem(getStorageKey('customPeriodCare'))
         ]);
         const getVal = (index) => results[index].status === 'fulfilled' ? results[index].value : null;
 
@@ -475,6 +476,7 @@ const loadData = async () => {
         const savedReplyGroups = getVal(18);
         const savedPokeGroups = getVal(19);
         const savedStatusGroups = getVal(20);
+        const savedPeriodCare = getVal(21);
 
         if (savedPartnerPersonas) partnerPersonas = savedPartnerPersonas;
 
@@ -503,6 +505,8 @@ const loadData = async () => {
         
         if (savedIntros) customIntros = savedIntros;
         else customIntros = CONSTANTS.WELCOME_ANIMATIONS.map(a => `${a.line1}|${a.line2}`);
+
+        customPeriodCare = savedPeriodCare || [];  // 没有内置预设，用户没配置就是空数组
 
         if (savedMessages && Array.isArray(savedMessages)) {
             messages = savedMessages.map(m => ({
@@ -642,6 +646,7 @@ const LIBRARY_CONFIG = {
         tabs: [
             { id: 'pokes', name: '拍一拍', mode: 'list' },
             { id: 'statuses', name: '对方状态', mode: 'list' },
+            { id: 'period', name: '经期', mode: 'list' },
             { id: 'mottos', name: '顶部格言', mode: 'list' },
             { id: 'intros', name: '开场动画', mode: 'list' }
         ]
@@ -761,6 +766,7 @@ const saveData = async () => {
         { key: 'customStatuses',         val: () => localforage.setItem(getStorageKey('customStatuses'), customStatuses) },
         { key: 'customMottos',           val: () => localforage.setItem(getStorageKey('customMottos'), customMottos) },
         { key: 'customIntros',           val: () => localforage.setItem(getStorageKey('customIntros'), customIntros) },
+        { key: 'customPeriodCare',       val: () => localforage.setItem(getStorageKey('customPeriodCare'), customPeriodCare) },
         { key: 'stickerLibrary',         val: () => localforage.setItem(getStorageKey('stickerLibrary'), stickerLibrary) },
         { key: 'myStickerLibrary',       val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
         { key: 'customThemes',           val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
@@ -2437,6 +2443,7 @@ function showModal(modalElement, focusElement = null) {
                         if (customStatuses && customStatuses.length > 0) exportObj.customStatuses = customStatuses;
                         if (customMottos && customMottos.length > 0) exportObj.customMottos = customMottos;
                         if (customIntros && customIntros.length > 0) exportObj.customIntros = customIntros;
+                        if (customPeriodCare && customPeriodCare.length > 0) exportObj.customPeriodCare = customPeriodCare;
                         if (window.customReplyGroups && window.customReplyGroups.length > 0) exportObj.customReplyGroups = window.customReplyGroups;
                         if (window.customPokeGroups && window.customPokeGroups.length > 0) exportObj.customPokeGroups = window.customPokeGroups;
                         if (window.customStatusGroups && window.customStatusGroups.length > 0) exportObj.customStatusGroups = window.customStatusGroups;
@@ -2670,6 +2677,7 @@ function showModal(modalElement, focusElement = null) {
                         if (doReplies  && importedData.customPokes && Array.isArray(importedData.customPokes)) customPokes = importedData.customPokes;
                         if (doReplies  && importedData.customStatuses && Array.isArray(importedData.customStatuses)) customStatuses = importedData.customStatuses;
                         if (doReplies  && importedData.customMottos && Array.isArray(importedData.customMottos)) customMottos = importedData.customMottos;
+                        if (doReplies  && importedData.customPeriodCare && Array.isArray(importedData.customPeriodCare)) customPeriodCare = importedData.customPeriodCare;
                         if (doReplies  && importedData.customIntros && Array.isArray(importedData.customIntros)) customIntros = importedData.customIntros;
                         if (doReplies  && importedData.customReplyGroups) window.customReplyGroups = importedData.customReplyGroups;
                         if (doReplies  && importedData.customPokeGroups) window.customPokeGroups = importedData.customPokeGroups;

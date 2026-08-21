@@ -240,9 +240,10 @@
     }
 
     window._pdGoToPeriodTab = function () {
-        if (typeof window.csSwitchTab === 'function') {
-            if (typeof window.openCoupleSpace === 'function') window.openCoupleSpace();
-            window.csSwitchTab('period');
+        var modal = document.getElementById('period-modal');
+        if (modal && typeof window.showModal === 'function') {
+            window.showModal(modal);
+            window._pdInit();
         }
     };
 
@@ -426,7 +427,7 @@
         var sheet   = document.getElementById('pd-day-sheet');
         var overlay = document.getElementById('cs-overlay');
         if (sheet)   sheet.classList.add('cs-sheet-open');
-        if (overlay) overlay.style.display = 'block';
+        if (overlay) overlay.classList.add('cs-overlay-on');
     }
 
     // ── 症状渲染 ──────────────────────────────────────
@@ -612,7 +613,7 @@
         var sheet   = document.getElementById('pd-day-sheet');
         var overlay = document.getElementById('cs-overlay');
         if (sheet)   sheet.classList.remove('cs-sheet-open');
-        if (overlay) overlay.style.display = 'none';
+        if (overlay) overlay.classList.remove('cs-overlay-on');
     };
 
     // ── 入口 ──────────────────────────────────────────

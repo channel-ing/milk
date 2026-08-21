@@ -52,7 +52,7 @@
         'envelopeData', 'pending_envelope',
         // 回复 / 氛围
         'customReplies', 'customPokes', 'customStatuses', 'customMottos',
-        'customIntros', 'customEmojis',
+        'customIntros', 'customEmojis', 'customPeriodCare',
         'customReplyGroups', 'customPokeGroups', 'customStatusGroups',
         // 纪念日
         'anniversaries', 'annCoverBg_',

@@ -285,7 +285,7 @@
         if (!replies.length) return;
 
         var shuffled = replies.slice().sort(function () { return Math.random() - 0.5; });
-        var lines    = shuffled.slice(0, 2 + Math.floor(Math.random() * 2));
+        var lines    = shuffled.slice(0, 1);
 
         _data.partnerMsg = { periodId: _data.notifyPeriodId, lines: lines };
         _data.notifyAt   = null;
@@ -300,6 +300,10 @@
         if (existing) existing.remove();
 
         var pname = _partnerName();
+        var realImg = document.querySelector('#partner-avatar img');
+        var avatarHtml = (realImg && realImg.src)
+            ? '<img src="' + realImg.src + '" style="width:100%;height:100%;object-fit:cover;">'
+            : '<i class="fas fa-user" style="font-size:18px;color:var(--text-secondary);"></i>';
         var popup = document.createElement('div');
         popup.id = 'pd-notif-popup';
         popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
@@ -309,7 +313,8 @@
             'animation:_mSlideUp 0.4s cubic-bezier(0.22,1,0.36,1);';
         popup.innerHTML =
             '<div style="display:flex;align-items:center;gap:10px;">' +
-                '<span style="font-size:26px;">🌸</span>' +
+                '<div style="width:36px;height:36px;border-radius:50%;background:rgba(var(--accent-color-rgb),0.12);' +
+                    'display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">' + avatarHtml + '</div>' +
                 '<div>' +
                     '<div style="font-size:14px;font-weight:700;color:var(--text-primary);">' + pname + ' 有话想说</div>' +
                     '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;opacity:0.8;">去经期记录里看看</div>' +

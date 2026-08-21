@@ -353,7 +353,6 @@
         var overlay = document.createElement('div');
         overlay.id = 'pd-predict-notif-overlay';
         overlay.className = 'modal';
-        overlay.style.display = 'flex';
         overlay.style.zIndex = '10000';  // 比开机欢迎动画(9999)高，双保险，避免延时不够时还是被盖住
         overlay.innerHTML =
             '<div class="modal-content" style="max-width:320px;padding:20px;">' +
@@ -371,6 +370,14 @@
                 '</div>' +
             '</div>';
         document.body.appendChild(overlay);
+        // 用公共的 showModal()，不然 .modal-content 那个入场动画播完之后，
+        // 没有代码把它钉在"显示"状态，会自动弹回动画开始前的透明状态——
+        // app 里所有其他弹窗都是靠这个函数才能在动画播完后正常留在屏幕上。
+        if (typeof window.showModal === 'function') {
+            window.showModal(overlay);
+        } else {
+            overlay.style.display = 'flex';
+        }
     }
 
     window._pdGoToPeriodTab = function () {

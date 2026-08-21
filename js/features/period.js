@@ -302,8 +302,21 @@
     function _updateStats() {
         var s = _calcStats();
         var nEl = document.getElementById('pd-next-date');
+        var lEl = document.getElementById('pd-next-date-label');
         var aEl = document.getElementById('pd-avg-days');
-        if (nEl) nEl.textContent = s.nextDate;
+
+        // 正在经期时，这张卡片专门显示"当前状态"，不显示"下一次经期"的预测——
+        // 不然"下次预测"这个标签配上一个日期区间，容易让人分不清这个日期到底是
+        // "这次什么时候结束"还是"下一次什么时候开始"。等这次经期真正结束了，
+        // 才切回显示下一次的预测区间。
+        var active = _activePeriod();
+        if (active) {
+            if (lEl) lEl.textContent = '当前状态';
+            if (nEl) nEl.textContent = '经期中 · 第' + _getDayNum(_today()) + '天';
+        } else {
+            if (lEl) lEl.textContent = '下次预测';
+            if (nEl) nEl.textContent = s.nextDate;
+        }
         if (aEl) aEl.textContent = s.avgDays;
     }
 

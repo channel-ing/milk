@@ -100,7 +100,7 @@
         if (gaps.length < 2) return 2;
         var maxGap = Math.max.apply(null, gaps);
         var minGap = Math.min.apply(null, gaps);
-        return Math.max(2, Math.round((maxGap - minGap) / 2));
+        return Math.min(5, Math.max(2, Math.round((maxGap - minGap) / 2)));  // 上限5天，避免历史数据不稳定时区间宽得离谱
     }
 
     // ── 统计 ──────────────────────────────────────────
@@ -199,22 +199,6 @@
                 i--;  // 合并后原地再检查一次，可能还能继续往后并
             }
         }
-    }
-
-    function _endPeriod(dateStr) {
-        var active = _activePeriod();
-        if (!active || dateStr < active.startDate) return;
-        // 开关按钮的语义是"从今天起不算经期了"，不是"今天仍算最后一天"——
-        // 所以结束日期设成昨天，而不是今天，点一下就该立刻生效，不用等到明天。
-        // 长按修改历史记录走的是另一套（_toggleHistory），精确到点哪天就是哪天，不受这里影响。
-        var endDate = _addD(dateStr, -1);
-        if (endDate < active.startDate) {
-            // 结束日期比开始日期还早，说明是今天开始今天就想撤销——直接删掉整条记录
-            _data.periods = _data.periods.filter(function (x) { return x.id !== active.id; });
-        } else {
-            active.endDate = endDate;
-        }
-        _save();
     }
 
     function _toggleHistory(dateStr) {
@@ -563,7 +547,21 @@
     window._pdToggleToday = function () {
         var today = _today();
         if (_isInPeriod(today)) {
-            _endPeriod(today);
+            // 覆盖"今天"的这条记录，可能是点"标记经期"建出来的"进行中"记录（_activePeriod能找到），
+            // 也可能是长按补录出来的、一开始就有明确结束日期的记录（_activePeriod找不到，
+            // 之前只处理前一种，导致长按补录出来的记录点"关闭"完全没反应）。
+            // 这里不区分是哪一种，统一找到"覆盖今天的那条记录"来处理。
+            var p = _getPeriodOf(today);
+            if (p) {
+                var newEnd = _addD(today, -1);
+                if (newEnd < p.startDate) {
+                    // 缩回去的结束日期比开始日期还早，说明这条记录只覆盖今天一天，直接整条删掉
+                    _data.periods = _data.periods.filter(function (x) { return x.id !== p.id; });
+                } else {
+                    p.endDate = newEnd;  // 今天不算了，缩到昨天为止
+                }
+                _save();
+            }
         } else {
             _startPeriod(today, true);
         }

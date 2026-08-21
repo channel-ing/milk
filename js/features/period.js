@@ -192,6 +192,9 @@
         var active = _activePeriod();
         if (active) active.endDate = _addD(dateStr, -1);  // 自动结束上次
         _data.periods.push({ id: 'pd_' + Date.now(), startDate: dateStr, endDate: null });
+        // 如果这次新开的记录，紧挨着最近一条刚结束的记录（比如手滑关闭又重新打开），
+        // 自动接回去合并成一条，避免"经期第几天"从1重新算起
+        _reconcilePeriods();
         _save();
         if (sendNotif) _scheduleNotif();
     }

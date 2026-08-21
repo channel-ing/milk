@@ -37,7 +37,8 @@
         let customPokeGroups = [];
         let customStatusGroups = [];
         let customMottos = [];
-        let customIntros = []; 
+        let customIntros = [];
+        let customPeriodCare = [];  // 经期关心话术——氛围感配置里的新分类，不分组
         let currentMajorTab = 'reply'; 
         let currentSubTab = 'custom';  
         let currentReplyTab = 'custom';

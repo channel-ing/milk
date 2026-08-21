@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/companion.css">
     <link rel="stylesheet" href="css/cinema.css">
+    <link rel="stylesheet" href="css/period.css">
 
     <style id="css-live-preview-style"></style>
     <style>
@@ -2339,6 +2340,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <div class="settings-item" id="music-player-toggle">
                         <i class="fas fa-music"></i><span>悬浮音乐播放器</span>
                     </div>
+                    <div class="settings-item" id="period-function">
+                        <i class="fas fa-tint"></i><span>经期</span>
+                    </div>
                     <div class="settings-item" id="envelope-function" style="display:none;">
                         <i class="fas fa-envelope-open-text"></i><span>信箱</span>
                     </div>
@@ -2355,6 +2359,133 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     </div>
 
 
+
+    <!-- ══════════════════════════════════════════════
+         经期记录 Modal（高级功能）
+    ══════════════════════════════════════════════ -->
+    <div class="modal" id="period-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <i class="fas fa-tint"></i><span>经期记录</span>
+            </div>
+
+            <div id="period-body">
+
+                <!-- 统计卡片行 -->
+                <div class="pd-stats-row">
+                    <div class="pd-stat-card">
+                        <div class="pd-stat-label">下次预测</div>
+                        <div class="pd-stat-value" id="pd-next-date">暂无预测</div>
+                    </div>
+                    <div class="pd-stat-card">
+                        <div class="pd-stat-label">平均经期天数</div>
+                        <div class="pd-stat-value" id="pd-avg-days">--</div>
+                    </div>
+                </div>
+                <div class="pd-longpress-hint"><i class="fas fa-info-circle"></i>预测仅供参考，实际可能因身体状态波动</div>
+
+                <!-- 日历卡片 -->
+                <div class="pd-cal-card">
+                    <div class="pd-cal-header">
+                        <button class="pd-cal-nav" id="pd-prev-month"><i class="fas fa-chevron-left"></i></button>
+                        <div class="pd-cal-month-label" id="pd-month-label">2025年1月</div>
+                        <button class="pd-cal-nav" id="pd-next-month"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="pd-cal-weekdays">
+                        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                    </div>
+                    <div class="pd-cal-grid" id="pd-cal-grid"></div>
+                    <div class="pd-cal-footer">
+                        <div class="pd-cal-legend">
+                            <span><span class="pd-legend-dot pd-dot-period"></span> 经期</span>
+                            <span><span class="pd-legend-dot pd-dot-predict"></span> 预测</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="pd-longpress-hint"><i class="fas fa-hand-point-up"></i>长按日历格子可标记/补录经期日</div>
+
+                <!-- 今日状态卡片 -->
+                <div class="pd-status-card" id="pd-status-card">
+                    <div class="pd-status-hd">
+                        <span class="pd-status-title">今日记录</span>
+                        <span class="pd-status-date" id="pd-status-date"></span>
+                    </div>
+                    <span class="pd-status-day-tag" id="pd-status-day-tag" style="display:none;"></span>
+
+                    <div class="pd-toggle-wrap" onclick="window._pdToggleToday && window._pdToggleToday()" style="margin-bottom:14px;">
+                        <div class="pd-toggle-track" id="pd-toggle-btn"><div class="pd-toggle-thumb"></div></div>
+                        <span class="pd-toggle-label" id="pd-toggle-label">标记经期</span>
+                    </div>
+
+                    <div class="pd-section">
+                        <div class="pd-section-label">出血量</div>
+                        <div class="pd-flow-track">
+                            <button class="pd-flow-btn" data-val="1" onclick="window._pdSetFlow && window._pdSetFlow(1)"><span class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.25)"></span>极少</button>
+                            <button class="pd-flow-btn" data-val="2" onclick="window._pdSetFlow && window._pdSetFlow(2)"><span class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.4)"></span>少</button>
+                            <button class="pd-flow-btn" data-val="3" onclick="window._pdSetFlow && window._pdSetFlow(3)"><span class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.6)"></span>正常</button>
+                            <button class="pd-flow-btn" data-val="4" onclick="window._pdSetFlow && window._pdSetFlow(4)"><span class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),0.8)"></span>多</button>
+                            <button class="pd-flow-btn" data-val="5" onclick="window._pdSetFlow && window._pdSetFlow(5)"><span class="pd-flow-dot" style="background:rgba(var(--pd-flow-rgb),1)"></span>极多</button>
+                        </div>
+                    </div>
+
+                    <div class="pd-section">
+                        <div class="pd-section-label">症状</div>
+                        <div class="pd-symptoms-wrap" id="pd-symptoms-wrap"></div>
+                    </div>
+
+                    <button class="pd-save-btn" id="pd-save-btn" onclick="window._pdSaveRecord && window._pdSaveRecord()">保存记录</button>
+                    <div class="pd-saved-hint" id="pd-saved-hint"></div>
+                </div>
+
+                <!-- 梦角留言卡片 -->
+                <div class="pd-letter-card">
+                    <div class="pd-letter-hd">
+                        <div class="pd-partner-av" id="pd-partner-av">🌸</div>
+                        <span class="pd-letter-name" id="pd-letter-name">梦角</span>
+                    </div>
+                    <div class="pd-letter-empty" id="pd-letter-empty">还没有收到 <span id="pd-letter-pname">梦角</span> 的留言</div>
+                    <div class="pd-letter-lines" id="pd-letter-lines" style="display:none;"></div>
+                </div>
+
+                <!-- 历史记录入口 -->
+                <button class="pd-history-entry-btn" id="pd-history-open" onclick="window._pdOpenHistory && window._pdOpenHistory()">
+                    <i class="fas fa-history"></i> 查看历史记录
+                </button>
+
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="close-period" onclick="hideModal(document.getElementById('period-modal'))">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 经期历史全屏页（陪伴日记风格） -->
+    <div class="pd-history-page" id="pd-history-page">
+        <div class="pd-history-page-hd">
+            <button class="pd-hist-back" onclick="window._pdCloseHistory && window._pdCloseHistory()"><i class="fas fa-arrow-left"></i></button>
+            <div class="pd-history-page-title"><i class="fas fa-history"></i>经期历史</div>
+            <div style="width:32px;"></div>
+        </div>
+        <div class="pd-history-page-body" id="pd-history-body"></div>
+    </div>
+
+    <!-- 历史某天只读弹窗 -->
+    <div class="cs-sheet" id="pd-day-sheet">
+        <div class="cs-sheet-handle-bar"></div>
+        <div class="cs-sheet-header">
+            <span id="pd-day-sheet-title">1月1日</span>
+            <button onclick="window._pdCloseDaySheet && window._pdCloseDaySheet()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="pd-day-sheet-body">
+            <div class="pd-day-info-row">
+                <span class="pd-day-tag" id="pd-day-period-tag">经期第1天</span>
+                <span class="pd-day-readonly-label">仅供查看</span>
+            </div>
+            <div class="pd-day-flow-display" id="pd-day-flow-display">暂无记录</div>
+            <div class="pd-day-symptom-tags" id="pd-day-symptom-tags"></div>
+        </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════
          声音克隆 Modal
@@ -3344,6 +3475,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <script src="js/data.js"></script>
     <script src="js/onboarding.js"></script> 
     <script src="js/features/anniversary.js"></script>
+    <script src="js/features/period.js"></script>
     <script src="js/listeners.js"></script>
     <script src="js/listeners-step2.js"></script>
     <script src="js/listeners-voice.js"></script>

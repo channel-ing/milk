@@ -2456,19 +2456,26 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     </div>
 
     <!-- 历史某天只读弹窗 -->
-    <div class="cs-sheet" id="pd-day-sheet">
-        <div class="cs-sheet-handle-bar"></div>
-        <div class="cs-sheet-header">
-            <span id="pd-day-sheet-title">1月1日</span>
-            <button onclick="window._pdCloseDaySheet && window._pdCloseDaySheet()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="pd-day-sheet-body">
-            <div class="pd-day-info-row">
+    <div class="modal" id="pd-day-sheet">
+        <div class="modal-content" style="max-width:320px;padding:20px;">
+            <div class="modal-title" style="margin-bottom:14px;">
+                <i class="fas fa-calendar-day"></i><span id="pd-day-sheet-title">1月1日</span>
+            </div>
+            <div class="pd-day-info-row" id="pd-day-info-row">
                 <span class="pd-day-tag" id="pd-day-period-tag">经期第1天</span>
                 <span class="pd-day-readonly-label">仅供查看</span>
             </div>
-            <div class="pd-day-flow-display" id="pd-day-flow-display">暂无记录</div>
-            <div class="pd-day-symptom-tags" id="pd-day-symptom-tags"></div>
+            <div id="pd-day-content">
+                <div class="pd-day-flow-display" id="pd-day-flow-display">暂无记录</div>
+                <div class="pd-day-symptom-tags" id="pd-day-symptom-tags"></div>
+            </div>
+            <div class="pd-day-empty" id="pd-day-empty" style="display:none;">
+                <i class="fas fa-calendar-times"></i>
+                <div>这天没有记录</div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" onclick="window._pdCloseDaySheet && window._pdCloseDaySheet()">关闭</button>
+            </div>
         </div>
     </div>
 

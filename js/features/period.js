@@ -95,12 +95,26 @@
         return _data.periods.find(function (p) { return !p.endDate; }) || null;
     }
 
-    // 区间宽度：历史周期波动越大，区间越宽；波动很小时至少给±2天，避免看起来像没算清楚
+    // 中位数——比平均数更抗干扰：偶尔一次异常波动（生病、旅行导致周期特别长或特别短）
+    // 不会像平均数那样被明显拉偏
+    function _median(arr) {
+        var sorted = arr.slice().sort(function (a, b) { return a - b; });
+        var mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0
+            ? sorted[mid]
+            : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    }
+
+    // 区间宽度：用上所有历史间隔数据，而不是只看"最长的一次"和"最短的一次"——
+    // 先算每次间隔跟中位数差多少，再取这些"差值"的中位数（统计上叫"中位数绝对偏差"）。
+    // 这样即使某一次因为生病/旅行出现极端波动，也不会直接把区间拉得很夸张，
+    // 跟前面把"平均数"换成"中位数"是同一个思路：都是为了不让单次异常值说了算。
     function _calcSwing(gaps) {
         if (gaps.length < 2) return 2;
-        var maxGap = Math.max.apply(null, gaps);
-        var minGap = Math.min.apply(null, gaps);
-        return Math.min(5, Math.max(2, Math.round((maxGap - minGap) / 2)));  // 上限5天，避免历史数据不稳定时区间宽得离谱
+        var med = _median(gaps);
+        var deviations = gaps.map(function (g) { return Math.abs(g - med); });
+        var mad = _median(deviations);
+        return Math.min(5, Math.max(2, mad));
     }
 
     // ── 统计 ──────────────────────────────────────────
@@ -125,7 +139,7 @@
             for (var i = 1; i < sorted.length; i++) {
                 gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
             }
-            var avgCycle = Math.round(gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length);
+            var avgCycle = _median(gaps);
             var lastStart = sorted[sorted.length - 1].startDate;
             var predStart = _addD(lastStart, avgCycle);
 
@@ -163,7 +177,7 @@
             for (var i = 1; i < sorted.length; i++) {
                 gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
             }
-            var avgCycle = Math.round(gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length);
+            var avgCycle = _median(gaps);
             var swing = _calcSwing(gaps);
             var predStart = _addD(sorted[sorted.length - 1].startDate, avgCycle);
             for (var s = -swing; s <= swing; s++) dates[_addD(predStart, s)] = true;
@@ -361,35 +375,30 @@
         var today       = _today();
         var predicted   = _predictedDates();
 
+        // 只显示当月的日期，不再补上个月/下个月的天数——月初用空白格子占位对齐星期即可，
+        // 月末不用补，网格行数跟着当月实际天数走。之前补相邻月份天数时，那些格子会被
+        // .pd-other-month 的淡化样式（透明度35%）盖一层，如果那天恰好也是真实经期，
+        // 叠加淡化后看起来像是被打了折的"预测色"，容易造成误解。
         var html = '';
-        var prevTotal = new Date(_viewYear, _viewMonth, 0).getDate();
-        for (var i = firstDay - 1; i >= 0; i--) {
-            var ds = _toStr(new Date(_viewYear, _viewMonth - 1, prevTotal - i));
-            html += _cellHtml(prevTotal - i, ds, today, predicted, true);
+        for (var i = 0; i < firstDay; i++) {
+            html += '<div class="pd-cal-cell pd-blank"></div>';
         }
         for (var d = 1; d <= daysInMonth; d++) {
             var ds2 = _toStr(new Date(_viewYear, _viewMonth, d));
-            html += _cellHtml(d, ds2, today, predicted, false);
-        }
-        var total = firstDay + daysInMonth;
-        var nextDays = total % 7 === 0 ? 0 : 7 - (total % 7);
-        for (var n = 1; n <= nextDays; n++) {
-            var ds3 = _toStr(new Date(_viewYear, _viewMonth + 1, n));
-            html += _cellHtml(n, ds3, today, predicted, true);
+            html += _cellHtml(d, ds2, today, predicted);
         }
 
         grid.innerHTML = html;
         _bindCalCells(grid);
     }
 
-    function _cellHtml(day, dateStr, today, predicted, otherMonth) {
+    function _cellHtml(day, dateStr, today, predicted) {
         var cls = 'pd-cal-cell';
-        if (otherMonth) cls += ' pd-other-month';
         if (dateStr === today) cls += ' pd-today';
         if (_isInPeriod(dateStr)) cls += ' pd-period';
         else if (predicted.indexOf(dateStr) !== -1) cls += ' pd-predict';
         // 有日记录但没有颜色时加小圆点
-        var dot = (!otherMonth && _data.dailyRecords[dateStr] && !_isInPeriod(dateStr) && predicted.indexOf(dateStr) === -1)
+        var dot = (_data.dailyRecords[dateStr] && !_isInPeriod(dateStr) && predicted.indexOf(dateStr) === -1)
             ? '<span class="pd-cal-dot"></span>' : '';
         return '<div class="' + cls + '" data-date="' + dateStr + '">' + day + dot + '</div>';
     }
@@ -397,43 +406,35 @@
     function _bindCalCells(grid) {
         grid.querySelectorAll('.pd-cal-cell').forEach(function (cell) {
             var dateStr = cell.dataset.date;
-            if (!dateStr) return;
-            var otherMonth = cell.classList.contains('pd-other-month');
+            if (!dateStr) return;  // 空白占位格子没有 data-date，跳过，不用绑事件
 
-            // 长按：仅历史非当月格子以及当月历史格子
-            if (!otherMonth) {
-                cell.addEventListener('touchstart', function () {
-                    _longPressTimer = setTimeout(function () {
-                        _longPressTimer = null;
-                        if (dateStr < _today()) {
-                            cell._longPressed = true;  // 标记这次是长按触发的，供下面 click 处理跳过
-                            _toggleHistory(dateStr);
-                            _renderCalendar();
-                            _updateStats();
-                            _updateToggleBtn();
-                            _updateStatusCard();  // 之前漏了这一行：长按补录后"今日记录"卡片的经期天数标签不会跟着刷新
-                        }
-                    }, 600);
-                }, { passive: true });
-                cell.addEventListener('touchend', function () {
-                    if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
-                });
-                cell.addEventListener('touchmove', function () {
-                    if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
-                });
-            }
+            cell.addEventListener('touchstart', function () {
+                _longPressTimer = setTimeout(function () {
+                    _longPressTimer = null;
+                    if (dateStr < _today()) {
+                        cell._longPressed = true;  // 标记这次是长按触发的，供下面 click 处理跳过
+                        _toggleHistory(dateStr);
+                        _renderCalendar();
+                        _updateStats();
+                        _updateToggleBtn();
+                        _updateStatusCard();
+                    }
+                }, 600);
+            }, { passive: true });
+            cell.addEventListener('touchend', function () {
+                if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+            });
+            cell.addEventListener('touchmove', function () {
+                if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+            });
 
-            // 单击
             cell.addEventListener('click', function () {
-                // 长按刚触发完，手机上松手常常会跟着补一个click事件——之前这里想跳过这种情况，
-                // 但判断条件里用来标记"刚长按过"的 cell._longPressed 从没被真正设置过（死代码，
-                // 长按已经在上面正确设置了这个标记），现在直接读它、读完立刻清掉，避免下次误判。
                 if (cell._longPressed) { cell._longPressed = false; return; }
                 var today = _today();
                 if (dateStr === today) {
                     var card = document.getElementById('pd-status-card');
                     if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else if (!otherMonth) {
+                } else {
                     _openDaySheet(dateStr);
                 }
             });

@@ -95,6 +95,14 @@
         return _data.periods.find(function (p) { return !p.endDate; }) || null;
     }
 
+    // 区间宽度：历史周期波动越大，区间越宽；波动很小时至少给±2天，避免看起来像没算清楚
+    function _calcSwing(gaps) {
+        if (gaps.length < 2) return 2;
+        var maxGap = Math.max.apply(null, gaps);
+        var minGap = Math.min.apply(null, gaps);
+        return Math.max(2, Math.round((maxGap - minGap) / 2));
+    }
+
     // ── 统计 ──────────────────────────────────────────
     function _calcStats() {
         var completed = _data.periods.filter(function (p) { return p.endDate; });
@@ -121,12 +129,7 @@
             var lastStart = sorted[sorted.length - 1].startDate;
             var predStart = _addD(lastStart, avgCycle);
 
-            var swing = 2;
-            if (gaps.length >= 2) {
-                var maxGap = Math.max.apply(null, gaps);
-                var minGap = Math.min.apply(null, gaps);
-                swing = Math.max(2, Math.round((maxGap - minGap) / 2));
-            }
+            var swing = _calcSwing(gaps);
             var lo = _parse(_addD(predStart, -swing));
             var hi = _parse(_addD(predStart, swing));
             nextDate = (lo.getMonth() + 1) + '月' + lo.getDate() + '日 ~ ' +
@@ -137,34 +140,36 @@
     }
 
     function _predictedDates() {
+        var dates = {};
+        var completed = _data.periods.filter(function (p) { return p.endDate; });
+
+        // 1）当前正在进行的经期（还没标记结束）——按历史平均时长推算，
+        //    "还没到/还没打卡"的那几天大概率也算经期，标成浅色预测
+        var active = _activePeriod();
+        if (active && completed.length > 0) {
+            var avgDur = Math.round(completed.reduce(function (s, p) { return s + _diff(p.startDate, p.endDate) + 1; }, 0) / completed.length);
+            for (var d = 0; d < avgDur; d++) {
+                var ds = _addD(active.startDate, d);
+                if (!_isInPeriod(ds)) dates[ds] = true;  // 已经算作经期(到今天为止)的不用重复标
+            }
+        }
+
+        // 2）下一次经期的预测窗口——高亮范围跟统计卡片里显示的区间完全对齐，
+        //    不再额外叠加经期时长（之前这里多加了一层，导致日历高亮的范围比
+        //    文字描述的区间宽出一大截，看起来莫名其妙）
         var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
-        if (sorted.length < 2) return [];
-
-        var gaps = [];
-        for (var i = 1; i < sorted.length; i++) {
-            gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
-        }
-        var avgCycle = Math.round(gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length);
-
-        var completed = sorted.filter(function (p) { return p.endDate; });
-        var avgDur = completed.length > 0
-            ? Math.round(completed.reduce(function (s, p) { return s + _diff(p.startDate, p.endDate) + 1; }, 0) / completed.length)
-            : 5;
-
-        var swing = 2;
-        if (gaps.length >= 2) {
-            var maxGap2 = Math.max.apply(null, gaps);
-            var minGap2 = Math.min.apply(null, gaps);
-            swing = Math.max(2, Math.round((maxGap2 - minGap2) / 2));
+        if (sorted.length >= 2) {
+            var gaps = [];
+            for (var i = 1; i < sorted.length; i++) {
+                gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
+            }
+            var avgCycle = Math.round(gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length);
+            var swing = _calcSwing(gaps);
+            var predStart = _addD(sorted[sorted.length - 1].startDate, avgCycle);
+            for (var s = -swing; s <= swing; s++) dates[_addD(predStart, s)] = true;
         }
 
-        // 日历上高亮的"预测"范围，跟统计卡片显示的区间保持一致宽度
-        var predStart   = _addD(sorted[sorted.length - 1].startDate, avgCycle);
-        var rangeStart  = _addD(predStart, -swing);
-        var totalSpan   = avgDur + swing * 2;
-        var dates = [];
-        for (var d = 0; d < totalSpan; d++) dates.push(_addD(rangeStart, d));
-        return dates;
+        return Object.keys(dates);
     }
 
     // ── 经期操作 ──────────────────────────────────────
@@ -199,14 +204,15 @@
     function _endPeriod(dateStr) {
         var active = _activePeriod();
         if (!active || dateStr < active.startDate) return;
-        if (active.startDate === dateStr) {
-            // 今天开始、今天就想关掉 —— 如果只是设结束日期=今天，这条记录依然会
-            // 把"今天"算作在经期里（首尾同一天也算数），界面上开关会一直显示"经期中"关不掉，
-            // 而长按对"今天"这一格又是禁用的，用户就没有第二条路能撤销了。
-            // 所以这种情况直接删掉整条记录，等同于撤销这次误触。
+        // 开关按钮的语义是"从今天起不算经期了"，不是"今天仍算最后一天"——
+        // 所以结束日期设成昨天，而不是今天，点一下就该立刻生效，不用等到明天。
+        // 长按修改历史记录走的是另一套（_toggleHistory），精确到点哪天就是哪天，不受这里影响。
+        var endDate = _addD(dateStr, -1);
+        if (endDate < active.startDate) {
+            // 结束日期比开始日期还早，说明是今天开始今天就想撤销——直接删掉整条记录
             _data.periods = _data.periods.filter(function (x) { return x.id !== active.id; });
         } else {
-            active.endDate = dateStr;
+            active.endDate = endDate;
         }
         _save();
     }
@@ -454,7 +460,7 @@
     function _openDaySheet(dateStr) {
         var d = _parse(dateStr);
         var titleEl = document.getElementById('pd-day-sheet-title');
-        if (titleEl) titleEl.textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEKDAYS[d.getDay()];
+        if (titleEl) titleEl.textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日';
 
         var tagEl    = document.getElementById('pd-day-period-tag');
         var infoRow  = document.getElementById('pd-day-info-row');

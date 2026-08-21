@@ -2188,6 +2188,8 @@ function _showBatchAddDialog() {
                 ? customPokes.some(r => normalizeStringStrict(r) === norm)
                 : currentSubTab === 'statuses'
                 ? customStatuses.some(r => normalizeStringStrict(r) === norm)
+                : currentSubTab === 'period'
+                ? customPeriodCare.some(r => normalizeStringStrict(r) === norm)
                 : false;
             if (isDup) { skipped++; return; }
             if (currentSubTab === 'custom') { customReplies.push(val); newItems.push(val); }
@@ -2374,7 +2376,7 @@ function initReplyLibraryListeners() {
 }
 
 function getCategoryName(tabId) {
-    return { custom: '回复', pokes: '拍一拍', statuses: '状态', mottos: '格言', intros: '开场语', period: '经期关心话' }[tabId] || '内容';
+    return { custom: '回复', pokes: '拍一拍', statuses: '状态', mottos: '格言', intros: '开场语', period: '相关字卡' }[tabId] || '内容';
 }
 
 function updateTabUI() {

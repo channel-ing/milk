@@ -354,6 +354,7 @@
         overlay.id = 'pd-predict-notif-overlay';
         overlay.className = 'modal';
         overlay.style.display = 'flex';
+        overlay.style.zIndex = '10000';  // 比开机欢迎动画(9999)高，双保险，避免延时不够时还是被盖住
         overlay.innerHTML =
             '<div class="modal-content" style="max-width:320px;padding:20px;">' +
                 '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
@@ -621,9 +622,10 @@
         var emptyEl = document.getElementById('pd-letter-empty');
         var linesEl = document.getElementById('pd-letter-lines');
 
-        // 判断当前经期是否有留言
-        var active   = _activePeriod() || (_data.periods.length ? _data.periods[_data.periods.length - 1] : null);
-        var hasMsg   = _data.partnerMsg && active && _data.partnerMsg.periodId === active.id;
+        // 判断当前经期是否有留言——只认"正在进行中"的这一次，不再退回去找"最后一次经期"，
+        // 不然经期都结束了，卡片还会一直显示上一次的旧留言内容，看起来像是没清干净
+        var active   = _activePeriod();
+        var hasMsg   = active && _data.partnerMsg && _data.partnerMsg.periodId === active.id;
 
         if (hasMsg && _data.partnerMsg.lines && _data.partnerMsg.lines.length) {
             if (emptyEl) emptyEl.style.display = 'none';
@@ -746,10 +748,14 @@
     }, 60000);
 
     // 脚本一加载（也就是打开网站）就先悄悄读一次数据，不用等用户点开经期记录弹窗，
-    // 这样"预测提醒"才能在用户完全没打开过经期功能的情况下也正常触发
+    // 这样"预测提醒"才能在用户完全没打开过经期功能的情况下也正常触发。
+    // 延迟4秒再检查，是因为开机欢迎动画的 z-index 比弹窗高很多，动画播完前就弹出来会被盖住看不见；
+    // 欢迎动画正常播放大概3秒左右结束，4秒留了一点余量。
     _load().then(function () {
-        _checkNotif();
-        _checkPredictReminder();
+        setTimeout(function () {
+            _checkNotif();
+            _checkPredictReminder();
+        }, 4000);
     });
 
 })();

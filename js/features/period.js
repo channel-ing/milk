@@ -341,33 +341,35 @@
     }
 
     function _showPredictReminderPopup(text) {
-        var existing = document.getElementById('pd-predict-notif-popup');
+        var existing = document.getElementById('pd-predict-notif-overlay');
         if (existing) existing.remove();
 
-        var pname = _partnerName();
-        var popup = document.createElement('div');
-        popup.id = 'pd-predict-notif-popup';
-        popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
-            'background:var(--secondary-bg);border:1px solid var(--border-color);' +
-            'border-radius:20px;padding:18px 20px;z-index:9000;max-width:320px;width:88%;' +
-            'box-shadow:0 8px 32px rgba(0,0,0,0.18);display:flex;flex-direction:column;gap:12px;' +
-            'animation:_mSlideUp 0.4s cubic-bezier(0.22,1,0.36,1);';
-        popup.innerHTML =
-            '<div style="display:flex;align-items:center;gap:10px;">' +
-                '<span style="font-size:26px;">🗓️</span>' +
-                '<div>' +
-                    '<div style="font-size:14px;font-weight:700;color:var(--text-primary);">' + pname + ' 提醒你</div>' +
-                    '<div style="font-size:12px;color:var(--text-primary);margin-top:4px;line-height:1.5;">' + text + '</div>' +
+        var pname   = _partnerName();
+        var realImg = document.querySelector('#partner-avatar img');
+        var avatarHtml = (realImg && realImg.src)
+            ? '<img src="' + realImg.src + '" style="width:100%;height:100%;object-fit:cover;">'
+            : '<i class="fas fa-user" style="font-size:20px;color:var(--text-secondary);"></i>';
+
+        var overlay = document.createElement('div');
+        overlay.id = 'pd-predict-notif-overlay';
+        overlay.className = 'modal';
+        overlay.style.display = 'flex';
+        overlay.innerHTML =
+            '<div class="modal-content" style="max-width:320px;padding:20px;">' +
+                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+                    '<div style="width:40px;height:40px;border-radius:50%;background:rgba(var(--accent-color-rgb),0.12);' +
+                        'display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">' + avatarHtml + '</div>' +
+                    '<div style="font-size:15px;font-weight:700;color:var(--text-primary);">' + pname + ' 提醒你</div>' +
                 '</div>' +
-            '</div>' +
-            '<div style="display:flex;gap:8px;">' +
-                '<button onclick="document.getElementById(\'pd-predict-notif-popup\').remove();" ' +
-                    'style="flex:1;padding:8px 0;border-radius:12px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">知道了</button>' +
-                '<button onclick="window._pdGoToPeriodTab();document.getElementById(\'pd-predict-notif-popup\').remove();" ' +
-                    'style="flex:2;padding:8px 0;border-radius:12px;border:none;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">去看看 ✦</button>' +
+                '<div style="font-size:13px;color:var(--text-primary);line-height:1.6;margin-bottom:18px;">' + text + '</div>' +
+                '<div style="display:flex;gap:10px;">' +
+                    '<button onclick="document.getElementById(\'pd-predict-notif-overlay\').remove();" ' +
+                        'style="flex:1;padding:10px 0;border-radius:12px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">知道了</button>' +
+                    '<button onclick="window._pdGoToPeriodTab();document.getElementById(\'pd-predict-notif-overlay\').remove();" ' +
+                        'style="flex:2;padding:10px 0;border-radius:12px;border:none;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">去看看 ✦</button>' +
+                '</div>' +
             '</div>';
-        document.body.appendChild(popup);
-        setTimeout(function () { if (popup.parentNode) popup.remove(); }, 8000);
+        document.body.appendChild(overlay);
     }
 
     window._pdGoToPeriodTab = function () {

@@ -1591,6 +1591,15 @@ autoSendSlider.addEventListener('change', () => {
 
 
         function initNewFeatureListeners() {
+            const periodEntry = document.getElementById('period-function');
+            if (periodEntry) {
+                periodEntry.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    showModal(document.getElementById('period-modal'));
+                    if (typeof window._pdInit === 'function') window._pdInit();
+                });
+            }
+
             const flEntry = document.getElementById('fortune-lenormand-function');
             if (flEntry) {
                 flEntry.addEventListener('click', () => {

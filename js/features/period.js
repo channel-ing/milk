@@ -55,6 +55,11 @@
                 if (!_data.customSymptoms) _data.customSymptoms = [];
             }
         } catch (e) { console.warn('[period] load failed:', e); }
+        // 开机自检：把满足合并条件、但因为之前版本的bug没能合并的历史碎片自动接好，
+        // 不用用户再手动操作一次。_reconcilePeriods 定义在下面，这里是前向引用，
+        // 因为函数声明会整体提升，运行时没问题。
+        _reconcilePeriods();
+        _save();
         _loaded = true;
     }
 
@@ -158,6 +163,25 @@
         if (sendNotif) _scheduleNotif();
     }
 
+    // 把间隔在合理范围内的经期记录自动接成一条——不管是新长按产生的碎片，
+    // 还是账号里本来就存在的历史碎片，每次数据变动后调用一次就会自动愈合。
+    // 阈值定为10天：正常经期很少超过7天，10天已经留足余量；
+    // 同时明显小于两次不同经期之间的间隔（哪怕周期很不规律，通常也不会短于10天以内），
+    // 所以不容易把两次完全不同的经期误判成一条。
+    var MERGE_GAP_LIMIT = 10;
+    function _reconcilePeriods() {
+        _data.periods.sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
+        for (var i = 0; i < _data.periods.length - 1; i++) {
+            var cur = _data.periods[i], next = _data.periods[i + 1];
+            if (!cur.endDate) continue;  // cur 正在进行中（理论上只会是排序后最后一条），没法再往后并
+            if (_diff(cur.endDate, next.startDate) <= MERGE_GAP_LIMIT) {
+                cur.endDate = next.endDate;  // next 若也在进行中，合并后 cur 也变成进行中
+                _data.periods.splice(i + 1, 1);
+                i--;  // 合并后原地再检查一次，可能还能继续往后并
+            }
+        }
+    }
+
     function _endPeriod(dateStr) {
         var active = _activePeriod();
         if (!active || dateStr < active.startDate) return;
@@ -181,31 +205,10 @@
             } else {
                 p.endDate = _addD(dateStr, -1);
             }
-            _save();
-            return;
-        }
-
-        // 这天目前不属于任何一条经期记录 —— 之前的做法是无脑新建一条"孤立单日"记录，
-        // 导致连续补录好几天时（比如16、17、18号），中间的17号会被漏掉（因为16和18
-        // 分别变成两条互不知道对方存在的独立记录），而且这些"假的完整周期"还会被统计/预测
-        // 模块当成真实数据来算，导致数据莫名其妙就出来了。
-        // 改成：先看这天是不是紧挨着已有记录的开头或结尾，挨着就直接合并/延伸，而不是新建。
-        var prevDay     = _addD(dateStr, -1);
-        var nextDay     = _addD(dateStr, 1);
-        var prevPeriod  = _data.periods.find(function (x) { return x.endDate === prevDay; });   // 挨着某条记录的结尾
-        var nextPeriod  = _data.periods.find(function (x) { return x.startDate === nextDay; });  // 挨着某条记录的开头（含"进行中"的那条）
-
-        if (prevPeriod && nextPeriod) {
-            // 两边都挨着：正好把中间缺口填上，合并成一条
-            prevPeriod.endDate = nextPeriod.endDate; // 如果 nextPeriod 是"进行中"（endDate=null），合并后 prevPeriod 也变成进行中
-            _data.periods = _data.periods.filter(function (x) { return x.id !== nextPeriod.id; });
-        } else if (prevPeriod) {
-            prevPeriod.endDate = dateStr;   // 往后延一天
-        } else if (nextPeriod) {
-            nextPeriod.startDate = dateStr; // 往前提一天（如果 nextPeriod 正在进行中，提前开始日期依然保持进行中）
         } else {
             _data.periods.push({ id: 'pd_' + Date.now(), startDate: dateStr, endDate: dateStr });
         }
+        _reconcilePeriods();
         _save();
     }
 
@@ -440,29 +443,39 @@
         if (titleEl) titleEl.textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEKDAYS[d.getDay()];
 
         var tagEl    = document.getElementById('pd-day-period-tag');
-        var infoRow  = document.querySelector('#pd-day-sheet .pd-day-info-row');
+        var infoRow  = document.getElementById('pd-day-info-row');
         var dayNum   = _getDayNum(dateStr);
         if (tagEl)   { tagEl.textContent = '经期第' + dayNum + '天'; tagEl.style.display = dayNum > 0 ? '' : 'none'; }
         if (infoRow) infoRow.style.display = dayNum > 0 ? '' : 'none';
 
-        var rec     = _data.dailyRecords[dateStr];
-        var flowEl  = document.getElementById('pd-day-flow-display');
-        var sympEl  = document.getElementById('pd-day-symptom-tags');
-        if (flowEl) flowEl.textContent = (rec && rec.flow) ? FLOW_LABELS[rec.flow] : '暂无记录';
-        if (sympEl) {
-            if (rec && rec.symptoms && rec.symptoms.length) {
-                sympEl.innerHTML = rec.symptoms.map(function (s) {
-                    return '<span class="pd-day-symptom-tag">' + s + '</span>';
-                }).join('');
-            } else {
-                sympEl.innerHTML = '<span style="color:var(--text-secondary);font-size:12px;opacity:0.6;">暂无记录</span>';
+        var rec        = _data.dailyRecords[dateStr];
+        var contentEl  = document.getElementById('pd-day-content');
+        var emptyEl    = document.getElementById('pd-day-empty');
+        var isEmpty    = dayNum === 0 && !rec;  // 既不在经期里，也没有任何打卡记录 —— 缺省状态
+
+        if (isEmpty) {
+            if (contentEl) contentEl.style.display = 'none';
+            if (emptyEl)   emptyEl.style.display = '';
+        } else {
+            if (contentEl) contentEl.style.display = '';
+            if (emptyEl)   emptyEl.style.display = 'none';
+
+            var flowEl = document.getElementById('pd-day-flow-display');
+            var sympEl = document.getElementById('pd-day-symptom-tags');
+            if (flowEl) flowEl.textContent = (rec && rec.flow) ? FLOW_LABELS[rec.flow] : '暂无出血量记录';
+            if (sympEl) {
+                if (rec && rec.symptoms && rec.symptoms.length) {
+                    sympEl.innerHTML = rec.symptoms.map(function (s) {
+                        return '<span class="pd-day-symptom-tag">' + s + '</span>';
+                    }).join('');
+                } else {
+                    sympEl.innerHTML = '<span style="color:var(--text-secondary);font-size:12px;opacity:0.6;">暂无症状记录</span>';
+                }
             }
         }
 
-        var sheet   = document.getElementById('pd-day-sheet');
-        var overlay = document.getElementById('cs-overlay');
-        if (sheet)   sheet.classList.add('cs-sheet-open');
-        if (overlay) overlay.classList.add('cs-overlay-on');
+        var sheet = document.getElementById('pd-day-sheet');
+        if (sheet && typeof window.showModal === 'function') window.showModal(sheet);
     }
 
     // ── 症状渲染 ──────────────────────────────────────
@@ -577,10 +590,8 @@
     };
 
     window._pdCloseDaySheet = function () {
-        var sheet   = document.getElementById('pd-day-sheet');
-        var overlay = document.getElementById('cs-overlay');
-        if (sheet)   sheet.classList.remove('cs-sheet-open');
-        if (overlay) overlay.classList.remove('cs-overlay-on');
+        var sheet = document.getElementById('pd-day-sheet');
+        if (sheet && typeof window.hideModal === 'function') window.hideModal(sheet);
     };
 
     // ── 入口 ──────────────────────────────────────────

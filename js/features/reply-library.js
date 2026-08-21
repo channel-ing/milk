@@ -2341,7 +2341,7 @@ function initReplyLibraryListeners() {
                 }
                 return;
             }
-            if (currentSubTab === 'custom' || currentSubTab === 'pokes' || currentSubTab === 'statuses') {
+            if (currentSubTab === 'custom' || currentSubTab === 'pokes' || currentSubTab === 'statuses' || currentSubTab === 'period') {
                 _showBatchAddDialog(); return;
             }
             let input;
@@ -2361,13 +2361,11 @@ function initReplyLibraryListeners() {
                 else if (currentSubTab === 'statuses' && customStatuses.some(r => normalizeStringStrict(r) === valNorm)) isDup = true;
                 else if (currentSubTab === 'mottos' && customMottos.some(r => normalizeStringStrict(r) === valNorm)) isDup = true;
                 else if (currentSubTab === 'intros' && customIntros.some(r => normalizeStringStrict(r) === valNorm)) isDup = true;
-                else if (currentSubTab === 'period' && customPeriodCare.some(r => normalizeStringStrict(r) === valNorm)) isDup = true;
                 if (isDup) { showNotification('该内容已存在', 'warning'); return; }
                 if (currentSubTab === 'pokes') customPokes.unshift(val);
                 else if (currentSubTab === 'statuses') customStatuses.unshift(val);
                 else if (currentSubTab === 'mottos') customMottos.unshift(val);
                 else if (currentSubTab === 'intros') customIntros.unshift(val);
-                else if (currentSubTab === 'period') customPeriodCare.unshift(val);
                 throttledSaveData(); renderReplyLibrary();
                 showNotification('✓ 添加成功', 'success');
             }

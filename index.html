@@ -2341,7 +2341,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                         <i class="fas fa-music"></i><span>悬浮音乐播放器</span>
                     </div>
                     <div class="settings-item" id="period-function">
-                        <i class="fas fa-tint"></i><span>经期</span>
+                        <i class="fas fa-tint"></i><span>经期记录</span>
                     </div>
                     <div class="settings-item" id="envelope-function" style="display:none;">
                         <i class="fas fa-envelope-open-text"></i><span>信箱</span>
@@ -2447,27 +2447,12 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <div class="pd-letter-lines" id="pd-letter-lines" style="display:none;"></div>
                 </div>
 
-                <!-- 历史记录入口 -->
-                <button class="pd-history-entry-btn" id="pd-history-open" onclick="window._pdOpenHistory && window._pdOpenHistory()">
-                    <i class="fas fa-history"></i> 查看历史记录
-                </button>
-
             </div>
 
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-secondary" id="close-period" onclick="hideModal(document.getElementById('period-modal'))">关闭</button>
             </div>
         </div>
-    </div>
-
-    <!-- 经期历史全屏页（陪伴日记风格） -->
-    <div class="pd-history-page" id="pd-history-page">
-        <div class="pd-history-page-hd">
-            <button class="pd-hist-back" onclick="window._pdCloseHistory && window._pdCloseHistory()"><i class="fas fa-arrow-left"></i></button>
-            <div class="pd-history-page-title"><i class="fas fa-history"></i>经期历史</div>
-            <div style="width:32px;"></div>
-        </div>
-        <div class="pd-history-page-body" id="pd-history-body"></div>
     </div>
 
     <!-- 历史某天只读弹窗 -->

@@ -248,7 +248,12 @@
         if (Date.now() < _data.notifyAt) return;
         if (_data.partnerMsg && _data.partnerMsg.periodId === _data.notifyPeriodId) return;
 
-        var replies = (window._customReplies) ||
+        // 优先用"经期"专属话术库（氛围感配置里新加的分类）；
+        // 用户没配置（数组为空）就退回主字卡库，跟原来的兜底逻辑一致。
+        var periodReplies = (typeof customPeriodCare !== 'undefined' && customPeriodCare && customPeriodCare.length)
+            ? customPeriodCare : null;
+        var replies = periodReplies ||
+                      (window._customReplies) ||
                       (typeof customReplies !== 'undefined' ? customReplies : []) || [];
         if (!replies.length) return;
 

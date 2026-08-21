@@ -43,6 +43,26 @@
     justify-content: flex-end;
 }
 
+/* ══════════════════════════════════════════
+   自定义回复 —— 氛围感配置的子tab按钮横向滚动
+   （新增"经期"分类后，5个tab按原来flex:1挤压排布会太窄，
+   改成按钮固定宽度、放不下就左右滑动）
+   ══════════════════════════════════════════ */
+.reply-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.reply-tabs::-webkit-scrollbar { display: none; }
+.reply-tab-btn {
+    flex: 0 0 auto;
+    padding: 10px 18px;
+    white-space: nowrap;
+}
+
+.pd-cal-cell.pd-blank { cursor: default; pointer-events: none; }
+
 /* 只读日详情弹窗：右上角❌关闭 */
 .pd-day-modal-content { position: relative; }
 .pd-day-close-x {

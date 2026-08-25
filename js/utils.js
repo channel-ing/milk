@@ -524,7 +524,7 @@ async function importAllData(file) {
             {
                 id: 'themes',
                 label: '主题 / 外观 / 图库',
-                indexedDBNeedles: ['customThemes', 'themeSchemes', 'backgroundGallery', 'chatBackground', 'partnerAvatar', 'myAvatar', 'partnerPersonas'],
+                indexedDBNeedles: ['customThemes', 'themeSchemes', 'backgroundGallery', 'chatBackground', 'partnerAvatar', 'myAvatar', 'partnerPersonas', 'callBgImageData'],
                 localStorageNeedles: []
             },
             {

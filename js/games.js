@@ -1352,18 +1352,27 @@ function _myStickerGroupsList() {
     groups.forEach(function (g) { list.push({ id: g.id, name: g.name, isDefault: false }); });
     return list;
 }
+// 网格显示顺序——新添加的排前面，紧跟在"添加表情"入口右边
 function _myStickerItemsInGroup(groupId) {
     return _myStickerLib()
         .filter(function (e) { return (e.groupId || null) === groupId; })
-        .sort(function (a, b) { return (a.addedAt || 0) - (b.addedAt || 0); });
+        .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
 }
-// 封面：用户手动设置的优先；没设置就用组里最早加入的那张
+// 封面候选排序——按"加入这个分组的时间"（groupJoinedAt）从早到晚，不是"上传时间"（addedAt）。
+// 这两件事不一样：一张图片可能很久以前就上传了，但是刚刚才被挪进这个分组，
+// 这种情况下它"加入这个分组"的时间应该算刚刚，不能因为它上传得早就抢了封面。
+function _myStickerCoverCandidates(groupId) {
+    return _myStickerLib()
+        .filter(function (e) { return (e.groupId || null) === groupId; })
+        .sort(function (a, b) { return (a.groupJoinedAt || a.addedAt || 0) - (b.groupJoinedAt || b.addedAt || 0); });
+}
+// 封面：用户手动设置的优先；没设置就用"加入这个分组最早"的那张
 function _myStickerCoverFor(groupId) {
     if (groupId) {
         var g = _myStickerGroupsRaw().find(function (x) { return x.id === groupId; });
         if (g && g.cover) return g.cover;
     }
-    var items = _myStickerItemsInGroup(groupId);
+    var items = _myStickerCoverCandidates(groupId);
     return items.length ? items[0].src : null;
 }
 function _myStickerSaveLibrary() {
@@ -1380,6 +1389,7 @@ function _myStickerMoveToGroup(entryId, targetGroupId) {
     var entry = _myStickerLib().find(function (e) { return e.id === entryId; });
     if (!entry) return;
     entry.groupId = targetGroupId || null;
+    entry.groupJoinedAt = Date.now();
     _myStickerSaveLibrary();
 }
 // 删除一个分组：keepStickers=true 时表情退回默认分组；false 时表情本体也一起删掉
@@ -1406,9 +1416,10 @@ function _myStickerDeleteGroup(groupId, keepStickers) {
 // 批量把好几个表情一次性移到同一个分组
 function _myStickerMoveMultipleToGroup(entryIds, targetGroupId) {
     var lib = _myStickerLib();
-    entryIds.forEach(function (id) {
+    var now = Date.now();
+    entryIds.forEach(function (id, idx) {
         var entry = lib.find(function (e) { return e.id === id; });
-        if (entry) entry.groupId = targetGroupId || null;
+        if (entry) { entry.groupId = targetGroupId || null; entry.groupJoinedAt = now + idx; }
     });
     _myStickerSaveLibrary();
 }
@@ -1466,6 +1477,10 @@ function initComboMenu() {
     comboBtn.dataset.initialized = 'true';
 
     document.addEventListener('click', (e) => {
+        // 点在任何弹窗（新建分组/移动分组/管理这些）或长按浮窗内部，
+        // 不算"点了面板外面"——这几个弹窗都是挂在页面最外层的，不在 picker 的DOM范围内，
+        // 之前没排除这种情况，导致点弹窗里任何按钮都会被误判成"点击外部"，把主面板意外关掉
+        if (e.target.closest('.modal') || e.target.closest('.my-sticker-action-popover')) return;
         if (!picker.contains(e.target) && !comboBtn.contains(e.target)) {
             picker.classList.remove('active');
         }
@@ -1703,7 +1718,7 @@ function initComboMenu() {
         if (old) old.remove();
         var list = _myStickerGroupsList();
         var modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'modal my-sticker-sub-modal';
         modal.id = 'my-sticker-move-modal';
         var rowsHtml = list.map(function (g) {
             var cover = _myStickerCoverFor(g.id);
@@ -1719,7 +1734,7 @@ function initComboMenu() {
             '<div class="modal-content" style="max-width:320px;">' +
                 '<div class="modal-title"><i class="fas fa-folder-open"></i><span>移动到哪个分组</span></div>' +
                 '<div style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:12px;">' + rowsHtml + '</div>' +
-                '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-move-cancel">取消</button></div>' +
+                '<div class="modal-buttons" style="justify-content:flex-end;"><button class="modal-btn modal-btn-secondary" id="my-sticker-move-cancel">取消</button></div>' +
             '</div>';
         document.body.appendChild(modal);
         if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
@@ -1817,7 +1832,7 @@ function initComboMenu() {
                             toStore = r.url;
                         } catch (upErr) { console.warn('[cloud-media] 新分组图片上传失败，降级本地', upErr); }
                     }
-                    newEntries.push({ id: 'stk_' + Date.now() + '_' + i, src: toStore, groupId: newGroup.id, addedAt: Date.now() + i });
+                    newEntries.push({ id: 'stk_' + Date.now() + '_' + i, src: toStore, groupId: newGroup.id, addedAt: Date.now() + i, groupJoinedAt: Date.now() + i });
                 } catch (e) { console.warn('新分组图片处理失败', e); }
             }
             if (newEntries.length) {
@@ -1904,7 +1919,7 @@ function initComboMenu() {
 
         function openDeleteChoice() {
             var sub = document.createElement('div');
-            sub.className = 'modal';
+            sub.className = 'modal my-sticker-sub-modal';
             sub.style.zIndex = '3100';
             sub.innerHTML =
                 '<div class="modal-content" style="max-width:300px;">' +
@@ -1977,7 +1992,7 @@ function initComboMenu() {
             // 排除"当前正在管理的这个分组"——挪到自己身上没有意义
             var list = _myStickerGroupsList().filter(function (g) { return g.id !== (groupId || null); });
             var pick = document.createElement('div');
-            pick.className = 'modal';
+            pick.className = 'modal my-sticker-sub-modal';
             pick.style.zIndex = '3100';
             pick.innerHTML =
                 '<div class="modal-content" style="max-width:300px;">' +
@@ -1989,7 +2004,7 @@ function initComboMenu() {
                             return '<button class="my-sticker-move-row" data-gid="' + (g.id === null ? '' : g.id) + '">' + thumb + '<span>' + g.name + '</span></button>';
                         }).join('') +
                     '</div>' +
-                    '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-batchmove-cancel">取消</button></div>' +
+                    '<div class="modal-buttons" style="justify-content:flex-end;"><button class="modal-btn modal-btn-secondary" id="my-sticker-batchmove-cancel">取消</button></div>' +
                 '</div>';
             document.body.appendChild(pick);
             if (typeof window.showModal === 'function') window.showModal(pick); else pick.style.display = 'flex';

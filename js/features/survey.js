@@ -1284,21 +1284,30 @@
         if (typeof showNotification === 'function') showNotification(rec.favorited ? '已收藏' : '已取消收藏', 'success');
     }
 
-    var _activeSurveyFavFilter = false; // false=全部, true=只看收藏
+    var _activeSurveyFilter = 'all'; // 'all' | 'askme'（梦角发的） | 'askpartner'（用户发的） | 'fav'（收藏）
 
-    // 全部/收藏 这两个胶囊——不影响置顶排序，纯粹是个过滤器
-    function _renderFavFilterBar(allItems) {
+    // 全部 / 梦角发的 / 用户发的 / 收藏——常驻显示，不像题库那边"没数据就隐藏"，
+    // 这四个筛选项本身就是列表页的主要导航方式，不该忽隐忽现
+    function _renderSurveyFilterBar(allItems) {
         var bar = document.getElementById('survey-fav-filter-bar');
         if (!bar) return;
+        var askMeCount = allItems.filter(function (it) { return it.src === 'me'; }).length;
+        var askPartnerCount = allItems.filter(function (it) { return it.src === 'partner'; }).length;
         var favCount = allItems.filter(function (it) { return it.ref.favorited; }).length;
-        if (!favCount && !_activeSurveyFavFilter) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
         bar.style.display = 'flex';
-        bar.innerHTML =
-            '<button class="gfp-btn' + (!_activeSurveyFavFilter ? ' gfp-active' : '') + '" data-fav-filter="all">全部 <span class="gfp-count">' + allItems.length + '</span></button>' +
-            '<button class="gfp-btn' + (_activeSurveyFavFilter ? ' gfp-active' : '') + '" data-fav-filter="fav"><i class="fas fa-star" style="font-size:10px;margin-right:3px;"></i>收藏 <span class="gfp-count">' + favCount + '</span></button>';
+        var tabs = [
+            { key: 'all', label: '全部', count: allItems.length },
+            { key: 'askme', label: _partnerName() + '发的', count: askMeCount },
+            { key: 'askpartner', label: _myName() + '发的', count: askPartnerCount },
+            { key: 'fav', label: '<i class="fas fa-star" style="font-size:10px;margin-right:3px;"></i>收藏', count: favCount }
+        ];
+        bar.innerHTML = tabs.map(function (t) {
+            return '<button class="gfp-btn' + (_activeSurveyFilter === t.key ? ' gfp-active' : '') + '" data-survey-filter="' + t.key + '">' +
+                t.label + ' <span class="gfp-count">' + t.count + '</span></button>';
+        }).join('');
         bar.querySelectorAll('.gfp-btn').forEach(function (btn) {
             btn.onclick = function () {
-                _activeSurveyFavFilter = btn.dataset.favFilter === 'fav';
+                _activeSurveyFilter = btn.dataset.surveyFilter;
                 _renderListBody();
             };
         });
@@ -1321,18 +1330,28 @@
         var meItems = _data.askMe.filter(function (s) { return !s.deletedAt; }).map(function (s) { return { ref: s, src: 'me' }; });
         var all = partnerItems.concat(meItems);
 
-        _renderFavFilterBar(all);
-        var list = _activeSurveyFavFilter ? all.filter(function (it) { return it.ref.favorited; }) : all;
+        _renderSurveyFilterBar(all);
+        var list = all;
+        if (_activeSurveyFilter === 'askme') list = all.filter(function (it) { return it.src === 'me'; });
+        else if (_activeSurveyFilter === 'askpartner') list = all.filter(function (it) { return it.src === 'partner'; });
+        else if (_activeSurveyFilter === 'fav') list = all.filter(function (it) { return it.ref.favorited; });
 
         if (!list.length) {
-            var emptyText = _activeSurveyFavFilter ? '还没有收藏的问卷' : '还没有问卷，问点什么给梦角吧';
+            var emptyTextMap = {
+                all: '还没有问卷，问点什么给梦角吧',
+                askme: '梦角还没主动问过你问题',
+                askpartner: '还没问过梦角问题',
+                fav: '还没有收藏的问卷'
+            };
+            var emptyText = emptyTextMap[_activeSurveyFilter];
+            var showCreateBtn = _activeSurveyFilter === 'all' || _activeSurveyFilter === 'askpartner';
             body.innerHTML =
                 '<div class="survey-list-empty">' +
                     '<i class="fas fa-clipboard-list"></i>' +
                     '<p>' + emptyText + '</p>' +
-                    (_activeSurveyFavFilter ? '' : '<button type="button" class="survey-empty-create-btn" id="survey-empty-create-btn"><i class="fas fa-plus"></i> 创建问卷</button>') +
+                    (showCreateBtn ? '<button type="button" class="survey-empty-create-btn" id="survey-empty-create-btn"><i class="fas fa-plus"></i> 创建问卷</button>' : '') +
                 '</div>';
-            if (!_activeSurveyFavFilter) {
+            if (showCreateBtn) {
                 var emptyBtn = document.getElementById('survey-empty-create-btn');
                 if (emptyBtn) emptyBtn.onclick = function () { _openCreateModal(); };
             }
@@ -1396,12 +1415,12 @@
             '<div class="survey-card-top">' +
                 '<span class="survey-tag ' + srcTagCls + '">' + _esc(srcTagText) + '</span>' +
                 '<span class="survey-tag survey-tag-status survey-tag-status-' + badge.cls + '">' + _esc(badge.text) + '</span>' +
-                favStar +
             '</div>' +
             '<div class="survey-card-title">' + _esc(_surveyTitle(s)) + '</div>' +
             '<div class="survey-card-meta">' + _fmtTime(createdAt) +
                 (answeredAt ? (' · 回复于 ' + _fmtTime(answeredAt)) : '') +
                 ' · ' + s.questions.length + ' 题</div>' +
+            favStar +
         '</div>';
     }
 

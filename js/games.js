@@ -1427,6 +1427,21 @@ async function _myStickerDeleteMultiple(entryIds) {
     _myStickerSaveLibrary();
 }
 
+function _myStickerCoverImgHTML(cover, sizePx, radiusPx) {
+    if (!cover) return '';
+    var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
+    var style = 'width:' + sizePx + 'px;height:' + sizePx + 'px;border-radius:' + radiusPx + 'px;object-fit:cover;';
+    return isCloud
+        ? '<img loading="lazy" data-cover-ref="' + cover + '" style="' + style + '">'
+        : '<img loading="lazy" src="' + cover + '" style="' + style + '">';
+}
+function _myStickerBindCoverRefs(container) {
+    if (!container || !window.CloudMedia) return;
+    container.querySelectorAll('img[data-cover-ref]').forEach(function (img) {
+        window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));
+    });
+}
+
 function initComboMenu() {
     const comboBtn = document.getElementById('combo-btn');
     const picker = document.getElementById('user-sticker-picker');
@@ -1505,8 +1520,11 @@ function initComboMenu() {
 
     function _myStickerGroupChipHTML(g, isActive) {
         var cover = _myStickerCoverFor(g.id);
+        var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
         var inner = cover
-            ? `<img loading="lazy" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+            ? (isCloud
+                ? `<img loading="lazy" data-cover-ref="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+                : `<img loading="lazy" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`)
             : `<i class="fas fa-images" style="font-size:13px;"></i>`;
         return `<button class="my-sticker-group-chip${isActive ? ' active' : ''}" data-group-id="${g.id === null ? '' : g.id}" title="${g.name}">${inner}</button>`;
     }
@@ -1529,6 +1547,11 @@ function initComboMenu() {
             html += '<button class="my-sticker-group-settings" title="管理分组与表情"><i class="fas fa-cog"></i></button>';
         }
         row.innerHTML = html;
+
+        // 云端封面图，用之前塞的 data-cover-ref 补一次懒加载绑定
+        row.querySelectorAll('img[data-cover-ref]').forEach(function (img) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));
+        });
 
         row.querySelector('.my-sticker-group-add').onclick = function (e) { e.stopPropagation(); _myStickerOpenNewGroupModal(); };
         var settingsBtn = row.querySelector('.my-sticker-group-settings');
@@ -1635,6 +1658,10 @@ function initComboMenu() {
         }
 
         contentArea.appendChild(renderMyStickerGroupRow());
+        var titleEl = document.createElement('div');
+        titleEl.className = 'my-sticker-add-title';
+        titleEl.textContent = '添加表情';
+        contentArea.appendChild(titleEl);
 
         var list = _myStickerGroupsList();
         if (!list.some(function (g) { return g.id === _myStickerActiveGroup; })) {
@@ -1677,11 +1704,10 @@ function initComboMenu() {
         var modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'my-sticker-move-modal';
-        modal.style.display = 'flex';
         var rowsHtml = list.map(function (g) {
             var cover = _myStickerCoverFor(g.id);
             var thumb = cover
-                ? '<img src="' + cover + '" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">'
+                ? _myStickerCoverImgHTML(cover, 36, 8)
                 : '<div style="width:36px;height:36px;border-radius:8px;background:var(--surface-1,#f0f0f0);display:flex;align-items:center;justify-content:center;"><i class="fas fa-images" style="font-size:14px;color:var(--text-secondary);"></i></div>';
             var isCurrent = (g.id || null) === (entry.groupId || null);
             return '<button class="my-sticker-move-row' + (isCurrent ? ' current' : '') + '" data-gid="' + (g.id === null ? '' : g.id) + '">' +
@@ -1695,6 +1721,8 @@ function initComboMenu() {
                 '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-move-cancel">取消</button></div>' +
             '</div>';
         document.body.appendChild(modal);
+        if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
+        _myStickerBindCoverRefs(modal);
         modal.querySelector('#my-sticker-move-cancel').onclick = function () { modal.remove(); };
         modal.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
             row.onclick = function () {
@@ -1716,9 +1744,8 @@ function initComboMenu() {
         var modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'my-sticker-newgroup-modal';
-        modal.style.display = 'flex';
         var gridHtml = lib.map(function (e) {
-            return '<button class="my-sticker-pick-item" data-id="' + e.id + '"><img loading="lazy" src="' + e.src + '"></button>';
+            return '<button class="my-sticker-pick-item" data-id="' + e.id + '"><img loading="lazy"></button>';
         }).join('');
         modal.innerHTML =
             '<div class="modal-content" style="max-width:340px;">' +
@@ -1729,10 +1756,19 @@ function initComboMenu() {
                 '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-newgroup-cancel">取消</button><button class="modal-btn modal-btn-primary" id="my-sticker-newgroup-confirm">创建</button></div>' +
             '</div>';
         document.body.appendChild(modal);
+        if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
 
-        modal.querySelectorAll('.my-sticker-pick-item').forEach(function (btn) {
+        modal.querySelectorAll('.my-sticker-pick-item').forEach(function (btn, i) {
             var img = btn.querySelector('img');
-            if (img.src.indexOf('oss://') === 0 && window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('src'));
+            var entrySrc = lib[i].src;
+            // 判断是不是云端图片，要看数据里原始存的字符串（entrySrc），
+            // 不能看 img.src——那是浏览器解析过的地址，跟原始的 "oss://..." 不是一回事，
+            // 用 img.src 判断永远不成立，之前缩略图显示不出来就是栽在这里
+            if (typeof entrySrc === 'string' && entrySrc.indexOf('oss://') === 0 && window.CloudMedia) {
+                window.CloudMedia.bindLazyImage(img, entrySrc);
+            } else {
+                img.src = entrySrc;
+            }
             btn.onclick = function () {
                 var id = btn.dataset.id;
                 if (selected[id]) { delete selected[id]; btn.classList.remove('picked'); }
@@ -1768,7 +1804,6 @@ function initComboMenu() {
         var modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'my-sticker-manage-modal';
-        modal.style.display = 'flex';
         modal.innerHTML =
             '<div class="modal-content" style="max-width:360px;max-height:85vh;">' +
                 '<div class="modal-title"><i class="fas fa-cog"></i><span>管理表情与分组</span></div>' +
@@ -1783,6 +1818,7 @@ function initComboMenu() {
                 '<div class="modal-buttons"><button class="modal-btn modal-btn-primary" id="my-sticker-manage-close">完成</button></div>' +
             '</div>';
         document.body.appendChild(modal);
+        if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
         modal.querySelector('#my-sticker-manage-close').onclick = function () {
             modal.remove();
             renderMyStickerLibrary();
@@ -1798,7 +1834,7 @@ function initComboMenu() {
             wrap.innerHTML = groups.map(function (g) {
                 var cover = _myStickerCoverFor(g.id);
                 var thumb = cover
-                    ? '<img src="' + cover + '" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">'
+                    ? _myStickerCoverImgHTML(cover, 28, 6)
                     : '<div style="width:28px;height:28px;border-radius:6px;background:var(--surface-1,#f0f0f0);"></div>';
                 return '<div class="my-sticker-manage-group-row" data-gid="' + g.id + '">' +
                     thumb +
@@ -1808,6 +1844,7 @@ function initComboMenu() {
                 '</div>';
             }).join('');
 
+            _myStickerBindCoverRefs(wrap);
             wrap.querySelectorAll('.my-sticker-manage-group-row').forEach(function (row) {
                 var gid = row.dataset.gid;
                 row.querySelector('[data-act="rename"]').onclick = function () { startRename(row, gid); };
@@ -1840,7 +1877,6 @@ function initComboMenu() {
             if (!g) return;
             var sub = document.createElement('div');
             sub.className = 'modal';
-            sub.style.display = 'flex';
             sub.style.zIndex = '3100';
             sub.innerHTML =
                 '<div class="modal-content" style="max-width:300px;">' +
@@ -1853,6 +1889,7 @@ function initComboMenu() {
                     '</div>' +
                 '</div>';
             document.body.appendChild(sub);
+            if (typeof window.showModal === 'function') window.showModal(sub); else sub.style.display = 'flex';
             sub.querySelector('#my-sticker-del-cancel').onclick = function () { sub.remove(); };
             sub.querySelector('#my-sticker-del-keep').onclick = function () {
                 _myStickerDeleteGroup(gid, true);
@@ -1905,7 +1942,6 @@ function initComboMenu() {
             var list = _myStickerGroupsList();
             var pick = document.createElement('div');
             pick.className = 'modal';
-            pick.style.display = 'flex';
             pick.style.zIndex = '3100';
             pick.innerHTML =
                 '<div class="modal-content" style="max-width:300px;">' +
@@ -1913,13 +1949,15 @@ function initComboMenu() {
                     '<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px;">' +
                         list.map(function (g) {
                             var cover = _myStickerCoverFor(g.id);
-                            var thumb = cover ? '<img src="' + cover + '" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">' : '<div style="width:32px;height:32px;border-radius:8px;background:var(--surface-1,#f0f0f0);"></div>';
+                            var thumb = cover ? _myStickerCoverImgHTML(cover, 32, 8) : '<div style="width:32px;height:32px;border-radius:8px;background:var(--surface-1,#f0f0f0);"></div>';
                             return '<button class="my-sticker-move-row" data-gid="' + (g.id === null ? '' : g.id) + '">' + thumb + '<span>' + g.name + '</span></button>';
                         }).join('') +
                     '</div>' +
                     '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-batchmove-cancel">取消</button></div>' +
                 '</div>';
             document.body.appendChild(pick);
+            if (typeof window.showModal === 'function') window.showModal(pick); else pick.style.display = 'flex';
+            _myStickerBindCoverRefs(pick);
             pick.querySelector('#my-sticker-batchmove-cancel').onclick = function () { pick.remove(); };
             pick.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
                 row.onclick = function () {

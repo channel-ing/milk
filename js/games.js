@@ -1330,6 +1330,103 @@ function startCoinFlipAnimation() {
 }
 window.startCoinFlipAnimation = startCoinFlipAnimation;
 
+// ══════════════════════════════════════════
+// "我的表情库"分组——纯数据逻辑，全局共用
+// 数据结构：myStickerLibrary 是 {id, src, groupId, addedAt} 的数组；
+// groupId 为 null 表示"默认分组"（没有专门分组，隐式存在，非空才显示）。
+// myStickerGroups 是 {id, name, cover, createdAt} 的数组。
+// ══════════════════════════════════════════
+function _myStickerLib() {
+    return (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
+}
+function _myStickerGroupsRaw() {
+    return window.myStickerGroups || [];
+}
+// 分组筛选条要遍历的列表：默认分组（有内容才出现）+ 自建分组（新建的在前）
+function _myStickerGroupsList() {
+    var lib = _myStickerLib();
+    var groups = _myStickerGroupsRaw().slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    var list = [];
+    var hasDefault = lib.some(function (e) { return !e.groupId; });
+    if (hasDefault) list.push({ id: null, name: '默认分组', isDefault: true });
+    groups.forEach(function (g) { list.push({ id: g.id, name: g.name, isDefault: false }); });
+    return list;
+}
+function _myStickerItemsInGroup(groupId) {
+    return _myStickerLib()
+        .filter(function (e) { return (e.groupId || null) === groupId; })
+        .sort(function (a, b) { return (a.addedAt || 0) - (b.addedAt || 0); });
+}
+// 封面：用户手动设置的优先；没设置就用组里最早加入的那张
+function _myStickerCoverFor(groupId) {
+    if (groupId) {
+        var g = _myStickerGroupsRaw().find(function (x) { return x.id === groupId; });
+        if (g && g.cover) return g.cover;
+    }
+    var items = _myStickerItemsInGroup(groupId);
+    return items.length ? items[0].src : null;
+}
+function _myStickerSaveLibrary() {
+    try { localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary); } catch (e) {}
+    if (typeof throttledSaveData === 'function') throttledSaveData();
+}
+function _myStickerSaveGroups() {
+    try { localforage.setItem(getStorageKey('myStickerGroups'), window.myStickerGroups || []); } catch (e) {}
+    if (typeof throttledSaveData === 'function') throttledSaveData();
+}
+// 把某个表情条目移到目标分组（null=默认分组）——一个表情只能在一个分组里，
+// 移过去之后原来的分组自然就不再有它了（因为归属只看这一个字段）
+function _myStickerMoveToGroup(entryId, targetGroupId) {
+    var entry = _myStickerLib().find(function (e) { return e.id === entryId; });
+    if (!entry) return;
+    entry.groupId = targetGroupId || null;
+    _myStickerSaveLibrary();
+}
+// 删除一个分组：keepStickers=true 时表情退回默认分组；false 时表情本体也一起删掉
+function _myStickerDeleteGroup(groupId, keepStickers) {
+    var lib = _myStickerLib();
+    if (keepStickers) {
+        lib.forEach(function (e) { if (e.groupId === groupId) e.groupId = null; });
+        _myStickerSaveLibrary();
+    } else {
+        var toDelete = lib.filter(function (e) { return e.groupId === groupId; });
+        toDelete.forEach(function (e) {
+            if (window.CloudMedia && typeof e.src === 'string' && e.src.indexOf('oss://') === 0) {
+                window.CloudMedia.delete(e.src).catch(function () {});
+            }
+        });
+        window.myStickerLibrary = lib.filter(function (e) { return e.groupId !== groupId; });
+        myStickerLibrary = window.myStickerLibrary;
+        _myStickerSaveLibrary();
+    }
+    window.myStickerGroups = _myStickerGroupsRaw().filter(function (g) { return g.id !== groupId; });
+    _myStickerSaveGroups();
+}
+
+// 批量把好几个表情一次性移到同一个分组
+function _myStickerMoveMultipleToGroup(entryIds, targetGroupId) {
+    var lib = _myStickerLib();
+    entryIds.forEach(function (id) {
+        var entry = lib.find(function (e) { return e.id === id; });
+        if (entry) entry.groupId = targetGroupId || null;
+    });
+    _myStickerSaveLibrary();
+}
+// 批量删除表情（真删图片，云端也一起删）
+async function _myStickerDeleteMultiple(entryIds) {
+    var lib = _myStickerLib();
+    var toDelete = lib.filter(function (e) { return entryIds.indexOf(e.id) !== -1; });
+    for (var i = 0; i < toDelete.length; i++) {
+        var e = toDelete[i];
+        if (window.CloudMedia && typeof e.src === 'string' && e.src.indexOf('oss://') === 0) {
+            try { await window.CloudMedia.delete(e.src); } catch (err) {}
+        }
+    }
+    window.myStickerLibrary = lib.filter(function (e) { return entryIds.indexOf(e.id) === -1; });
+    myStickerLibrary = window.myStickerLibrary;
+    _myStickerSaveLibrary();
+}
+
 function initComboMenu() {
     const comboBtn = document.getElementById('combo-btn');
     const picker = document.getElementById('user-sticker-picker');
@@ -1404,10 +1501,108 @@ function initComboMenu() {
         return item;
     }
 
-    function makeDeletableStickerItem(src, onClick, onDelete) {
+    let _myStickerActiveGroup = null; // null = 默认分组（或者默认分组为空时，落到第一个真实分组）
+
+    function _myStickerGroupChipHTML(g, isActive) {
+        var cover = _myStickerCoverFor(g.id);
+        var inner = cover
+            ? `<img loading="lazy" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+            : `<i class="fas fa-images" style="font-size:13px;"></i>`;
+        return `<button class="my-sticker-group-chip${isActive ? ' active' : ''}" data-group-id="${g.id === null ? '' : g.id}" title="${g.name}">${inner}</button>`;
+    }
+
+    function renderMyStickerGroupRow() {
+        var row = document.createElement('div');
+        row.className = 'my-sticker-group-row';
+        var list = _myStickerGroupsList();
+
+        // 当前选中的分组如果已经不存在了（比如刚被删掉），退回第一个可选分组
+        if (!list.some(function (g) { return g.id === _myStickerActiveGroup; })) {
+            _myStickerActiveGroup = list.length ? list[0].id : null;
+        }
+
+        var html = '<button class="my-sticker-group-add" title="新建分组"><i class="fas fa-plus"></i></button>';
+        list.forEach(function (g) {
+            html += _myStickerGroupChipHTML(g, g.id === _myStickerActiveGroup);
+        });
+        if (list.length) {
+            html += '<button class="my-sticker-group-settings" title="管理分组与表情"><i class="fas fa-cog"></i></button>';
+        }
+        row.innerHTML = html;
+
+        row.querySelector('.my-sticker-group-add').onclick = function (e) { e.stopPropagation(); _myStickerOpenNewGroupModal(); };
+        var settingsBtn = row.querySelector('.my-sticker-group-settings');
+        if (settingsBtn) settingsBtn.onclick = function (e) { e.stopPropagation(); _myStickerOpenManageModal(); };
+        row.querySelectorAll('.my-sticker-group-chip').forEach(function (chip) {
+            chip.onclick = function (e) {
+                e.stopPropagation();
+                var gid = chip.dataset.groupId || null;
+                _myStickerActiveGroup = gid;
+                renderMyStickerLibrary();
+            };
+        });
+        return row;
+    }
+
+    // 长按一个表情，弹出"设为分组封面 / 移动分组"的小浮窗
+    function _myStickerShowActionPopover(entry, anchorEl) {
+        var old = document.getElementById('my-sticker-action-popover');
+        if (old) old.remove();
+        var rect = anchorEl.getBoundingClientRect();
+        var pop = document.createElement('div');
+        pop.id = 'my-sticker-action-popover';
+        pop.className = 'my-sticker-action-popover';
+        pop.style.left = Math.min(rect.left, window.innerWidth - 160) + 'px';
+        pop.style.top = Math.max(rect.top - 84, 8) + 'px';
+        pop.innerHTML =
+            '<button class="my-sticker-action-btn" data-act="cover"><i class="fas fa-image"></i> 设为分组封面</button>' +
+            '<button class="my-sticker-action-btn" data-act="move"><i class="fas fa-folder-open"></i> 移动分组</button>';
+        document.body.appendChild(pop);
+
+        pop.querySelector('[data-act="cover"]').onclick = function (e) {
+            e.stopPropagation();
+            var gid = entry.groupId || null;
+            if (gid === null) {
+                showNotification('默认分组没有单独的封面设置', 'info');
+            } else {
+                var g = _myStickerGroupsRaw().find(function (x) { return x.id === gid; });
+                if (g) { g.cover = entry.src; _myStickerSaveGroups(); showNotification('已设为该分组封面', 'success'); }
+            }
+            pop.remove();
+            renderMyStickerLibrary();
+        };
+        pop.querySelector('[data-act="move"]').onclick = function (e) {
+            e.stopPropagation();
+            pop.remove();
+            _myStickerOpenMoveModal(entry);
+        };
+
+        setTimeout(function () {
+            function closeIt(ev) { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('click', closeIt); } }
+            document.addEventListener('click', closeIt);
+        }, 50);
+    }
+
+    // 给表情图片绑定长按（跟其余长按手势一样：按住600ms触发，移动/松手就取消）
+    function _bindStickerLongPress(imgEl, entry) {
+        var timer = null;
+        imgEl.addEventListener('touchstart', function () {
+            timer = setTimeout(function () {
+                timer = null;
+                imgEl._longPressed = true;
+                _myStickerShowActionPopover(entry, imgEl);
+            }, 600);
+        }, { passive: true });
+        imgEl.addEventListener('touchend', function () { if (timer) { clearTimeout(timer); timer = null; } });
+        imgEl.addEventListener('touchmove', function () { if (timer) { clearTimeout(timer); timer = null; } });
+        imgEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    }
+
+    function makeMyStickerItem(entry, onClick, onDelete) {
         const item = document.createElement('div');
         item.className = 'sticker-grid-item';
         item.style.position = 'relative';
+        var src = entry.src;
         const isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
         item.innerHTML = `<img loading="lazy"><div class="sticker-delete-btn" title="删除"><i class="fas fa-times"></i></div>`;
         const imgEl = item.querySelector('img');
@@ -1416,7 +1611,12 @@ function initComboMenu() {
         } else {
             imgEl.src = src;
         }
-        imgEl.onclick = (e) => { e.stopPropagation(); onClick(); };
+        imgEl.onclick = (e) => {
+            e.stopPropagation();
+            if (imgEl._longPressed) { imgEl._longPressed = false; return; }
+            onClick();
+        };
+        _bindStickerLongPress(imgEl, entry);
         item.querySelector('.sticker-delete-btn').onclick = (e) => { e.stopPropagation(); onDelete(); };
         return item;
     }
@@ -1433,32 +1633,318 @@ function initComboMenu() {
             `;
             return;
         }
+
+        contentArea.appendChild(renderMyStickerGroupRow());
+
+        var list = _myStickerGroupsList();
+        if (!list.some(function (g) { return g.id === _myStickerActiveGroup; })) {
+            _myStickerActiveGroup = list.length ? list[0].id : null;
+        }
+        var itemsToShow = _myStickerItemsInGroup(_myStickerActiveGroup);
+
         const grid = document.createElement('div');
         grid.className = 'sticker-grid-view';
-        myStickerLibrary.forEach((src, idx) => {
-            const item = makeDeletableStickerItem(src, () => {
-                addMessage({ id: Date.now(), sender: 'user', text: '', timestamp: new Date(), image: src, status: 'sent', type: 'normal' });
+        if (!itemsToShow.length) {
+            grid.innerHTML = '<div class="empty-sticker-tip" style="grid-column:1/-1;">这个分组还没有表情</div>';
+        }
+        itemsToShow.forEach((entry) => {
+            const item = makeMyStickerItem(entry, () => {
+                addMessage({ id: Date.now(), sender: 'user', text: '', timestamp: new Date(), image: entry.src, status: 'sent', type: 'normal' });
                 playSound('send');
                 picker.classList.remove('active');
                 const delayRange = settings.replyDelayMax - settings.replyDelayMin;
                 setTimeout(simulateReply, settings.replyDelayMin + Math.random() * delayRange);
             }, async () => {
-                // 阶段三B：如果是云端引用，先删云端（失败不阻塞）
-                if (window.CloudMedia && typeof src === 'string' && src.indexOf('oss://') === 0) {
-                    try {
-                        await window.CloudMedia.delete(src);
-                    } catch (err) {
-                        console.warn('[cloud-media] 云端删除失败', err);
-                    }
+                if (window.CloudMedia && typeof entry.src === 'string' && entry.src.indexOf('oss://') === 0) {
+                    try { await window.CloudMedia.delete(entry.src); } catch (err) { console.warn('[cloud-media] 云端删除失败', err); }
                 }
-                myStickerLibrary.splice(idx, 1);
-                localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary);
+                window.myStickerLibrary = _myStickerLib().filter(function (e) { return e.id !== entry.id; });
+                myStickerLibrary = window.myStickerLibrary;
+                _myStickerSaveLibrary();
                 showNotification('✓ 已删除', 'success');
                 renderMyStickerLibrary();
             });
             grid.appendChild(item);
         });
         contentArea.appendChild(grid);
+    }
+
+    // ── 移动分组弹窗：列出所有分组（封面+名字），点一个就挪过去 ──
+    function _myStickerOpenMoveModal(entry) {
+        var old = document.getElementById('my-sticker-move-modal');
+        if (old) old.remove();
+        var list = _myStickerGroupsList();
+        var modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'my-sticker-move-modal';
+        modal.style.display = 'flex';
+        var rowsHtml = list.map(function (g) {
+            var cover = _myStickerCoverFor(g.id);
+            var thumb = cover
+                ? '<img src="' + cover + '" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">'
+                : '<div style="width:36px;height:36px;border-radius:8px;background:var(--surface-1,#f0f0f0);display:flex;align-items:center;justify-content:center;"><i class="fas fa-images" style="font-size:14px;color:var(--text-secondary);"></i></div>';
+            var isCurrent = (g.id || null) === (entry.groupId || null);
+            return '<button class="my-sticker-move-row' + (isCurrent ? ' current' : '') + '" data-gid="' + (g.id === null ? '' : g.id) + '">' +
+                thumb + '<span>' + g.name + '</span>' + (isCurrent ? '<i class="fas fa-check" style="margin-left:auto;color:var(--accent-color);"></i>' : '') +
+                '</button>';
+        }).join('');
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:320px;">' +
+                '<div class="modal-title"><i class="fas fa-folder-open"></i><span>移动到哪个分组</span></div>' +
+                '<div style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:12px;">' + rowsHtml + '</div>' +
+                '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-move-cancel">取消</button></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        modal.querySelector('#my-sticker-move-cancel').onclick = function () { modal.remove(); };
+        modal.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
+            row.onclick = function () {
+                var gid = row.dataset.gid || null;
+                _myStickerMoveToGroup(entry.id, gid);
+                modal.remove();
+                showNotification('已移动分组', 'success');
+                renderMyStickerLibrary();
+            };
+        });
+    }
+
+    // ── 新建分组弹窗：填名字 + 从现有表情里多选（可以不选，先建个空分组） ──
+    function _myStickerOpenNewGroupModal() {
+        var old = document.getElementById('my-sticker-newgroup-modal');
+        if (old) old.remove();
+        var lib = _myStickerLib();
+        var selected = {};
+        var modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'my-sticker-newgroup-modal';
+        modal.style.display = 'flex';
+        var gridHtml = lib.map(function (e) {
+            return '<button class="my-sticker-pick-item" data-id="' + e.id + '"><img loading="lazy" src="' + e.src + '"></button>';
+        }).join('');
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:340px;">' +
+                '<div class="modal-title"><i class="fas fa-folder-plus"></i><span>新建分组</span></div>' +
+                '<input type="text" class="modal-input" id="my-sticker-newgroup-name" maxlength="20" placeholder="分组名称">' +
+                '<div class="modal-title" style="font-size:13px;margin:10px 0 6px;color:var(--text-secondary);">选几张表情放进去（可不选，之后再长按加）</div>' +
+                '<div id="my-sticker-newgroup-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:220px;overflow-y:auto;margin-bottom:12px;">' + gridHtml + '</div>' +
+                '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-newgroup-cancel">取消</button><button class="modal-btn modal-btn-primary" id="my-sticker-newgroup-confirm">创建</button></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.my-sticker-pick-item').forEach(function (btn) {
+            var img = btn.querySelector('img');
+            if (img.src.indexOf('oss://') === 0 && window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('src'));
+            btn.onclick = function () {
+                var id = btn.dataset.id;
+                if (selected[id]) { delete selected[id]; btn.classList.remove('picked'); }
+                else { selected[id] = true; btn.classList.add('picked'); }
+            };
+        });
+
+        modal.querySelector('#my-sticker-newgroup-cancel').onclick = function () { modal.remove(); };
+        modal.querySelector('#my-sticker-newgroup-confirm').onclick = function () {
+            var nameInput = modal.querySelector('#my-sticker-newgroup-name');
+            var name = nameInput.value.trim();
+            if (!name) { showNotification('给分组起个名字吧', 'error'); return; }
+            var newGroup = { id: 'stg_' + Date.now(), name: name, cover: null, createdAt: Date.now() };
+            window.myStickerGroups = [newGroup].concat(_myStickerGroupsRaw());
+            _myStickerSaveGroups();
+            var ids = Object.keys(selected);
+            if (ids.length) {
+                ids.forEach(function (id) { _myStickerMoveToGroup(id, newGroup.id); });
+            }
+            _myStickerActiveGroup = newGroup.id;
+            modal.remove();
+            showNotification('分组已创建', 'success');
+            renderMyStickerLibrary();
+        };
+    }
+
+    // ── 管理界面：分组的改名/删除 + 表情批量移动/删除 ──
+    function _myStickerOpenManageModal() {
+        var old = document.getElementById('my-sticker-manage-modal');
+        if (old) old.remove();
+        var selectedIds = {};
+
+        var modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'my-sticker-manage-modal';
+        modal.style.display = 'flex';
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:360px;max-height:85vh;">' +
+                '<div class="modal-title"><i class="fas fa-cog"></i><span>管理表情与分组</span></div>' +
+                '<div class="my-sticker-manage-section-label">分组</div>' +
+                '<div id="my-sticker-manage-group-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;"></div>' +
+                '<div class="my-sticker-manage-section-label">所有表情（可多选）</div>' +
+                '<div id="my-sticker-manage-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:220px;overflow-y:auto;margin-bottom:8px;"></div>' +
+                '<div id="my-sticker-manage-batch-bar" style="display:none;gap:8px;margin-bottom:10px;">' +
+                    '<button class="modal-btn modal-btn-secondary" id="my-sticker-manage-move" style="flex:1;">移动到…</button>' +
+                    '<button class="modal-btn modal-btn-secondary" id="my-sticker-manage-delete" style="flex:1;color:var(--text-danger,#c0392b);">删除</button>' +
+                '</div>' +
+                '<div class="modal-buttons"><button class="modal-btn modal-btn-primary" id="my-sticker-manage-close">完成</button></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        modal.querySelector('#my-sticker-manage-close').onclick = function () {
+            modal.remove();
+            renderMyStickerLibrary();
+        };
+
+        function renderGroupList() {
+            var wrap = modal.querySelector('#my-sticker-manage-group-list');
+            var groups = _myStickerGroupsRaw().slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+            if (!groups.length) {
+                wrap.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">还没有自建分组</div>';
+                return;
+            }
+            wrap.innerHTML = groups.map(function (g) {
+                var cover = _myStickerCoverFor(g.id);
+                var thumb = cover
+                    ? '<img src="' + cover + '" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">'
+                    : '<div style="width:28px;height:28px;border-radius:6px;background:var(--surface-1,#f0f0f0);"></div>';
+                return '<div class="my-sticker-manage-group-row" data-gid="' + g.id + '">' +
+                    thumb +
+                    '<span class="my-sticker-manage-group-name">' + g.name + '</span>' +
+                    '<button class="my-sticker-manage-mini-btn" data-act="rename"><i class="fas fa-pen"></i></button>' +
+                    '<button class="my-sticker-manage-mini-btn" data-act="delete"><i class="fas fa-trash"></i></button>' +
+                '</div>';
+            }).join('');
+
+            wrap.querySelectorAll('.my-sticker-manage-group-row').forEach(function (row) {
+                var gid = row.dataset.gid;
+                row.querySelector('[data-act="rename"]').onclick = function () { startRename(row, gid); };
+                row.querySelector('[data-act="delete"]').onclick = function () { openDeleteChoice(gid); };
+            });
+        }
+
+        function startRename(row, gid) {
+            var g = _myStickerGroupsRaw().find(function (x) { return x.id === gid; });
+            if (!g) return;
+            var nameEl = row.querySelector('.my-sticker-manage-group-name');
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.value = g.name;
+            input.maxLength = 20;
+            input.className = 'my-sticker-manage-rename-input';
+            nameEl.replaceWith(input);
+            input.focus();
+            function commit() {
+                var v = input.value.trim();
+                if (v) { g.name = v; _myStickerSaveGroups(); }
+                renderGroupList();
+            }
+            input.addEventListener('blur', commit);
+            input.addEventListener('keydown', function (e) { if (e.key === 'Enter') input.blur(); });
+        }
+
+        function openDeleteChoice(gid) {
+            var g = _myStickerGroupsRaw().find(function (x) { return x.id === gid; });
+            if (!g) return;
+            var sub = document.createElement('div');
+            sub.className = 'modal';
+            sub.style.display = 'flex';
+            sub.style.zIndex = '3100';
+            sub.innerHTML =
+                '<div class="modal-content" style="max-width:300px;">' +
+                    '<div class="modal-title"><i class="fas fa-trash"></i><span>删除"' + g.name + '"</span></div>' +
+                    '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">这个分组里的表情要怎么处理？</div>' +
+                    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                        '<button class="modal-btn modal-btn-secondary" id="my-sticker-del-keep">只删分组，表情退回默认分组</button>' +
+                        '<button class="modal-btn modal-btn-secondary" id="my-sticker-del-all" style="color:var(--text-danger,#c0392b);">整组删除，表情也一起删掉</button>' +
+                        '<button class="modal-btn modal-btn-secondary" id="my-sticker-del-cancel">取消</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(sub);
+            sub.querySelector('#my-sticker-del-cancel').onclick = function () { sub.remove(); };
+            sub.querySelector('#my-sticker-del-keep').onclick = function () {
+                _myStickerDeleteGroup(gid, true);
+                sub.remove();
+                showNotification('分组已删除，表情已退回默认分组', 'success');
+                renderGroupList();
+                renderGrid();
+            };
+            sub.querySelector('#my-sticker-del-all').onclick = function () {
+                _myStickerDeleteGroup(gid, false);
+                sub.remove();
+                showNotification('分组和里面的表情已全部删除', 'success');
+                renderGroupList();
+                renderGrid();
+            };
+        }
+
+        function updateBatchBar() {
+            var bar = modal.querySelector('#my-sticker-manage-batch-bar');
+            var ids = Object.keys(selectedIds);
+            bar.style.display = ids.length ? 'flex' : 'none';
+        }
+
+        function renderGrid() {
+            var grid = modal.querySelector('#my-sticker-manage-grid');
+            var lib = _myStickerLib();
+            grid.innerHTML = lib.map(function (e) {
+                var isSel = !!selectedIds[e.id];
+                return '<button class="my-sticker-pick-item' + (isSel ? ' picked' : '') + '" data-id="' + e.id + '" style="position:relative;">' +
+                    '<img loading="lazy" src="' + e.src + '">' +
+                    (isSel ? '<div style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:var(--accent-color);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;"><i class="fas fa-check"></i></div>' : '') +
+                '</button>';
+            }).join('');
+            grid.querySelectorAll('.my-sticker-pick-item').forEach(function (btn) {
+                var img = btn.querySelector('img');
+                if (img.getAttribute('src').indexOf('oss://') === 0 && window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('src'));
+                btn.onclick = function () {
+                    var id = btn.dataset.id;
+                    if (selectedIds[id]) delete selectedIds[id]; else selectedIds[id] = true;
+                    renderGrid();
+                    updateBatchBar();
+                };
+            });
+            updateBatchBar();
+        }
+
+        modal.querySelector('#my-sticker-manage-move').onclick = function () {
+            var ids = Object.keys(selectedIds);
+            if (!ids.length) return;
+            var list = _myStickerGroupsList();
+            var pick = document.createElement('div');
+            pick.className = 'modal';
+            pick.style.display = 'flex';
+            pick.style.zIndex = '3100';
+            pick.innerHTML =
+                '<div class="modal-content" style="max-width:300px;">' +
+                    '<div class="modal-title"><i class="fas fa-folder-open"></i><span>移动 ' + ids.length + ' 张表情到</span></div>' +
+                    '<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px;">' +
+                        list.map(function (g) {
+                            var cover = _myStickerCoverFor(g.id);
+                            var thumb = cover ? '<img src="' + cover + '" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">' : '<div style="width:32px;height:32px;border-radius:8px;background:var(--surface-1,#f0f0f0);"></div>';
+                            return '<button class="my-sticker-move-row" data-gid="' + (g.id === null ? '' : g.id) + '">' + thumb + '<span>' + g.name + '</span></button>';
+                        }).join('') +
+                    '</div>' +
+                    '<div class="modal-buttons"><button class="modal-btn modal-btn-secondary" id="my-sticker-batchmove-cancel">取消</button></div>' +
+                '</div>';
+            document.body.appendChild(pick);
+            pick.querySelector('#my-sticker-batchmove-cancel').onclick = function () { pick.remove(); };
+            pick.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
+                row.onclick = function () {
+                    _myStickerMoveMultipleToGroup(ids, row.dataset.gid || null);
+                    selectedIds = {};
+                    pick.remove();
+                    showNotification('已移动 ' + ids.length + ' 张', 'success');
+                    renderGroupList();
+                    renderGrid();
+                };
+            });
+        };
+
+        modal.querySelector('#my-sticker-manage-delete').onclick = async function () {
+            var ids = Object.keys(selectedIds);
+            if (!ids.length) return;
+            await _myStickerDeleteMultiple(ids);
+            selectedIds = {};
+            showNotification('已删除 ' + ids.length + ' 张', 'success');
+            renderGroupList();
+            renderGrid();
+        };
+
+        renderGroupList();
+        renderGrid();
     }
 
     function renderPartnerStickerLibrary() {

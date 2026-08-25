@@ -1,9 +1,9 @@
 /**
  * survey.js — 调查问卷功能
  *
- * Step 1（这一步做的）：数据结构 + 创建问卷弹窗（我问梦角）+ 聊天设置→节奏tab 问卷回复时间滑块
- * Step 2（下一步）：梦角选择算法 + 提醒机制 + 历史记录列表页 + 详情页（我问梦角完整闭环）
- * Step 3（最后）：反向问卷（梦角问我）+ 回复库"问卷题库"tab + 撤回/编辑/删除走回收站
+ * Step 1：数据结构 + 创建问卷弹窗（我问梦角）+ 聊天设置→节奏tab 问卷回复时间滑块
+ * Step 2：梦角选择算法 + 提醒机制 + 历史记录列表页 + 详情页（我问梦角完整闭环）
+ * Step 3（这一步做的）：反向问卷（梦角问我）+ 回复库"问卷题库"tab + 触发引擎 + 回收站
  *
  * 数据结构（_data）：
  * {
@@ -11,15 +11,26 @@
  *     {
  *       id, createdAt, dueAt,                 // dueAt = 倒计时结束时间点，到点才真正"算"梦角选了什么
  *       status: 'pending' | 'answered' | 'withdrawn',
- *       answeredAt: null | timestamp,
+ *       answeredAt, deletedAt,
  *       selections: null | { [questionId]: [optionId, ...] },  // 倒计时结束那一刻才算，之前一直是 null
  *       questions: [
  *         { id, type: 'single'|'multi', text, options: [ { id, kind:'text'|'image', value } ] }
  *       ]
  *     }, ...
  *   ],
- *   askMe: [],                 // Step 3 才用
- *   replyDelayMinHours: 1,      // 问卷回复时间区间（小时），聊天设置→节奏tab 那两个新滑块
+ *   askMe: [                     // 反向问卷（梦角问我）
+ *     {
+ *       id, sentAt, status: 'sent' | 'received', receivedAt, deletedAt,
+ *       answers: null | { [questionId]: answerText },
+ *       questions: [ { id, text } ]   // 纯文字开放式提问，没有选项
+ *     }, ...
+ *   ],
+ *   bank: [                      // 反向问卷题库（回复库→氛围感→"问卷题库"tab 管理）
+ *     { id, text, builtin: bool, hidden: bool, usedInRound: bool }
+ *   ],
+ *   askMeTrigger: { nextCheckAt: timestamp, missStreak: 0|1|2+ },
+ *     // 触发概率：missStreak 0→50%，1→80%，2+→100%；中了清零；每次检查后不管中没中都重排 5-10 天后的 nextCheckAt
+ *   replyDelayMinHours: 1,       // 问卷回复时间区间（小时），聊天设置→节奏tab 那两个新滑块
  *   replyDelayMaxHours: 24
  * }
  *
@@ -88,8 +99,13 @@
                 if (!_data.replyDelayMaxHours) _data.replyDelayMaxHours = 24;
                 // 兼容 Step 1 时创建的旧数据（那会儿还没有 deletedAt 字段）
                 _data.askPartner.forEach(function (s) { if (s.deletedAt === undefined) s.deletedAt = null; });
+                _data.askMe.forEach(function (s) { if (s.deletedAt === undefined) s.deletedAt = null; });
             }
         } catch (e) { console.warn('[survey] load failed:', e); }
+        if (!Array.isArray(_data.bank) || !_data.bank.length) _seedBuiltinBank();
+        if (!_data.askMeTrigger) {
+            _data.askMeTrigger = { nextCheckAt: Date.now() + _randDays(5, 10), missStreak: 0 };
+        }
         _loaded = true;
         _syncDelaySlidersUI();
     }
@@ -103,6 +119,44 @@
 
     function _uid(prefix) {
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function _randDays(a, b) { return (a + Math.random() * (b - a)) * 86400000; }
+
+    // ── 反向问卷（梦角问我）内置题库，60条，感情/生活习惯/未来展望各20 ──
+    var BUILTIN_BANK_TEXTS = [
+        '你生气的时候希望我哄你还是让你静一静', '你难过的时候想让我抱你还是陪你说话', '你跟我吵架的时候最怕我说什么',
+        '你希望我吃醋还是不吃的醋', '你喜欢惊喜还是提前商量', '你最喜欢我碰你哪里',
+        '你睡觉的时候希望我抱着你还是各自睡', '你早上醒来第一件事会想我吗', '你希望每天说晚安吗',
+        '你怎么表达"我想你了"', '你什么时候会主动牵我的手', '你会因为什么小事突然对我心动',
+        '你最喜欢我叫你什么', '你会因为我的哪句话开心一整天', '你心里有没有一个"理想伴侣"的样子，我像吗',
+        '你觉得我们之间最默契的地方是什么', '你希望我怎么对待你的朋友', '你有没有幻想过我们结婚的场景',
+        '你更想要浪漫还是实用', '你希望我用什么方式告诉你我爱你',
+        '你刷牙用冷水还是温水', '你睡觉喜欢朝左还是朝右', '你吃饭时先吃菜还是先吃饭',
+        '你洗澡的时候会唱歌吗', '你挤牙膏从中间挤还是从尾巴挤', '你吃饺子蘸醋还是蘸酱油',
+        '你睡觉抱东西吗', '你喜欢穿拖鞋还是光脚', '你吃西瓜用勺子还是切块',
+        '你喜欢淋浴还是泡澡', '你喝咖啡加糖吗', '你吃薯条蘸番茄酱还是冰淇淋',
+        '你煮泡面会加鸡蛋吗', '你吃苹果削皮吗', '你喜欢开灯睡觉还是全黑',
+        '你吃炸鸡先吃皮还是先吃肉', '你喝汤会端起碗喝还是用勺子', '你吃巧克力会咬还是含',
+        '你系鞋带是蝴蝶结还是单结', '你喝牛奶会舔嘴角吗',
+        '我们以后会住在一起吗', '以后家里你想养猫还是狗', '你想过结婚吗',
+        '孩子像你还是像我', '十年后我们还会一起吃饭吗', '我们以后每年都去旅行好不好',
+        '你以后还会像现在这样对我好吗', '下辈子你还想遇到我吗', '你以后会记得我们的纪念日吗',
+        '我想多了解你一点', '你小时候发生过什么有趣的事吗', '你最喜欢的颜色是什么',
+        '你小时候的梦想是什么', '你最开心的一次回忆是什么', '你最喜欢吃什么',
+        '你喜欢什么样的天气', '你最喜欢的一首歌是什么', '你从什么时候开始喜欢我的',
+        '你最喜欢我哪一点', '你希望我们变成什么样子'
+    ];
+
+    function _seedBuiltinBank() {
+        var existing = Array.isArray(_data.bank) ? _data.bank : [];
+        // 万一之前已经有自定义题（理论上现在不会，但留个防御），种子只补内置的，不覆盖已有数据
+        var already = new Set(existing.filter(function (q) { return q.builtin; }).map(function (q) { return q.text; }));
+        BUILTIN_BANK_TEXTS.forEach(function (t, i) {
+            if (already.has(t)) return;
+            existing.push({ id: 'bk_' + i, text: t, builtin: true, hidden: false, usedInRound: false });
+        });
+        _data.bank = existing;
     }
 
     // ── 问卷回复时间滑块（聊天设置→节奏tab）──────────────────────
@@ -496,6 +550,192 @@
         }
     }
 
+    // ══ 反向问卷（梦角问我）：触发引擎 + 抽题 + 提交回答 ══════════
+    //
+    // 触发概率：5-10天随机检查一次；上次触发过 → 这次50%；上次没中 → 这次80%；
+    // 再没中 → 这次100%必中。中了就把 missStreak 清零，重新从50%开始下一轮计时。
+    function _checkAskMeTrigger() {
+        if (!_loaded) return;
+        var t = _data.askMeTrigger;
+        if (!t || Date.now() < t.nextCheckAt) return;
+
+        var prob = t.missStreak === 0 ? 0.5 : (t.missStreak === 1 ? 0.8 : 1);
+        var hit = Math.random() < prob;
+        if (hit) {
+            var batch = _createAskMeBatch();
+            if (batch) {
+                t.missStreak = 0;
+                _queueNotify({ type: 'askme_new', survey: batch });
+                _refreshOpenViews();
+            }
+            // 题库里没有可用题目（比如全被隐藏了）就当这次白抽，missStreak 不变，
+            // 照样往下重新排一次 5-10 天后的检查时间，不会卡住
+        } else {
+            t.missStreak++;
+        }
+        t.nextCheckAt = Date.now() + _randDays(5, 10);
+        _save();
+    }
+
+    // 抽题：不放回抽取，题库（排除隐藏的）问完一轮就整体重置再开始新一轮
+    function _createAskMeBatch() {
+        var pool = _data.bank.filter(function (q) { return !q.hidden; });
+        if (!pool.length) return null;
+        var available = pool.filter(function (q) { return !q.usedInRound; });
+        if (!available.length) {
+            pool.forEach(function (q) { q.usedInRound = false; });
+            available = pool.slice();
+        }
+        var kChoices = [3, 4, 5];
+        var k = Math.min(kChoices[Math.floor(Math.random() * 3)], available.length);
+        var shuffled = available.slice().sort(function () { return Math.random() - 0.5; });
+        var picked = shuffled.slice(0, k);
+        picked.forEach(function (q) { q.usedInRound = true; });
+
+        var batch = {
+            id: _uid('am'),
+            sentAt: Date.now(),
+            status: 'sent',
+            receivedAt: null,
+            deletedAt: null,
+            answers: null,
+            questions: picked.map(function (q) { return { id: q.id, text: q.text }; })
+        };
+        _data.askMe.push(batch);
+        _save();
+        return batch;
+    }
+
+    function _submitAskMeAnswers(id, answersMap) {
+        var b = _data.askMe.find(function (x) { return x.id === id; });
+        if (!b) return;
+        b.answers = answersMap;
+        b.status = 'received';
+        b.receivedAt = Date.now();
+        _save();
+        _closeDetailModal();
+        _refreshOpenViews();
+        if (typeof showNotification === 'function') showNotification('已提交', 'success');
+    }
+
+    // ── 问卷题库管理（回复库 → 氛围感 → "问卷题库" tab）──────────
+    // 内置(60条)+自定义功能完全一致，都可编辑/删除/隐藏；隐藏的不参与 _createAskMeBatch 抽题
+    function _bankAdd(text) {
+        text = (text || '').trim();
+        if (!text) return;
+        _data.bank.push({ id: _uid('bk'), text: text, builtin: false, hidden: false, usedInRound: false });
+        _save();
+    }
+    function _bankEdit(id, text) {
+        var q = _data.bank.find(function (x) { return x.id === id; });
+        if (!q) return;
+        text = (text || '').trim();
+        if (!text) return;
+        q.text = text;
+        _save();
+    }
+    function _bankDelete(id) {
+        _data.bank = _data.bank.filter(function (x) { return x.id !== id; });
+        _save();
+    }
+    function _bankToggleHide(id) {
+        var q = _data.bank.find(function (x) { return x.id === id; });
+        if (!q) return;
+        q.hidden = !q.hidden;
+        _save();
+    }
+
+    // 新增/编辑用小弹窗输入，不用浏览器原生 prompt()——iOS Safari 下原生对话框这类东西
+    // 之前踩过坑（confirm() 在 iOS Safari 不好用），而且原生 prompt 长相跟 app 完全不搭
+    function _bankPromptModal(title, initialValue, onConfirm) {
+        var existing = document.getElementById('survey-bank-prompt-modal');
+        if (existing) existing.remove();
+        var modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'survey-bank-prompt-modal';
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:320px;">' +
+                '<div class="modal-title"><i class="fas fa-clipboard-list"></i><span>' + _esc(title) + '</span></div>' +
+                '<textarea class="modal-input" id="survey-bank-prompt-input" rows="2" style="resize:none;width:100%;box-sizing:border-box;"></textarea>' +
+                '<div class="modal-buttons">' +
+                    '<button class="modal-btn modal-btn-secondary" id="survey-bank-prompt-cancel">取消</button>' +
+                    '<button class="modal-btn modal-btn-primary" id="survey-bank-prompt-ok">确定</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        var input = modal.querySelector('#survey-bank-prompt-input');
+        input.value = initialValue || '';
+        if (typeof window.showModal === 'function') window.showModal(modal, input); else modal.style.display = 'flex';
+        function close() { modal.remove(); }
+        modal.querySelector('#survey-bank-prompt-cancel').onclick = close;
+        modal.querySelector('#survey-bank-prompt-ok').onclick = function () {
+            var val = input.value;
+            close();
+            onConfirm(val);
+        };
+    }
+
+    var _bankSearchQuery = '';
+    function _renderBankTab(list) {
+        list.innerHTML =
+            '<div class="survey-bank-toolbar">' +
+                '<input type="text" class="survey-bank-search" id="survey-bank-search" placeholder="搜索题目…" value="' + _esc(_bankSearchQuery) + '">' +
+            '</div>' +
+            '<div id="survey-bank-rows"></div>' +
+            '<button type="button" class="survey-add-option-btn" id="survey-bank-add-btn" style="margin-top:8px;">' +
+                '<i class="fas fa-plus"></i> 新增题目' +
+            '</button>';
+
+        var searchInput = list.querySelector('#survey-bank-search');
+        searchInput.oninput = function () { _bankSearchQuery = searchInput.value; _renderBankRows(); };
+        list.querySelector('#survey-bank-add-btn').onclick = function () {
+            _bankPromptModal('新增问卷题目', '', function (text) {
+                if (text && text.trim()) { _bankAdd(text); _renderBankRows(); }
+            });
+        };
+        _renderBankRows();
+    }
+
+    function _renderBankRows() {
+        var rows = document.getElementById('survey-bank-rows');
+        if (!rows) return;
+        var q = _bankSearchQuery.toLowerCase().trim();
+        var items = _data.bank.filter(function (x) { return !q || x.text.toLowerCase().indexOf(q) !== -1; });
+        if (!items.length) {
+            rows.innerHTML = '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:20px 0;">' +
+                (q ? ('未找到 "' + _esc(q) + '"') : '还没有题目') + '</div>';
+            return;
+        }
+        rows.innerHTML = items.map(function (item) {
+            return '<div class="custom-reply-item' + (item.hidden ? ' survey-bank-row-hidden' : '') + '" data-id="' + item.id + '">' +
+                '<span class="custom-reply-text">' +
+                    (item.builtin ? '<span class="survey-bank-builtin-tag">内置</span>' : '') +
+                    _esc(item.text) +
+                '</span>' +
+                '<div class="custom-reply-actions">' +
+                    '<button class="reply-action-mini hide-btn" title="' + (item.hidden ? '取消隐藏' : '隐藏') + '"><i class="fas fa-eye' + (item.hidden ? '-slash' : '') + '"></i></button>' +
+                    '<button class="reply-action-mini edit-btn" title="编辑"><i class="fas fa-pen"></i></button>' +
+                    '<button class="reply-action-mini delete-btn" title="删除"><i class="fas fa-trash"></i></button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+        rows.querySelectorAll('.custom-reply-item').forEach(function (row) {
+            var id = row.dataset.id;
+            row.querySelector('.hide-btn').onclick = function () { _bankToggleHide(id); _renderBankRows(); };
+            row.querySelector('.edit-btn').onclick = function () {
+                var cur = _data.bank.find(function (x) { return x.id === id; });
+                _bankPromptModal('编辑题目', cur ? cur.text : '', function (text) {
+                    if (text && text.trim()) { _bankEdit(id, text); _renderBankRows(); }
+                });
+            };
+            row.querySelector('.delete-btn').onclick = function () {
+                _bankDelete(id);
+                _renderBankRows();
+            };
+        });
+    }
+    window._surveyRenderBankTab = _renderBankTab;
+
     // ── 提醒合并：不管什么来源（问卷回复、以后 Step 3 的反向问卷新提问……），
     //    只要短时间内一起发生，就合并成一条弹窗，不用逐条打扰 ──
     var _notifyQueue = [];
@@ -563,10 +803,12 @@
         popup.querySelector('#survey-notif-later').onclick = function () { popup.remove(); };
         popup.querySelector('#survey-notif-view').onclick = function () {
             popup.remove();
-            // 只有一份问卷回复、且没有新提问混在一起时，直接进详情页；否则进列表页让用户自己挑
-            if (answeredCount === 1 && items.length === 1) {
+            // 只有一条动态时直接进详情/回答页；混了好几条（不管什么类型）就进列表页让用户自己挑
+            if (items.length === 1) {
                 _openListModal();
-                setTimeout(function () { _openDetailModal(items[0].survey.id); }, 320);
+                var only = items[0];
+                var src = only.type === 'answered' ? 'partner' : 'me';
+                setTimeout(function () { _openDetailModal(only.survey.id, src); }, 320);
             } else {
                 _openListModal();
             }
@@ -582,7 +824,7 @@
         return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
     }
 
-    var STATUS_LABEL = { pending: '等待中', answered: '已回复', withdrawn: '已撤回' };
+    var STATUS_LABEL = { pending: '等待中', answered: '已回复', withdrawn: '已撤回', sent: '已发送', received: '已收到' };
 
     function _surveyTitle(s) {
         var t = s.questions[0] && s.questions[0].text;
@@ -602,39 +844,64 @@
     function _renderListBody() {
         var body = document.getElementById('survey-list-body');
         if (!body) return;
-        var all = _data.askPartner.filter(function (s) { return !s.deletedAt; });
+        var partnerItems = _data.askPartner.filter(function (s) { return !s.deletedAt; }).map(function (s) { return { ref: s, src: 'partner' }; });
+        var meItems = _data.askMe.filter(function (s) { return !s.deletedAt; }).map(function (s) { return { ref: s, src: 'me' }; });
+        var all = partnerItems.concat(meItems);
         if (!all.length) {
             body.innerHTML =
                 '<div class="survey-list-empty">' +
                     '<i class="fas fa-clipboard-list"></i>' +
                     '<p>还没有问卷，问点什么给梦角吧</p>' +
                 '</div>';
+            _sizeListBody();
             return;
         }
-        var pinned = all.filter(function (s) { return s.status === 'pending'; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
-        var rest = all.filter(function (s) { return s.status !== 'pending'; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
+        var isPinned = function (it) { return it.src === 'partner' ? it.ref.status === 'pending' : it.ref.status === 'sent'; };
+        var pinned = all.filter(isPinned).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
+        var rest = all.filter(function (it) { return !isPinned(it); }).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
 
         var html = '';
-        pinned.forEach(function (s) { html += _cardHTML(s); });
+        pinned.forEach(function (it) { html += _cardHTML(it.ref, it.src); });
         if (pinned.length && rest.length) html += '<div class="survey-pin-divider">已完成</div>';
-        rest.forEach(function (s) { html += _cardHTML(s); });
+        rest.forEach(function (it) { html += _cardHTML(it.ref, it.src); });
         body.innerHTML = html;
 
         body.querySelectorAll('.survey-card').forEach(function (el) {
-            el.onclick = function () { _openDetailModal(el.dataset.sid); };
+            el.onclick = function () { _openDetailModal(el.dataset.sid, el.dataset.src); };
+        });
+        _sizeListBody();
+    }
+
+    // 弹窗高度固定在"大概4张卡片"这个高度，不管实际有几份问卷都不会跟着变矮/变高——
+    // 超过4份就在这块区域内部上下滑动看剩下的。量的是第一张卡片的实际渲染高度（卡片高度
+    // 会因为标题是1行还是2行有点误差，但足够接近"4份"这个视觉预期了），量不到（比如空状态）
+    // 就用一个兜底估算值，保证弹窗不会因为没数据而缩得比平时小
+    function _sizeListBody() {
+        var body = document.getElementById('survey-list-body');
+        if (!body) return;
+        requestAnimationFrame(function () {
+            var card = body.querySelector('.survey-card');
+            var cardH = card ? card.getBoundingClientRect().height : 100;
+            var gap = 10; // 对应 .survey-card 的 margin-bottom
+            body.style.height = (cardH * 4 + gap * 3) + 'px';
+            body.style.overflowY = 'auto';
         });
     }
 
-    function _cardHTML(s) {
+    function _cardHTML(s, src) {
         var statusCls = 'survey-tag-status-' + s.status;
-        return '<div class="survey-card" data-sid="' + s.id + '">' +
+        var srcTagCls = src === 'partner' ? 'survey-tag-src-me' : 'survey-tag-src-partner';
+        var srcTagText = src === 'partner' ? '我问的' : '它问的';
+        var createdAt = s.createdAt || s.sentAt;
+        var answeredAt = s.answeredAt || s.receivedAt;
+        return '<div class="survey-card" data-sid="' + s.id + '" data-src="' + src + '">' +
             '<div class="survey-card-top">' +
-                '<span class="survey-tag survey-tag-src-me">我问的</span>' +
+                '<span class="survey-tag ' + srcTagCls + '">' + srcTagText + '</span>' +
                 '<span class="survey-tag survey-tag-status ' + statusCls + '">' + STATUS_LABEL[s.status] + '</span>' +
             '</div>' +
             '<div class="survey-card-title">' + _esc(_surveyTitle(s)) + '</div>' +
-            '<div class="survey-card-meta">' + _fmtTime(s.createdAt) +
-                (s.answeredAt ? (' · 回复于 ' + _fmtTime(s.answeredAt)) : '') +
+            '<div class="survey-card-meta">' + _fmtTime(createdAt) +
+                (answeredAt ? (' · 回复于 ' + _fmtTime(answeredAt)) : '') +
                 ' · ' + s.questions.length + ' 题</div>' +
         '</div>';
     }
@@ -647,9 +914,11 @@
 
     // ── 详情页 ──────────────────────────────────────────────────
     var _detailCurrentId = null;
+    var _detailCurrentSrc = 'partner';
 
-    function _openDetailModal(id) {
+    function _openDetailModal(id, src) {
         _detailCurrentId = id;
+        _detailCurrentSrc = src || 'partner';
         _renderDetail();
         if (typeof window.showModal === 'function') window.showModal(document.getElementById('survey-detail-modal'));
         else document.getElementById('survey-detail-modal').style.display = 'flex';
@@ -660,6 +929,11 @@
     }
 
     function _renderDetail() {
+        if (_detailCurrentSrc === 'me') _renderDetailAskMe();
+        else _renderDetailPartner();
+    }
+
+    function _renderDetailPartner() {
         var s = _data.askPartner.find(function (x) { return x.id === _detailCurrentId; });
         var body = document.getElementById('survey-detail-body');
         var actions = document.getElementById('survey-detail-actions');
@@ -691,6 +965,7 @@
         body.innerHTML = metaHtml + qHtml;
 
         if (s.status === 'pending') {
+            actions.className = 'modal-buttons';
             actions.innerHTML =
                 '<button class="modal-btn modal-btn-secondary" id="survey-detail-withdraw">撤回</button>' +
                 '<button class="modal-btn modal-btn-primary" id="survey-detail-edit">编辑</button>';
@@ -699,7 +974,76 @@
                 _closeDetailModal();
                 setTimeout(function () { _openCreateModal(s); }, 200);
             };
+        } else if (s.status === 'withdrawn') {
+            actions.className = 'modal-buttons';
+            actions.innerHTML =
+                '<button class="modal-btn modal-btn-secondary" id="survey-detail-delete" style="color:#e0605a;">删除</button>' +
+                '<button class="modal-btn modal-btn-primary" id="survey-detail-resend">重新发送</button>';
+            actions.querySelector('#survey-detail-delete').onclick = function () { _softDeleteSurvey(s.id); };
+            actions.querySelector('#survey-detail-resend').onclick = function () { _resendSurvey(s.id); };
         } else {
+            // 已回复：单独一个"删除"按钮，靠右下角（survey-buttons-solo 这个类负责让它靠右，见 survey.css）
+            actions.className = 'modal-buttons survey-buttons-solo';
+            actions.innerHTML = '<button class="modal-btn modal-btn-secondary" id="survey-detail-delete" style="color:#e0605a;">删除</button>';
+            actions.querySelector('#survey-detail-delete').onclick = function () { _softDeleteSurvey(s.id); };
+        }
+    }
+
+    // 反向问卷（梦角问我）详情页：
+    //   已发送 → 逐题一个文字输入框，底部"提交"（全部填完才能点亮）
+    //   已收到 → 只读展示题目+已填的回答，底部只有"删除"
+    function _renderDetailAskMe() {
+        var s = _data.askMe.find(function (x) { return x.id === _detailCurrentId; });
+        var body = document.getElementById('survey-detail-body');
+        var actions = document.getElementById('survey-detail-actions');
+        if (!s || !body || !actions) return;
+
+        var metaHtml = '<div class="survey-detail-meta-row">' +
+            '<span class="survey-tag survey-tag-status survey-tag-status-' + s.status + '">' + STATUS_LABEL[s.status] + '</span>' +
+            '<span>提问于 ' + _fmtTime(s.sentAt) + '</span>' +
+            (s.receivedAt ? ('<span>回复于 ' + _fmtTime(s.receivedAt) + '</span>') : '') +
+        '</div>';
+
+        if (s.status === 'sent') {
+            var qHtml = s.questions.map(function (q, qi) {
+                return '<div class="survey-detail-q-block">' +
+                    '<div class="survey-detail-q-text">' + _esc(q.text) + '</div>' +
+                    '<textarea class="survey-answer-input" data-qidx="' + qi + '" placeholder="写点什么…" rows="2"></textarea>' +
+                '</div>';
+            }).join('');
+            body.innerHTML = metaHtml + qHtml;
+
+            var textareas = body.querySelectorAll('.survey-answer-input');
+            var submitBtn;
+            function updateSubmitState() {
+                var allFilled = Array.prototype.every.call(textareas, function (ta) { return ta.value.trim(); });
+                if (submitBtn) submitBtn.disabled = !allFilled;
+            }
+            textareas.forEach(function (ta) { ta.oninput = updateSubmitState; });
+
+            actions.className = 'modal-buttons survey-buttons-solo';
+            actions.innerHTML = '<button class="modal-btn modal-btn-primary" id="survey-detail-submit-answer" disabled>提交</button>';
+            submitBtn = actions.querySelector('#survey-detail-submit-answer');
+            submitBtn.onclick = function () {
+                var answers = {};
+                textareas.forEach(function (ta) {
+                    var q = s.questions[+ta.dataset.qidx];
+                    answers[q.id] = ta.value.trim();
+                });
+                _submitAskMeAnswers(s.id, answers);
+            };
+            updateSubmitState();
+        } else {
+            var qHtml2 = s.questions.map(function (q) {
+                var answerText = (s.answers && s.answers[q.id]) || '';
+                return '<div class="survey-detail-q-block">' +
+                    '<div class="survey-detail-q-text">' + _esc(q.text) + '</div>' +
+                    '<div class="survey-detail-opt selected"><span>' + _esc(answerText) + '</span></div>' +
+                '</div>';
+            }).join('');
+            body.innerHTML = metaHtml + qHtml2;
+
+            actions.className = 'modal-buttons survey-buttons-solo';
             actions.innerHTML = '<button class="modal-btn modal-btn-secondary" id="survey-detail-delete" style="color:#e0605a;">删除</button>';
             actions.querySelector('#survey-detail-delete').onclick = function () { _softDeleteSurvey(s.id); };
         }
@@ -707,6 +1051,15 @@
 
     // ── 撤回 / 软删除（回收站，30天）/ 恢复 / 彻底删除 ────────────
     var _TRASH_TTL = 30 * 24 * 60 * 60 * 1000;
+
+    // 在两个数组里都找一下，返回 {rec, arr} 或 null——回收站/删除这些操作现在两种来源都要处理
+    function _findRecord(id) {
+        var r = _data.askPartner.find(function (x) { return x.id === id; });
+        if (r) return { rec: r, arr: _data.askPartner };
+        r = _data.askMe.find(function (x) { return x.id === id; });
+        if (r) return { rec: r, arr: _data.askMe };
+        return null;
+    }
 
     function _withdrawSurvey(id) {
         var s = _data.askPartner.find(function (x) { return x.id === id; });
@@ -719,20 +1072,43 @@
     }
 
     function _softDeleteSurvey(id) {
-        var s = _data.askPartner.find(function (x) { return x.id === id; });
-        if (!s) return;
-        s.deletedAt = Date.now();
+        var found = _findRecord(id);
+        if (!found) return;
+        found.rec.deletedAt = Date.now();
         _save();
         _closeDetailModal();
         _refreshOpenViews();
         if (typeof showNotification === 'function') showNotification('已删除，30天内可在回收站恢复', 'info');
     }
 
+    // 撤回的问卷可以"重新发送"——原样复制一份题目内容，当成一份全新的问卷发出去
+    // （新 id、新的创建时间、重新随机一个 dueAt），跟原来那份撤回的问卷互不影响
+    function _resendSurvey(id) {
+        var s = _data.askPartner.find(function (x) { return x.id === id; });
+        if (!s) return;
+        var fresh = {
+            id: _uid('sv'),
+            createdAt: Date.now(),
+            dueAt: _randomDueAt(),
+            status: 'pending',
+            answeredAt: null,
+            deletedAt: null,
+            selections: null,
+            questions: JSON.parse(JSON.stringify(s.questions))
+        };
+        _data.askPartner.push(fresh);
+        _save();
+        _migrateOptionImagesToCloud(fresh); // 万一原问卷的图片选项当时是本地base64、现在配了OSS，顺手迁移一下
+        _closeDetailModal();
+        _refreshOpenViews();
+        if (typeof showNotification === 'function') showNotification('已作为新问卷重新发出', 'success');
+    }
+
     // 开机自检+每次打开回收站前都清一次——过期的直接从数组里摘掉，不占地方
     function _cleanTrash() {
-        _data.askPartner = _data.askPartner.filter(function (s) {
-            return !s.deletedAt || (Date.now() - s.deletedAt) < _TRASH_TTL;
-        });
+        var filterFn = function (s) { return !s.deletedAt || (Date.now() - s.deletedAt) < _TRASH_TTL; };
+        _data.askPartner = _data.askPartner.filter(filterFn);
+        _data.askMe = _data.askMe.filter(filterFn);
     }
 
     function _openTrashModal() {
@@ -750,12 +1126,15 @@
     function _renderTrashBody() {
         var body = document.getElementById('survey-trash-body');
         if (!body) return;
-        var trashed = _data.askPartner.filter(function (s) { return s.deletedAt; }).sort(function (a, b) { return b.deletedAt - a.deletedAt; });
+        var trashedPartner = _data.askPartner.filter(function (s) { return s.deletedAt; }).map(function (s) { return { rec: s, src: 'partner' }; });
+        var trashedMe = _data.askMe.filter(function (s) { return s.deletedAt; }).map(function (s) { return { rec: s, src: 'me' }; });
+        var trashed = trashedPartner.concat(trashedMe).sort(function (a, b) { return b.rec.deletedAt - a.rec.deletedAt; });
         if (!trashed.length) {
             body.innerHTML = '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:24px 0;">回收站是空的</div>';
             return;
         }
-        body.innerHTML = trashed.map(function (s) {
+        body.innerHTML = trashed.map(function (it) {
+            var s = it.rec;
             var daysLeft = Math.max(0, Math.ceil((_TRASH_TTL - (Date.now() - s.deletedAt)) / 86400000));
             return '<div class="survey-trash-row" data-sid="' + s.id + '">' +
                 '<span class="survey-trash-title">' + _esc(_surveyTitle(s)) + '</span>' +
@@ -769,10 +1148,11 @@
                 var row = btn.closest('.survey-trash-row');
                 var sid = row.dataset.sid;
                 if (btn.dataset.act === 'restore') {
-                    var s = _data.askPartner.find(function (x) { return x.id === sid; });
-                    if (s) { s.deletedAt = null; _save(); }
+                    var found = _findRecord(sid);
+                    if (found) { found.rec.deletedAt = null; _save(); }
                 } else {
                     _data.askPartner = _data.askPartner.filter(function (x) { return x.id !== sid; });
+                    _data.askMe = _data.askMe.filter(function (x) { return x.id !== sid; });
                     _save();
                 }
                 _renderTrashBody();
@@ -805,6 +1185,20 @@
     window._surveyOpenCreateModal = function () { _openCreateModal(); };
     window._surveyOpenListModal = _openListModal;
     window._surveyOpenDetailModal = _openDetailModal;
+    window._surveyDebugListAskMe = function () { console.log(JSON.parse(JSON.stringify(_data.askMe))); return _data.askMe; };
+    window._surveyDebugBank = function () { console.log(JSON.parse(JSON.stringify(_data.bank))); return _data.bank; };
+    // 强制立刻触发一次反向问卷（不用等5-10天），传 true 强制必中（跳过概率判定），方便测试抽题/去重逻辑
+    window._surveyDebugForceAskMe = function (forceHit) {
+        if (forceHit) {
+            var batch = _createAskMeBatch();
+            if (batch) { _data.askMeTrigger.missStreak = 0; _save(); console.log('[survey] 已生成一批反向问卷：', batch.id); }
+            else console.warn('[survey] 题库里没有可用（未隐藏）的题目');
+            return;
+        }
+        _data.askMeTrigger.nextCheckAt = Date.now() - 1000;
+        _save();
+        _checkAskMeTrigger();
+    };
 
     // ── 初始化 ────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
@@ -834,12 +1228,13 @@
         _bindDelaySliders();
     });
 
-    // 每分钟检查一次到点的问卷（照抄 period.js 的轮询方式）
-    setInterval(_checkDueSurveys, 60000);
+    // 每分钟检查一次到点的问卷（照抄 period.js 的轮询方式）；反向问卷的触发检查间隔是"天"级别的，
+    // 不需要这么密，但挂在同一个 60秒 定时器里跑一下也没什么成本，简单点，不用另开一个定时器
+    setInterval(function () { _checkDueSurveys(); _checkAskMeTrigger(); }, 60000);
 
     _load().then(function () {
         _cleanTrash();
         _save();
-        setTimeout(_checkDueSurveys, 4000);
+        setTimeout(function () { _checkDueSurveys(); _checkAskMeTrigger(); }, 4000);
     });
 })();

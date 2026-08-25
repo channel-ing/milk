@@ -426,7 +426,8 @@
     border-radius: 16px 16px 16px 4px;
 }
 .cinema-msg-img {
-    max-width: 50%;
+    max-width: 100px; /* 跟主聊天一样固定死——之前是按聊天面板宽度的50%来算，
+        表情包这种本来就小的图片会被硬生生撑得巨大，改成固定像素就不会再跟着面板宽度走了 */
     border-radius: 12px;
     overflow: hidden;
     line-height: 0;

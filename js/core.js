@@ -451,7 +451,8 @@ const loadData = async () => {
             localforage.getItem(getStorageKey('customReplyGroups')),
             localforage.getItem(getStorageKey('customPokeGroups')),
             localforage.getItem(getStorageKey('customStatusGroups')),
-            localforage.getItem(getStorageKey('customPeriodCare'))
+            localforage.getItem(getStorageKey('customPeriodCare')),
+            localforage.getItem(getStorageKey('myStickerGroups'))
         ]);
         const getVal = (index) => results[index].status === 'fulfilled' ? results[index].value : null;
 
@@ -477,6 +478,7 @@ const loadData = async () => {
         const savedPokeGroups = getVal(19);
         const savedStatusGroups = getVal(20);
         const savedPeriodCare = getVal(21);
+        const savedMyStickerGroups = getVal(22);
 
         if (savedPartnerPersonas) partnerPersonas = savedPartnerPersonas;
 
@@ -547,6 +549,26 @@ const loadData = async () => {
         if (savedAnniversaries) anniversaries = savedAnniversaries;
         if (savedStickers) stickerLibrary = savedStickers;
         if (savedMyStickers) myStickerLibrary = savedMyStickers;
+        if (savedMyStickerGroups) window.myStickerGroups = savedMyStickerGroups;
+        else window.myStickerGroups = [];
+
+        // 迁移："我的表情库"以前是纯字符串数组（元素直接是图片地址），
+        // 现在要支持分组，每一项需要有自己的身份（id）和归属（groupId），
+        // 改成对象数组。只有第一次加载到旧格式数据时才会触发，转完就直接存回去，
+        // 以后不会再重复转。
+        (function _migrateMyStickerLibrary() {
+            if (!Array.isArray(myStickerLibrary) || !myStickerLibrary.length) return;
+            var needsMigration = myStickerLibrary.some(function (s) { return typeof s === 'string'; });
+            if (!needsMigration) return;
+            var base = Date.now();
+            myStickerLibrary = myStickerLibrary.map(function (s, i) {
+                if (typeof s === 'string') {
+                    return { id: 'stk_' + base + '_' + i, src: s, groupId: null, addedAt: base + i };
+                }
+                return s; // 已经是新格式的，原样保留
+            });
+            try { localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary); } catch (e) {}
+        })();
         if (savedCustomThemes) customThemes = savedCustomThemes;
         if (savedThemeSchemes) themeSchemes = savedThemeSchemes;
         try { const ce = await localforage.getItem(getStorageKey('customEmojis')); if (ce && Array.isArray(ce)) customEmojis = ce; } catch(e) {}
@@ -769,6 +791,7 @@ const saveData = async () => {
         { key: 'customPeriodCare',       val: () => localforage.setItem(getStorageKey('customPeriodCare'), customPeriodCare) },
         { key: 'stickerLibrary',         val: () => localforage.setItem(getStorageKey('stickerLibrary'), stickerLibrary) },
         { key: 'myStickerLibrary',       val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
+        { key: 'myStickerGroups',        val: () => localforage.setItem(getStorageKey('myStickerGroups'), window.myStickerGroups || []) },
         { key: 'customThemes',           val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
         { key: 'themeSchemes',           val: () => localforage.setItem(`${APP_PREFIX}themeSchemes`, themeSchemes) },
         { key: 'chatMessages',           val: () => localforage.setItem(getStorageKey('chatMessages'), messages) },

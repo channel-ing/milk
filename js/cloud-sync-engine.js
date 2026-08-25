@@ -95,7 +95,8 @@
     var GLOBAL_TEXT_KEYS = [
         APP_PREFIX_STR + 'sessionList',    // 梦角列表（最重要！）
         APP_PREFIX_STR + 'customThemes',   // 主题
-        APP_PREFIX_STR + 'themeSchemes'    // 主题方案
+        APP_PREFIX_STR + 'themeSchemes',   // 主题方案
+        APP_PREFIX_STR + 'customSongs'     // 悬浮播放器歌单（不分账号，全局共享）
     ];
 
     // 不同步的全局键（系统状态，不属于用户数据）

@@ -2,6 +2,21 @@
    我的表情库 —— 分组功能样式
    ══════════════════════════════════════════ */
 
+/* 原来"添加表情"标题是纯CSS伪元素(::before)，天生固定显示在容器最前面，
+   没办法通过调整DOM顺序把它挪到分组行后面。这里关掉伪元素，
+   改成在JS里插入一个真实的DOM标题，插在分组行和表情网格之间，
+   才能真正控制它的位置。（这条规则原本没有跟其他布局逻辑耦合，关掉不影响别的） */
+#user-sticker-picker .combo-content-area.show-title::before {
+    content: none;
+}
+.my-sticker-add-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 4px 4px 10px;
+    opacity: 0.9;
+}
+
 .my-sticker-group-row {
     display: flex;
     align-items: center;

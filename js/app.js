@@ -262,7 +262,7 @@ if (myStickerQuickUpload) {
                         console.warn('[cloud-media] 我的贴纸上传失败，降级本地', upErr);
                     }
                 }
-                newStickers.push(toStore);
+                newStickers.push({ id: 'stk_' + Date.now() + '_' + ok, src: toStore, groupId: null, addedAt: Date.now() });
                 ok++;
             } catch(err) { fail++; }
         }

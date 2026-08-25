@@ -264,7 +264,7 @@ let _mActiveStickerGroup = null;
 function _mStickerGroupRowHTML(list){
     if(!list.some(g=>g.id===_mActiveStickerGroup)) _mActiveStickerGroup = list.length ? list[0].id : null;
     if(list.length<=1) return '';
-    let html='<div class="my-sticker-group-row" id="cs-sticker-group-row" style="padding:0 0 8px;flex-shrink:0;">';
+    let html='<div class="my-sticker-group-row" id="cs-sticker-group-row" style="padding:0 0 8px;">';
     list.forEach(g=>{
         const cover=(typeof _myStickerCoverFor==='function')?_myStickerCoverFor(g.id):null;
         const isCloud=typeof cover==='string' && cover.indexOf('oss://')===0;
@@ -293,11 +293,14 @@ window._mToggleSticker=function(postId){
     }
     const btn=document.getElementById('cs-sticker-btn-'+postId);
     const rect=btn?btn.getBoundingClientRect():{top:300,left:10};
+    const PANEL_H=240; // 面板固定高度（content-box，不含padding/border），不随表情数量变化
     const picker=document.createElement('div'); picker.id='cs-sticker-picker';
-    // 面板高度固定，不随表情数量变化——之前用 max-height 会导致表情少的分组把面板"缩短"，
-    // 每次切分组面板忽高忽低看着很怪。改成 height 定死 + flex 布局：
-    // 分组条不参与滚动，网格区域自己滚动，撑不满就空着，不会把外框往上顶。
-    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);height:240px;display:flex;flex-direction:column;overflow:hidden;`;
+    // 之前用 flex:1 + overflow-y:auto 直接加在 grid 上"占满剩余高度"，
+    // 这个写法在 iOS Safari 上会把 grid 的行高按分配到的 flex 高度整体重算一遍，
+    // 表情一多格子就被压扁成长方形——跟主聊天那次的坑不是同一个，但是同一类"flex 高度协商"的锅。
+    // 这次不用 flex 布局协商高度，改成量出分组条实际渲染高度后用 JS 直接给滚动区钉一个固定像素高度，
+    // 网格永远是普通块级元素，不会被任何弹性布局的高度重算插手，格子的正方形只取决于自己的宽度。
+    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);height:${PANEL_H}px;overflow:hidden;`;
 
     let pool;
     if(hasGroupApi){
@@ -327,16 +330,19 @@ window._mToggleSticker=function(postId){
         b.onclick=()=>window._mSelectSticker(postId,src);
         grid.appendChild(b);
     });
-    // grid 本身不直接当 flex 子项——grid 内部格子靠 padding-top 百分比撑出正方形，是靠"宽度"算的，
-    // 但如果 grid 自己是 flex:1 的那个元素，浏览器（尤其是 Safari）算 flex 高度那一步会先把
-    // grid 的行高按分配到的 flex 高度整体摊平重算一遍，行数一多格子就被压扁成长方形。
-    // 套一层专门负责"占满剩余高度 + 滚动"的容器，grid 退回普通块级元素，格子的正方形就不会再被这层布局干扰
+
     const scrollWrap=document.createElement('div');
-    scrollWrap.style.cssText='flex:1;min-height:0;overflow-y:auto;';
+    scrollWrap.id='cs-sticker-scrollwrap';
+    scrollWrap.style.cssText='overflow-y:auto;'; // 高度先不设，等分组条真正渲染完量出实际高度后再钉死
     scrollWrap.appendChild(grid);
     picker.appendChild(scrollWrap);
 
     document.body.appendChild(picker);
+    // 分组条挂到DOM后才有真实渲染高度——量出来，用固定像素高度钉死滚动区，
+    // 不让浏览器用任何弹性布局的算法去"猜"这块该有多高（那正是压扁 bug 的来源）
+    const groupRowEl=picker.querySelector('#cs-sticker-group-row');
+    const groupRowH=groupRowEl?groupRowEl.offsetHeight:0;
+    scrollWrap.style.height=Math.max(PANEL_H-groupRowH,40)+'px';
     _bindLazy(picker);
     picker.querySelectorAll('img[data-cover-ref]').forEach(img=>{
         if(window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));

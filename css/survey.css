@@ -427,8 +427,60 @@
 .survey-trash-btn-mini.danger { color: #e0605a; border-color: rgba(224,96,90,0.4); }
 
 /* ── 问卷题库 tab（回复库→氛围感）── */
-.survey-bank-toolbar {
-    padding: 8px 0 10px;
+.survey-bank-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0 6px;
+}
+.survey-bank-toolbar-row .survey-bank-search { flex: 1; }
+.survey-bank-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border-color);
+    background: var(--primary-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 13px;
+}
+.survey-bank-icon-btn:active { border-color: var(--accent-color); color: var(--accent-color); }
+.survey-bank-filter-pills {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 0 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.survey-bank-filter-pills::-webkit-scrollbar { display: none; }
+.survey-bank-group-edit-btn,
+.survey-bank-group-chevron {
+    flex-shrink: 0;
+}
+.survey-bank-group-edit-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--primary-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+.survey-bank-group-chevron {
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
 }
 .survey-bank-search {
     width: 100%;
@@ -443,15 +495,6 @@
 }
 .survey-bank-search:focus { outline: none; border-color: var(--accent-color); }
 .survey-bank-row-hidden { opacity: 0.45; }
-.survey-bank-group-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    opacity: 0.65;
-    margin: 12px 0 6px;
-    padding-left: 2px;
-}
-.survey-bank-group-label:first-child { margin-top: 0; }
 
 /* ── 反向问卷回答输入框 ── */
 .survey-answer-input {

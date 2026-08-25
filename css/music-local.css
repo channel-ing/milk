@@ -57,6 +57,11 @@
     color: var(--text-secondary);
     font-size: 12px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
 }
 .music-local-filename {
     font-size: 12px;
@@ -72,3 +77,8 @@
     line-height: 1.5;
 }
 .music-local-hint.is-blocked { color: #e0a030; opacity: 1; }
+
+/* 这个弹窗内容比一般弹窗多（加了本地上传那一块），底部留白单独加大一点，
+   不改全局 .modal-content/.modal-buttons，避免影响其他弹窗 */
+#add-song-modal .modal-content { padding-bottom: 22px; }
+#add-song-modal .modal-buttons { margin-bottom: 4px; }

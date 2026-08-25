@@ -45,7 +45,8 @@
         let customEmojis = [];
         let anniversaries = [];
         let stickerLibrary = []; 
-        let myStickerLibrary = []; 
+        let myStickerLibrary = [];
+        let myStickerGroups = [];  // 我的表情库分组：{id, name, cover, createdAt}，归属关系存在每个表情条目自己的groupId上
         let currentAnniversaryType = 'anniversary';
         let customThemes = [];
         let themeSchemes = []; 

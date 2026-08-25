@@ -225,6 +225,22 @@
     /* 同上，防止内容一多被 .modal-content 的 flex 布局压缩 */
     flex-shrink: 0;
 }
+/* "关闭"/"删除"这种只有一个按钮的场景，靠右下角，不要贴在左边；
+   这三个弹窗的按钮区都补上安全区下边距，别贴着屏幕底部/小白条 */
+#survey-list-content > .modal-buttons {
+    justify-content: flex-end;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+}
+#survey-detail-content > .modal-buttons {
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+}
+#survey-detail-content > .modal-buttons.survey-buttons-solo {
+    justify-content: flex-end;
+}
+#survey-trash-modal .modal-content > .modal-buttons {
+    justify-content: flex-end;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+}
 .survey-icon-btn {
     width: 30px;
     height: 30px;
@@ -402,3 +418,47 @@
     white-space: nowrap;
 }
 .survey-trash-btn-mini.danger { color: #e0605a; border-color: rgba(224,96,90,0.4); }
+
+/* ── 问卷题库 tab（回复库→氛围感）── */
+.survey-bank-toolbar {
+    padding: 8px 0 10px;
+}
+.survey-bank-search {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--secondary-bg);
+}
+.survey-bank-search:focus { outline: none; border-color: var(--accent-color); }
+.survey-bank-builtin-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.12);
+    border-radius: 6px;
+    padding: 1px 6px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.survey-bank-row-hidden { opacity: 0.45; }
+
+/* ── 反向问卷回答输入框 ── */
+.survey-answer-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--primary-bg);
+    resize: none;
+}
+.survey-answer-input:focus { outline: none; border-color: var(--accent-color); }

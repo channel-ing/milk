@@ -267,23 +267,22 @@
 }
 .survey-list-empty i { font-size: 32px; opacity: 0.35; }
 .survey-list-empty p { font-size: 13px; opacity: 0.7; margin: 0; }
-
-.survey-pin-divider {
+.survey-empty-create-btn {
+    margin-top: 6px;
+    padding: 9px 20px;
+    border-radius: 20px;
+    border: none;
+    background: var(--accent-color);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 14px 0 8px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    opacity: 0.6;
+    gap: 6px;
 }
-.survey-pin-divider::before,
-.survey-pin-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border-color);
-}
+.survey-empty-create-btn:active { opacity: 0.8; }
 
 .survey-card {
     border: 1px solid var(--border-color);
@@ -311,11 +310,19 @@
 .survey-tag-src-partner { background: rgba(120, 150, 255, 0.15); color: #7896ff; }
 
 .survey-tag-status { margin-left: auto; }
-.survey-tag-status-pending  { background: rgba(230, 175, 60, 0.18); color: #c98b1f; }
-.survey-tag-status-answered { background: rgba(90, 180, 120, 0.18); color: #3f9e64; }
-.survey-tag-status-withdrawn,
-.survey-tag-status-sent     { background: rgba(150, 150, 150, 0.18); color: var(--text-secondary); }
-.survey-tag-status-received { background: rgba(90, 180, 120, 0.18); color: #3f9e64; }
+.survey-tag-status-pending          { background: rgba(230, 175, 60, 0.18); color: #c98b1f; }
+.survey-tag-status-answered         { background: rgba(90, 180, 120, 0.18); color: #3f9e64; }
+.survey-tag-status-withdrawn        { background: rgba(150, 150, 150, 0.18); color: var(--text-secondary); }
+.survey-tag-status-received         { background: rgba(90, 180, 120, 0.18); color: #3f9e64; }
+.survey-tag-status-unanswered       { background: rgba(150, 150, 150, 0.18); color: var(--text-secondary); }
+.survey-tag-status-awaiting-receipt { background: rgba(150, 150, 150, 0.18); color: var(--text-secondary); }
+/* "new"角标要最显眼——用主题色+加粗，跟其他灰扑扑的状态区分开 */
+.survey-tag-status-new {
+    background: var(--accent-color);
+    color: #fff;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
 
 .survey-card-title {
     font-size: 14px;
@@ -435,18 +442,16 @@
     background: var(--secondary-bg);
 }
 .survey-bank-search:focus { outline: none; border-color: var(--accent-color); }
-.survey-bank-builtin-tag {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--accent-color);
-    background: rgba(var(--accent-color-rgb), 0.12);
-    border-radius: 6px;
-    padding: 1px 6px;
-    margin-right: 6px;
-    vertical-align: middle;
-}
 .survey-bank-row-hidden { opacity: 0.45; }
+.survey-bank-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    opacity: 0.65;
+    margin: 12px 0 6px;
+    padding-left: 2px;
+}
+.survey-bank-group-label:first-child { margin-top: 0; }
 
 /* ── 反向问卷回答输入框 ── */
 .survey-answer-input {

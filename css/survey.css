@@ -272,7 +272,12 @@
     gap: 6px;
     padding: 2px 0 10px;
     flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
+#survey-fav-filter-bar::-webkit-scrollbar { display: none; }
+#survey-fav-filter-bar .gfp-btn { white-space: nowrap; }
 .survey-empty-create-btn {
     margin-top: 6px;
     padding: 9px 20px;
@@ -293,10 +298,11 @@
 .survey-card {
     border: 1px solid var(--border-color);
     border-radius: 14px;
-    padding: 12px 14px;
+    padding: 12px 40px 12px 14px; /* 右边多留出空间给右下角的收藏星星，不会跟标题/meta文字压在一起 */
     background: var(--primary-bg);
     margin-bottom: 10px;
     cursor: pointer;
+    position: relative;
 }
 .survey-card:active { opacity: 0.8; }
 .survey-card-top {
@@ -317,8 +323,11 @@
 
 .survey-tag-status { margin-left: auto; }
 .survey-fav-btn {
-    width: 22px;
-    height: 22px;
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 26px;
+    height: 26px;
     border: none;
     background: transparent;
     color: var(--text-secondary);
@@ -327,7 +336,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 15px;
     flex-shrink: 0;
     padding: 0;
 }

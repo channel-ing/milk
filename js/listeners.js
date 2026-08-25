@@ -1,4 +1,4 @@
-function setupEventListeners() {
+、function setupEventListeners() {
     try {
         initCoreListeners();
         initModalListeners();
@@ -2761,7 +2761,14 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
     let searchTerm = '';
     let isSearchVisible = false;
 
-    function loadSong(index) {
+    function _markPlaying(playing) {
+        isPlaying = playing;
+        document.getElementById('icon-play').style.display = playing ? 'none' : 'block';
+        document.getElementById('icon-pause').style.display = playing ? 'block' : 'none';
+        player.classList.toggle('playing', playing);
+    }
+
+    function loadSong(index, forcePlay) {
         if (songs.length === 0) return;
         if (index >= songs.length) index = 0;
         if (index < 0) index = songs.length - 1;
@@ -2776,12 +2783,17 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
             // 不能像本地链接那样直接同步赋值给 audio.src
             window.CloudMedia.fetchUrl(song.url).then((blobUrl) => {
                 audio.src = blobUrl;
-                if (isPlaying) audio.play().catch(() => {});
+                if (forcePlay || isPlaying) {
+                    audio.play().then(() => _markPlaying(true)).catch(() => {});
+                }
             }).catch((e) => {
                 showNotification('云端音频加载失败：' + (e && e.message || e), 'error');
             });
         } else if (song.url) {
             audio.src = song.url;
+            if (forcePlay || isPlaying) {
+                audio.play().then(() => _markPlaying(true)).catch(() => {});
+            }
         }
         updatePlaylistHighlight();
     }
@@ -2793,18 +2805,12 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         }
         if (isPlaying) {
             audio.pause();
-            isPlaying = false;
-            document.getElementById('icon-play').style.display = 'block';
-            document.getElementById('icon-pause').style.display = 'none';
-            player.classList.remove('playing');
+            _markPlaying(false);
         } else {
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(_ => {
-                    isPlaying = true;
-                    document.getElementById('icon-play').style.display = 'none';
-                    document.getElementById('icon-pause').style.display = 'block';
-                    player.classList.add('playing');
+                    _markPlaying(true);
                 }).catch(error => {
                     console.error(error);
                     showNotification('播放失败，请检查网络或链接是否有效', 'error');
@@ -2819,14 +2825,12 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         else if (playMode === 'shuffle') currentIndex = Math.floor(Math.random() * songs.length);
         else currentIndex = (currentIndex + 1) % songs.length;
         if (playMode !== 'single') loadSong(currentIndex);
-        if (isPlaying) audio.play();
     }
 
     function prevSong() {
         if (songs.length === 0) return;
         currentIndex = (currentIndex - 1 + songs.length) % songs.length;
         loadSong(currentIndex);
-        if (isPlaying) audio.play();
     }
 
     function savePlaylist() {
@@ -3068,10 +3072,9 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
                         if (songs.length > 0) {
                             currentIndex = realIndex % songs.length;
                             loadSong(currentIndex);
-                            if (isPlaying) audio.play();
                         } else {
                             audio.pause();
-                            isPlaying = false;
+                            _markPlaying(false);
                             loadSong(0);
                         }
                     } else if (realIndex < currentIndex) {
@@ -3083,9 +3086,7 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
             div.addEventListener('click', (e) => {
                 e.stopPropagation();
                 currentIndex = realIndex;
-                loadSong(currentIndex);
-                if (!isPlaying) togglePlay();
-                else audio.play();
+                loadSong(currentIndex, true);
             });
 
             container.appendChild(div);

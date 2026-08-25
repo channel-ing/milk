@@ -135,6 +135,10 @@
         return _data.periods.find(function (p) { return !p.endDate; }) || null;
     }
 
+    // 只用最近几次记录来算规律，不用全部历史——身体状态会随时间变化（换季/压力/年龄），
+    // 太久以前的规律参考价值该打折扣，只看最近的能让预测更快跟上"最近的你"
+    var RECENT_CYCLES_N = 6;
+
     // 中位数——比平均数更抗干扰：偶尔一次异常波动（生病、旅行导致周期特别长或特别短）
     // 不会像平均数那样被明显拉偏
     function _median(arr) {
@@ -145,16 +149,19 @@
             : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
     }
 
-    // 区间宽度：用上所有历史间隔数据，而不是只看"最长的一次"和"最短的一次"——
-    // 先算每次间隔跟中位数差多少，再取这些"差值"的中位数（统计上叫"中位数绝对偏差"）。
-    // 这样即使某一次因为生病/旅行出现极端波动，也不会直接把区间拉得很夸张，
-    // 跟前面把"平均数"换成"中位数"是同一个思路：都是为了不让单次异常值说了算。
+    // 区间宽度：改用标准差——统计学里最主流、最基础的"波动有多大"的衡量方式
+    // （比中位数绝对偏差更常见，主流经期app的公开文档里也是用这个思路）。
+    // 用样本标准差(除以n-1，不是n，这是统计学教科书的标准做法)。
+    // 封顶8天：参考Natural Cycles公开写出来的"周期波动超过8天就算不规律"这个标准，
+    // 这不是我们自己拍的数字，是抄一个做得比较严谨的经期app公开的判定标准。
+    // 触发封顶时会额外标记"irregular"，UI上会多显示一行提示，老实告诉用户这个预测
+    // 参考价值有限，而不是偷偷把数字压小装作很准。
     function _calcSwing(gaps) {
-        if (gaps.length < 2) return 2;
-        var med = _median(gaps);
-        var deviations = gaps.map(function (g) { return Math.abs(g - med); });
-        var mad = _median(deviations);
-        return Math.min(5, Math.max(2, mad));
+        if (gaps.length < 2) return { days: 0, irregular: false };
+        var mean = gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length;
+        var variance = gaps.reduce(function (s, g) { return s + Math.pow(g - mean, 2); }, 0) / (gaps.length - 1);
+        var sd = Math.sqrt(variance);
+        return { days: Math.min(8, Math.round(sd)), irregular: sd >= 8 };
     }
 
     // 预测区间——起止日期字符串，只算一次，统计卡片显示和"提前一天提醒"功能共用，
@@ -162,20 +169,35 @@
     function _getPredictionWindow() {
         var sorted = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
         if (sorted.length < 2) return null;
+        var recent = sorted.slice(-RECENT_CYCLES_N);  // 只用最近N次，不用全部历史
         var gaps = [];
-        for (var i = 1; i < sorted.length; i++) {
-            gaps.push(_diff(sorted[i - 1].startDate, sorted[i].startDate));
+        for (var i = 1; i < recent.length; i++) {
+            gaps.push(_diff(recent[i - 1].startDate, recent[i].startDate));
         }
+        if (!gaps.length) return null;
         var avgCycle  = _median(gaps);
-        var lastStart = sorted[sorted.length - 1].startDate;
+        var lastStart = recent[recent.length - 1].startDate;
         var predStart = _addD(lastStart, avgCycle);
-        var swing     = _calcSwing(gaps);
-        return { lo: _addD(predStart, -swing), hi: _addD(predStart, swing) };
+        var swingInfo = _calcSwing(gaps);
+        var swing     = swingInfo.days;
+
+        // 经期时长——同样只看最近N次里"已结束"的记录，跟"平均经期天数"那张卡片
+        // 保持一致的算法和取样范围，避免两处数字对不上；一次已结束的记录都没有时，先用5天顶着用
+        var completed = recent.filter(function (p) { return p.endDate; });
+        var avgDur = completed.length > 0
+            ? Math.round(completed.reduce(function (s, p) { return s + _diff(p.startDate, p.endDate) + 1; }, 0) / completed.length)
+            : 5;
+
+        // 区间代表"这整段时间都可能在经期里"——把"哪天开始"的不确定性(swing)
+        // 和"经期本身大概几天"(avgDur)合起来算成一个窗口，不是只给"开始日"的浮动范围
+        return { lo: _addD(predStart, -swing), hi: _addD(predStart, swing + avgDur - 1), irregular: swingInfo.irregular };
     }
 
     // ── 统计 ──────────────────────────────────────────
     function _calcStats() {
-        var completed = _data.periods.filter(function (p) { return p.endDate; });
+        var sorted    = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
+        var recent    = sorted.slice(-RECENT_CYCLES_N);  // 跟预测区间用同一个"最近N次"取样范围
+        var completed = recent.filter(function (p) { return p.endDate; });
 
         // 平均经期天数
         var avgDays = '--';
@@ -189,22 +211,26 @@
         // 区间宽度跟着历史波动走：波动越大区间越宽；波动很小时至少给±2天，
         // 避免看起来像没算清楚。
         var nextDate = '暂无预测';
+        var irregular = false;
         var win = _getPredictionWindow();
         if (win) {
             var lo = _parse(win.lo);
             var hi = _parse(win.hi);
             nextDate = (lo.getMonth() + 1) + '月' + lo.getDate() + '日 ~ ' +
                        (hi.getMonth() + 1) + '月' + hi.getDate() + '日';
+            irregular = !!win.irregular;
         }
 
-        return { avgDays: avgDays, nextDate: nextDate };
+        return { avgDays: avgDays, nextDate: nextDate, irregular: irregular };
     }
 
     function _predictedDates() {
         var dates = {};
-        var completed = _data.periods.filter(function (p) { return p.endDate; });
+        var sortedAll = _data.periods.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
+        var recent    = sortedAll.slice(-RECENT_CYCLES_N);
+        var completed = recent.filter(function (p) { return p.endDate; });
 
-        // 1）当前正在进行的经期（还没标记结束）——按历史平均时长推算，
+        // 1）当前正在进行的经期（还没标记结束）——按最近几次的平均时长推算，
         //    "还没到/还没打卡"的那几天大概率也算经期，标成浅色预测
         var active = _activePeriod();
         if (active && completed.length > 0) {
@@ -439,10 +465,15 @@
             if (lEl) lEl.textContent = '当前状态';
             if (nEl) nEl.textContent = '经期中 · 第' + _getDayNum(_today()) + '天';
         } else {
-            if (lEl) lEl.textContent = '下次预测';
+            if (lEl) lEl.textContent = '预测时间';
             if (nEl) nEl.textContent = s.nextDate;
         }
         if (aEl) aEl.textContent = s.avgDays;
+
+        // 周期波动超过8天封顶时，多显示一行提示——老实告诉用户这个预测参考价值有限，
+        // 不是偷偷把区间压小装作很准
+        var irregEl = document.getElementById('pd-irregular-hint');
+        if (irregEl) irregEl.style.display = (!active && s.irregular) ? '' : 'none';
     }
 
     function _updateToggleBtn() {

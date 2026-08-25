@@ -1442,32 +1442,69 @@
 
     var _activeSurveyFilter = 'all'; // 'all' | 'askme'（梦角发的） | 'askpartner'（用户发的） | 'fav'（收藏）
 
-    // 全部 / 梦角发的 / 用户发的 / 收藏——常驻显示，不像题库那边"没数据就隐藏"，
-    // 这四个筛选项本身就是列表页的主要导航方式，不该忽隐忽现
+    // 单个下拉筛选chip——照抄陪伴日记"种类"筛选那一套（.cd-chip / .cd-dropdown / .cd-dropdown-item
+    // 这几个类已经在 styles.css 里全局定义好了，直接借用，长相和交互跟陪伴日记一模一样）
     function _renderSurveyFilterBar(allItems) {
         var bar = document.getElementById('survey-fav-filter-bar');
         if (!bar) return;
         var askMeCount = allItems.filter(function (it) { return it.src === 'me'; }).length;
         var askPartnerCount = allItems.filter(function (it) { return it.src === 'partner'; }).length;
         var favCount = allItems.filter(function (it) { return it.ref.favorited; }).length;
-        bar.style.display = 'flex';
         var tabs = [
             { key: 'all', label: '全部', count: allItems.length },
             { key: 'askme', label: _partnerName() + '发的', count: askMeCount },
             { key: 'askpartner', label: _myName() + '发的', count: askPartnerCount },
-            { key: 'fav', label: '<i class="fas fa-star" style="font-size:10px;margin-right:3px;"></i>收藏', count: favCount }
+            { key: 'fav', label: '<i class="fas fa-star" style="font-size:9px;margin-right:4px;"></i>收藏', count: favCount }
         ];
-        bar.innerHTML = tabs.map(function (t) {
-            return '<button class="gfp-btn' + (_activeSurveyFilter === t.key ? ' gfp-active' : '') + '" data-survey-filter="' + t.key + '">' +
-                t.label + ' <span class="gfp-count">' + t.count + '</span></button>';
-        }).join('');
-        bar.querySelectorAll('.gfp-btn').forEach(function (btn) {
-            btn.onclick = function () {
-                _activeSurveyFilter = btn.dataset.surveyFilter;
-                _renderListBody();
+        var current = tabs.filter(function (t) { return t.key === _activeSurveyFilter; })[0] || tabs[0];
+        // chip上显示的文字：选中"全部"时不带数字（跟陪伴日记一致，"全部"就是纯文字不强调数量），
+        // 选中别的筛选项时，chip变成高亮态并显示当前选的是哪个
+        var chipLabel = _activeSurveyFilter === 'all' ? '筛选' : current.label.replace(/<[^>]+>/g, '');
+
+        bar.innerHTML =
+            '<div class="cd-chip' + (_activeSurveyFilter !== 'all' ? ' active' : '') + '" id="survey-filter-chip">' +
+                '<span id="survey-filter-chip-label">' + chipLabel + '</span>' +
+                '<i class="fas fa-chevron-down"></i>' +
+                '<div class="cd-dropdown" id="survey-filter-dropdown">' +
+                    tabs.map(function (t) {
+                        return '<div class="cd-dropdown-item' + (_activeSurveyFilter === t.key ? ' active' : '') + '" data-filter="' + t.key + '">' +
+                            t.label + '（' + t.count + '）' +
+                        '</div>';
+                    }).join('') +
+                '</div>' +
+            '</div>';
+
+        var chip = bar.querySelector('#survey-filter-chip');
+        var dropdown = bar.querySelector('#survey-filter-dropdown');
+        if (chip && dropdown) {
+            chip.onclick = function (e) {
+                e.stopPropagation();
+                document.querySelectorAll('.cd-dropdown.open').forEach(function (d) {
+                    if (d !== dropdown) d.classList.remove('open');
+                });
+                dropdown.classList.toggle('open');
             };
-        });
+            dropdown.querySelectorAll('.cd-dropdown-item').forEach(function (item) {
+                item.onclick = function (e) {
+                    e.stopPropagation();
+                    _activeSurveyFilter = item.dataset.filter;
+                    dropdown.classList.remove('open');
+                    _renderListBody();
+                };
+            });
+        }
+        // 点击空白处收起下拉——只绑一次，不然每次刷新列表都会叠加一个新的监听器
+        if (!_surveyFilterOutsideClickBound) {
+            _surveyFilterOutsideClickBound = true;
+            document.addEventListener('click', function (e) {
+                document.querySelectorAll('#survey-filter-dropdown.open').forEach(function (d) {
+                    var c = document.getElementById('survey-filter-chip');
+                    if (c && !c.contains(e.target)) d.classList.remove('open');
+                });
+            });
+        }
     }
+    var _surveyFilterOutsideClickBound = false;
 
     function _openListModal() {
         _renderListBody();

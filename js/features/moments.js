@@ -264,7 +264,7 @@ let _mActiveStickerGroup = null;
 function _mStickerGroupRowHTML(list){
     if(!list.some(g=>g.id===_mActiveStickerGroup)) _mActiveStickerGroup = list.length ? list[0].id : null;
     if(list.length<=1) return '';
-    let html='<div class="my-sticker-group-row" id="cs-sticker-group-row" style="padding:0 0 8px;">';
+    let html='<div class="my-sticker-group-row" id="cs-sticker-group-row" style="padding:0 0 8px;flex-shrink:0;">';
     list.forEach(g=>{
         const cover=(typeof _myStickerCoverFor==='function')?_myStickerCoverFor(g.id):null;
         const isCloud=typeof cover==='string' && cover.indexOf('oss://')===0;
@@ -294,7 +294,10 @@ window._mToggleSticker=function(postId){
     const btn=document.getElementById('cs-sticker-btn-'+postId);
     const rect=btn?btn.getBoundingClientRect():{top:300,left:10};
     const picker=document.createElement('div'); picker.id='cs-sticker-picker';
-    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-height:240px;overflow-y:auto;`;
+    // 面板高度固定，不随表情数量变化——之前用 max-height 会导致表情少的分组把面板"缩短"，
+    // 每次切分组面板忽高忽低看着很怪。改成 height 定死 + flex 布局：
+    // 分组条不参与滚动，网格区域自己滚动，撑不满就空着，不会把外框往上顶。
+    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);height:240px;display:flex;flex-direction:column;overflow:hidden;`;
 
     let pool;
     if(hasGroupApi){
@@ -308,7 +311,9 @@ window._mToggleSticker=function(postId){
 
     const grid=document.createElement('div');
     grid.id='cs-sticker-grid';
-    grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;';
+    // flex:1 占满面板剩余高度；align-content:start 防止表情数量少时，浏览器把这几行拉伸铺满整个高度
+    // （grid 默认会把多余空间摊派给每一行，行一拉伸格子就不再是正方形了）；overflow-y:auto 表情多了自己滚动
+    grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);align-content:start;gap:8px;flex:1;overflow-y:auto;';
     if(!pool.length){
         grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);opacity:.5;font-size:12px;padding:16px 0;">这个分组还没有表情</div>';
     }

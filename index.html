@@ -2471,7 +2471,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
 
             </div>
 
-            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-20px;margin-right:-20px;padding-left:max(20px, env(safe-area-inset-left, 20px));padding-right:max(20px, env(safe-area-inset-right, 20px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));justify-content:space-between;">
                 <button class="modal-btn modal-btn-secondary" id="period-back-btn" onclick="(function(){hideModal(document.getElementById('period-modal'));showModal(document.getElementById('advanced-modal'))})()">
                     <i class="fas fa-arrow-left"></i> 返回
                 </button>
@@ -2705,7 +2705,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                 </div>
                 <div class="favorites-list" id="favorites-list" style="max-height:55vh;overflow-y:auto;"></div>
             </div>
-            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-20px;margin-right:-20px;padding-left:max(20px, env(safe-area-inset-left, 20px));padding-right:max(20px, env(safe-area-inset-right, 20px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));justify-content:space-between;">
                 <button class="modal-btn modal-btn-secondary" id="stats-back-btn" onclick="(function(){hideModal(document.getElementById('stats-modal'));showModal(document.getElementById('advanced-modal'))})()">
                     <i class="fas fa-arrow-left"></i> 返回
                 </button>
@@ -2745,7 +2745,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             </div>
             <div id="fl-panel-fortune" class="fl-panel fl-panel-active">
                 <div id="fortune-content"></div>
-                <div class="modal-buttons" style="margin-top:16px;">
+                <div class="modal-buttons" style="margin-top:16px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
                     <button class="modal-btn modal-btn-secondary" id="fl-back-btn-fortune" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
                         <i class="fas fa-arrow-left"></i> 返回
                     </button>
@@ -2771,7 +2771,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     </div>
                     <div id="lenormand-result" style="display:none;"></div>
                 </div>
-                <div class="modal-buttons" style="margin-top:12px;">
+                <div class="modal-buttons" style="margin-top:12px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
                     <button class="modal-btn modal-btn-secondary" id="fl-back-btn-lenormand" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
                         <i class="fas fa-arrow-left"></i> 返回
                     </button>
@@ -2799,7 +2799,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     </div>
                     <div id="tarot-result" style="display:none;"></div>
                 </div>
-                <div class="modal-buttons" style="margin-top:12px;">
+                <div class="modal-buttons" style="margin-top:12px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
                     <button class="modal-btn modal-btn-secondary" id="fl-back-btn-tarot" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
                         <i class="fas fa-arrow-left"></i> 返回
                     </button>
@@ -2817,7 +2817,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <i class="fas fa-moon" style="font-size:32px;opacity:0.3;display:block;margin-bottom:12px;"></i>
                     尚无占卜记录<br><span style="font-size:11px;opacity:0.6;">完成一次占卜后，结果将自动收录于此</span>
                 </div>
-                <div class="modal-buttons" style="margin-top:16px;">
+                <div class="modal-buttons" style="margin-top:16px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
                     <button class="modal-btn modal-btn-secondary" id="fl-back-btn-divihistory" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
                         <i class="fas fa-arrow-left"></i> 返回
                     </button>
@@ -3543,7 +3543,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
         </div>
 
         <!-- 关闭按钮 -->
-        <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+        <!-- 陪伴日记外层容器 .cd-modal-content 本身 padding:0（自己整个卡片式设计），
+             不像大多数弹窗默认padding:24px，所以这里不用"负margin撑满再padding回来"那套技巧，
+             直接在这个按钮条上加左右安全区padding就行，不然会跟其他弹窗一样越界被裁切、贴到屏幕边缘 -->
+        <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px max(24px, env(safe-area-inset-right, 24px)) max(14px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 24px));z-index:10;margin-top:8px;">
             <button class="modal-btn modal-btn-secondary" id="cd-back-btn" onclick="(function(){hideModal(document.getElementById('companion-diary-modal'));showModal(document.getElementById('advanced-modal'))})()">
                 <i class="fas fa-arrow-left"></i> 返回
             </button>

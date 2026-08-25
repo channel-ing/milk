@@ -1133,8 +1133,11 @@
                 '<div class="cinema-invite-response-card">' +
                     '<div class="cinema-invite-response-time">' + _escapeHtml(_negoState.dateStr) + '  ' + _escapeHtml(_negoState.timeStr) + '</div>' +
                     '<div class="cinema-invite-response-actions">' +
-                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--decline" id="cinema-resp-decline">拒绝</button>' +
                         '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--secondary" id="cinema-resp-reschedule">更换时间</button>' +
+                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--secondary" id="cinema-resp-changemovie">换片</button>' +
+                    '</div>' +
+                    '<div class="cinema-invite-response-actions" style="margin-top:8px;">' +
+                        '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--decline" id="cinema-resp-decline">拒绝</button>' +
                         '<button class="cinema-invite-resp-btn cinema-invite-resp-btn--primary" id="cinema-resp-accept">同意</button>' +
                     '</div>' +
                 '</div>';
@@ -1157,6 +1160,7 @@
         if (isUserTurn) {
             document.getElementById('cinema-resp-accept').addEventListener('click', _negoAcceptCountered);
             document.getElementById('cinema-resp-reschedule').addEventListener('click', _negoOpenRescheduleModal);
+            document.getElementById('cinema-resp-changemovie').addEventListener('click', _negoOpenChangeMovieModal);
             document.getElementById('cinema-resp-decline').addEventListener('click', _negoDecline);
         } else if (!negoActive) {
             document.getElementById('cinema-invite-btn').addEventListener('click', _openInviteSheet);
@@ -1859,9 +1863,12 @@
             actionsHtml = '<div class="cinema-invite-card-status cinema-invite-card-status--declined">下次吧…</div>';
         } else {
             actionsHtml =
-                '<div class="cinema-invite-card-actions cinema-invite-card-actions--three">' +
-                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--decline" data-invite-action="decline">拒绝</button>' +
+                '<div class="cinema-invite-card-actions">' +
                     '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="reschedule">更换时间</button>' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--secondary" data-invite-action="changemovie">换片</button>' +
+                '</div>' +
+                '<div class="cinema-invite-card-actions" style="margin-top:8px;">' +
+                    '<button class="cinema-invite-card-btn cinema-invite-card-btn--decline" data-invite-action="decline">拒绝</button>' +
                     '<button class="cinema-invite-card-btn cinema-invite-card-btn--primary" data-invite-action="accept">同意</button>' +
                 '</div>';
         }
@@ -2252,6 +2259,45 @@
         });
     }
 
+    // 换片弹窗——照抄"更换时间"的结构，只是把日期/时间选择器换成片名输入框
+    function _negoOpenChangeMovieModal() {
+        if (!_negoState || !_negoState.active) return;
+        var old = document.getElementById('cinema-changemovie-modal');
+        if (old) old.remove();
+
+        var modal = document.createElement('div');
+        modal.id = 'cinema-changemovie-modal';
+        modal.className = 'cinema-invite-sheet';
+        modal.innerHTML =
+            '<div class="cinema-invite-mask" id="cinema-changemovie-mask"></div>' +
+            '<div class="cinema-invite-body">' +
+                '<div class="cinema-invite-title">换个片子</div>' +
+                '<div class="cinema-invite-label">片名</div>' +
+                '<input type="text" class="cinema-invite-input" id="cinema-changemovie-input" maxlength="40" placeholder="想看什么电影？" value="' + _escapeHtml(_negoState.movieTitle) + '">' +
+                '<div class="cinema-invite-error" id="cinema-changemovie-error"></div>' +
+                '<div class="cinema-invite-actions">' +
+                    '<button class="cinema-invite-cancel" id="cinema-changemovie-cancel">取消</button>' +
+                    '<button class="cinema-invite-confirm" id="cinema-changemovie-confirm">发出新片名</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        function close() { modal.remove(); }
+        document.getElementById('cinema-changemovie-mask').addEventListener('click', close);
+        document.getElementById('cinema-changemovie-cancel').addEventListener('click', close);
+        document.getElementById('cinema-changemovie-confirm').addEventListener('click', function () {
+            var input = document.getElementById('cinema-changemovie-input');
+            var val = input.value.trim();
+            var errorEl = document.getElementById('cinema-changemovie-error');
+            if (!val) { errorEl.textContent = '片名不能是空的呀'; return; }
+            close();
+            // 跟"更换时间"用的是同一套协商引擎：时间不变，只换片名，
+            // 梦角下一次回复的"第几次"照样要 +1（复用更换时间那套接受概率递增逻辑）
+            var nextReplyIndex = (_negoState ? _negoState.replyIndex : 1) + 1;
+            _negoStartRound(val, _negoState.dateStr, _negoState.timeStr, nextReplyIndex);
+        });
+    }
+
     // 主聊天里邀请卡按钮的事件委托（卡片是动态插入主聊天的，绑定在 document 上）
     function _bindInviteCardDelegation() {
         document.addEventListener('click', function (e) {
@@ -2264,6 +2310,7 @@
             var action = btn.getAttribute('data-invite-action');
             if (action === 'accept') _negoAcceptCountered();
             else if (action === 'reschedule') _negoOpenRescheduleModal();
+            else if (action === 'changemovie') _negoOpenChangeMovieModal();
             else if (action === 'decline') _negoDecline();
         });
     }

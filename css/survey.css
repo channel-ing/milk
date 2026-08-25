@@ -285,16 +285,17 @@
     min-width: 0; /* 允许在需要时缩小，不撑爆右边trash/+按钮的位置 */
 }
 /* 筛选chip的下拉菜单默认是贴右边往左长的（陪伴日记那边是这么设计的，因为它的chip本来就靠右）。
-   问卷这边chip靠左放，如果昵称比较长（比如"梦角发的"换成用户自定义的长昵称），下拉框往左长
-   很容易顶到屏幕外面去，所以这里反过来贴左边往右长，同时允许换行、给个宽度上限，不会无限变宽 */
+   问卷这边chip靠左放，如果昵称比较长很容易顶到屏幕外面去，所以这里反过来贴左边往右长；
+   宽度用 max-content 让每一项自己撑开、数字跟文字保持同一行，同时用 min() 兜个底，
+   万一昵称长到接近整个屏幕宽度了也不会真的把弹窗顶穿出去 */
 #survey-filter-dropdown {
     left: 0;
     right: auto;
-    max-width: 200px;
+    width: max-content;
+    max-width: min(280px, calc(100vw - 64px));
 }
 #survey-filter-dropdown .cd-dropdown-item {
-    white-space: normal;
-    line-height: 1.4;
+    white-space: nowrap;
 }
 .survey-empty-create-btn {
     margin-top: 6px;

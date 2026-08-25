@@ -668,10 +668,10 @@ const LIBRARY_CONFIG = {
         tabs: [
             { id: 'pokes', name: '拍一拍', mode: 'list' },
             { id: 'statuses', name: '对方状态', mode: 'list' },
+            { id: 'surveyBank', name: '问卷题库', mode: 'list' },
             { id: 'period', name: '经期', mode: 'list' },
             { id: 'mottos', name: '顶部格言', mode: 'list' },
-            { id: 'intros', name: '开场动画', mode: 'list' },
-            { id: 'surveyBank', name: '问卷题库', mode: 'list' }
+            { id: 'intros', name: '开场动画', mode: 'list' }
         ]
     }
 };

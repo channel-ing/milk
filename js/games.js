@@ -1356,7 +1356,10 @@ function _myStickerGroupsList() {
 function _myStickerItemsInGroup(groupId) {
     return _myStickerLib()
         .filter(function (e) { return (e.groupId || null) === groupId; })
-        .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
+        // 按"加入这个分组的时间"倒序，不是"上传时间"——
+        // 这样一张图从别的分组挪过来，不管它本来上传得多早，都会显示在最新的位置，
+        // 跟封面判断用的是同一个字段（groupJoinedAt），只是这里要倒序（新的在前）
+        .sort(function (a, b) { return (b.groupJoinedAt || b.addedAt || 0) - (a.groupJoinedAt || a.addedAt || 0); });
 }
 // 封面候选排序——按"加入这个分组的时间"（groupJoinedAt）从早到晚，不是"上传时间"（addedAt）。
 // 这两件事不一样：一张图片可能很久以前就上传了，但是刚刚才被挪进这个分组，

@@ -1,4 +1,4 @@
-、function setupEventListeners() {
+function setupEventListeners() {
     try {
         initCoreListeners();
         initModalListeners();

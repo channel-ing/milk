@@ -36,6 +36,9 @@
     // watching 状态下：true=沉浸全屏剧场模式，false=嵌入普通电影院tab视图
     var _immersive = true;
 
+    // 观影表情面板当前选中的分组（null=默认分组）——只读展示，不提供新建/管理分组的入口
+    var _cinemaActiveStickerGroup = null;
+
     var _fakeAppt = {
         movieTitle: '',
         dateStr: '',
@@ -974,8 +977,42 @@
     function _stickerPickerHTML() {
         return '<div class="cinema-sticker-popover" id="cinema-sticker-picker">' +
             '<div class="cinema-sticker-popover-hd">我的表情</div>' +
+            '<div class="my-sticker-group-row" id="cinema-sticker-group-row" style="flex-shrink:0;padding:0 12px 8px;"></div>' +
             '<div class="cinema-sticker-grid" id="cinema-sticker-grid"></div>' +
         '</div>';
+    }
+    // 分组筛选条——纯展示 + 切换，不提供新建/管理分组的入口（那些功能只在主聊天"我的表情库"里）
+    function _renderCinemaStickerGroupRow(list) {
+        var row = document.getElementById('cinema-sticker-group-row');
+        if (!row) return;
+        if (!list.some(function (g) { return g.id === _cinemaActiveStickerGroup; })) {
+            _cinemaActiveStickerGroup = list.length ? list[0].id : null;
+        }
+        if (list.length <= 1) { row.innerHTML = ''; row.style.display = 'none'; return; }
+        row.style.display = '';
+        var html = '';
+        list.forEach(function (g) {
+            var cover = (typeof _myStickerCoverFor === 'function') ? _myStickerCoverFor(g.id) : null;
+            var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
+            var inner = cover
+                ? (isCloud
+                    ? '<img loading="lazy" data-cover-ref="' + cover + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
+                    : '<img loading="lazy" src="' + cover + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">')
+                : '<i class="fas fa-images" style="font-size:13px;"></i>';
+            var isActive = g.id === _cinemaActiveStickerGroup;
+            html += '<button class="my-sticker-group-chip' + (isActive ? ' active' : '') + '" data-group-id="' + (g.id === null ? '' : g.id) + '" title="' + g.name + '">' + inner + '</button>';
+        });
+        row.innerHTML = html;
+        row.querySelectorAll('img[data-cover-ref]').forEach(function (img) {
+            if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));
+        });
+        row.querySelectorAll('.my-sticker-group-chip').forEach(function (chip) {
+            chip.onclick = function (e) {
+                e.stopPropagation();
+                _cinemaActiveStickerGroup = chip.dataset.groupId || null;
+                _renderCinemaStickerGrid();
+            };
+        });
     }
     function _inputBarHTML() {
         return '<div class="cinema-input-bar-wrap">' +
@@ -994,15 +1031,38 @@
         grid.innerHTML = '';
 
         // 用户自己添加的表情库（不是梦角的）——"我的表情"这个面板只应该显示这个，
-        // 之前误把 customEmojis（专门给梦角用的表情符号库）和预设表情也塞了进来，已经去掉
-        var myStickers = (typeof myStickerLibrary !== 'undefined' && myStickerLibrary) ? myStickerLibrary : [];
+        // 之前误把 customEmojis（专门给梦角用的表情符号库）和预设表情也塞了进来，已经去掉。
+        // 表情库现在是带分组的对象数组（{id, src, groupId, ...}），这里只做展示 + 分组切换，
+        // 新建/管理分组的入口不放在这——那些只在主聊天"我的表情库"里
+        var hasGroupApi = typeof _myStickerGroupsList === 'function' && typeof _myStickerItemsInGroup === 'function';
+        var rawLib = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
 
-        if (!myStickers.length) {
+        var groupRow = document.getElementById('cinema-sticker-group-row');
+
+        if (!rawLib.length) {
+            if (groupRow) { groupRow.innerHTML = ''; groupRow.style.display = 'none'; }
             grid.innerHTML = '<div class="cinema-sticker-empty">暂无表情，去主聊天页的"我的表情库"里添加吧</div>';
             return;
         }
 
-        myStickers.forEach(function (src) {
+        var itemsToShow;
+        if (hasGroupApi) {
+            var list = _myStickerGroupsList();
+            _renderCinemaStickerGroupRow(list);
+            itemsToShow = _myStickerItemsInGroup(_cinemaActiveStickerGroup);
+        } else {
+            // 兜底：分组相关函数还没加载到时，退回展示整个表情库（不分组）
+            if (groupRow) { groupRow.innerHTML = ''; groupRow.style.display = 'none'; }
+            itemsToShow = rawLib.map(function (s) { return (typeof s === 'string') ? { src: s } : s; });
+        }
+
+        if (!itemsToShow.length) {
+            grid.innerHTML = '<div class="cinema-sticker-empty">这个分组还没有表情</div>';
+            return;
+        }
+
+        itemsToShow.forEach(function (entry) {
+            var src = entry.src;
             var item = document.createElement('div');
             item.className = 'cinema-sticker-item';
             item.innerHTML = '<img>';

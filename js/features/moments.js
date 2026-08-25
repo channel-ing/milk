@@ -257,12 +257,35 @@ function _fmtDate(d){if(!d)return'';if(d===_mToday())return'今天';const dt=new
 function _getAvSrc(isPartner){const c=window._avatarCache||{};if(isPartner){if(c.partner)return c.partner;const e=document.getElementById('partner-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}else{if(c.me)return c.me;const e=document.getElementById('my-avatar');return e&&e.src&&!e.src.endsWith('/')?e.src:null;}}
 function _avEl(isPartner,size){const src=_getAvSrc(isPartner),s=size||36;return src?`<img src="${src}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;display:block;flex-shrink:0;">`:`<span style="width:${s}px;height:${s}px;border-radius:50%;background:var(--border-color,#d0d0d0);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-user" style="font-size:${Math.round(s*0.48)}px;color:var(--text-secondary,#aaa);"></i></span>`;}
 
-// ─── 贴纸选择器（用户自己的 stickerLibrary） ───
+// ─── 贴纸选择器（用户自己的 myStickerLibrary，带分组筛选）───
+// 只做展示 + 切换分组，不提供新建分组/管理分组/上传表情的入口——那些只在主聊天"我的表情库"里
+let _mActiveStickerGroup = null;
+
+function _mStickerGroupRowHTML(list){
+    if(!list.some(g=>g.id===_mActiveStickerGroup)) _mActiveStickerGroup = list.length ? list[0].id : null;
+    if(list.length<=1) return '';
+    let html='<div class="my-sticker-group-row" id="cs-sticker-group-row" style="padding:0 0 8px;">';
+    list.forEach(g=>{
+        const cover=(typeof _myStickerCoverFor==='function')?_myStickerCoverFor(g.id):null;
+        const isCloud=typeof cover==='string' && cover.indexOf('oss://')===0;
+        const inner=cover
+            ? (isCloud
+                ? `<img loading="lazy" data-cover-ref="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+                : `<img loading="lazy" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`)
+            : '<i class="fas fa-images" style="font-size:13px;"></i>';
+        const isActive=g.id===_mActiveStickerGroup;
+        html+=`<button class="my-sticker-group-chip${isActive?' active':''}" data-group-id="${g.id===null?'':g.id}" title="${g.name}">${inner}</button>`;
+    });
+    html+='</div>';
+    return html;
+}
+
 window._mToggleSticker=function(postId){
     const existing=document.getElementById('cs-sticker-picker');
     if(existing){existing.remove();return;}
-    const pool=[...(myStickerLibrary||[])];
-    if(!pool.length){
+    const hasGroupApi = typeof _myStickerGroupsList==='function' && typeof _myStickerItemsInGroup==='function';
+    const rawLib=(myStickerLibrary||[]);
+    if(!rawLib.length){
         const toast=document.createElement('div');
         toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;';
         toast.textContent='还没有表情包，请先在设置中上传哦~';
@@ -271,7 +294,24 @@ window._mToggleSticker=function(postId){
     const btn=document.getElementById('cs-sticker-btn-'+postId);
     const rect=btn?btn.getBoundingClientRect():{top:300,left:10};
     const picker=document.createElement('div'); picker.id='cs-sticker-picker';
-    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:200px;overflow-y:auto;`;
+    picker.style.cssText=`position:fixed;bottom:${window.innerHeight-rect.top+8}px;left:48px;right:48px;z-index:9500;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:14px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-height:240px;overflow-y:auto;`;
+
+    let pool;
+    if(hasGroupApi){
+        const list=_myStickerGroupsList();
+        picker.insertAdjacentHTML('beforeend', _mStickerGroupRowHTML(list));
+        pool=_myStickerItemsInGroup(_mActiveStickerGroup).map(e=>e.src);
+    } else {
+        // 兜底：分组相关函数还没加载到时，退回展示整个表情库（不分组），兼容旧的纯字符串格式
+        pool=rawLib.map(s=>(typeof s==='string')?s:s.src);
+    }
+
+    const grid=document.createElement('div');
+    grid.id='cs-sticker-grid';
+    grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;';
+    if(!pool.length){
+        grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);opacity:.5;font-size:12px;padding:16px 0;">这个分组还没有表情</div>';
+    }
     pool.forEach(src=>{
         const b=document.createElement('button');
         b.style.cssText='position:relative;background:var(--primary-bg);border:1px solid var(--border-color);padding:0;cursor:pointer;border-radius:7px;overflow:hidden;display:block;';
@@ -282,10 +322,28 @@ window._mToggleSticker=function(postId){
         const imgTag=isCloud?`<img data-lazy-cloud-ref="${src}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;">`:`<img src="${src}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;">`;
         b.insertAdjacentHTML('beforeend', imgTag);
         b.onclick=()=>window._mSelectSticker(postId,src);
-        picker.appendChild(b);
+        grid.appendChild(b);
     });
+    picker.appendChild(grid);
+
     document.body.appendChild(picker);
     _bindLazy(picker);
+    picker.querySelectorAll('img[data-cover-ref]').forEach(img=>{
+        if(window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));
+    });
+    const groupRow=picker.querySelector('#cs-sticker-group-row');
+    if(groupRow){
+        groupRow.querySelectorAll('.my-sticker-group-chip').forEach(chip=>{
+            chip.onclick=(e)=>{
+                e.stopPropagation();
+                _mActiveStickerGroup=chip.dataset.groupId||null;
+                // 切分组＝关掉重开：面板整个是重新 build 的，没有单独的"只刷新网格"路径，
+                // 复用 toggle 的关/开两步，避免另写一份局部刷新逻辑
+                picker.remove();
+                window._mToggleSticker(postId);
+            };
+        });
+    }
     setTimeout(()=>{function c(ev){if(!picker.contains(ev.target)&&(!btn||!btn.contains(ev.target))){picker.remove();document.removeEventListener('click',c);}}document.addEventListener('click',c);},100);
 };
 

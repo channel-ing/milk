@@ -1185,7 +1185,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             </div>
 
 
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));">
                 <span></span>
                 <button class="modal-btn modal-btn-secondary" id="cancel-settings" onclick="hideModal(document.getElementById('settings-modal'))">关闭</button>
             </div>
@@ -2471,7 +2471,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
 
             </div>
 
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="period-back-btn" onclick="(function(){hideModal(document.getElementById('period-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
                 <button class="modal-btn modal-btn-secondary" id="close-period" onclick="hideModal(document.getElementById('period-modal'))">关闭</button>
             </div>
         </div>
@@ -2491,7 +2494,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                 </div>
             </div>
             <div id="survey-list-body"></div>
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="survey-list-back-btn" onclick="(function(){hideModal(document.getElementById('survey-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
                 <button class="modal-btn modal-btn-secondary" id="survey-list-close">关闭</button>
             </div>
         </div>
@@ -2699,7 +2705,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                 </div>
                 <div class="favorites-list" id="favorites-list" style="max-height:55vh;overflow-y:auto;"></div>
             </div>
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="stats-back-btn" onclick="(function(){hideModal(document.getElementById('stats-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
                 <button class="modal-btn modal-btn-secondary" id="close-stats">关闭</button>
             </div>
         </div>
@@ -2737,7 +2746,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             <div id="fl-panel-fortune" class="fl-panel fl-panel-active">
                 <div id="fortune-content"></div>
                 <div class="modal-buttons" style="margin-top:16px;">
-
+                    <button class="modal-btn modal-btn-secondary" id="fl-back-btn-fortune" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
                     <button class="modal-btn modal-btn-secondary" id="close-fortune">关闭</button>
                 </div>
             </div>
@@ -2761,6 +2772,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <div id="lenormand-result" style="display:none;"></div>
                 </div>
                 <div class="modal-buttons" style="margin-top:12px;">
+                    <button class="modal-btn modal-btn-secondary" id="fl-back-btn-lenormand" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
                     <button class="modal-btn modal-btn-secondary" id="lenormand-reset-btn" onclick="resetLenormand()" style="display:none;">重新占卜</button>
                     <button class="modal-btn modal-btn-secondary" id="close-lenormand">关闭</button>
                 </div>
@@ -2786,6 +2800,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <div id="tarot-result" style="display:none;"></div>
                 </div>
                 <div class="modal-buttons" style="margin-top:12px;">
+                    <button class="modal-btn modal-btn-secondary" id="fl-back-btn-tarot" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
                     <button class="modal-btn modal-btn-secondary" id="tarot-reset-btn" onclick="resetTarotDivination()" style="display:none;">重新占卜</button>
                     <button class="modal-btn modal-btn-secondary" id="close-tarot-divination">关闭</button>
                 </div>
@@ -2801,6 +2818,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     尚无占卜记录<br><span style="font-size:11px;opacity:0.6;">完成一次占卜后，结果将自动收录于此</span>
                 </div>
                 <div class="modal-buttons" style="margin-top:16px;">
+                    <button class="modal-btn modal-btn-secondary" id="fl-back-btn-divihistory" onclick="(function(){hideModal(document.getElementById('fortune-lenormand-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
                     <button class="modal-btn modal-btn-secondary" id="close-divihistory">关闭</button>
                 </div>
             </div>
@@ -3241,7 +3261,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <p>自定义选项随机抽取</p>
                 </div>
             </div>
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="decision-back-btn" onclick="(function(){hideModal(document.getElementById('decision-menu-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
                 <button class="modal-btn modal-btn-secondary" id="close-decision-menu">关闭</button>
             </div>
         </div>
@@ -3520,7 +3543,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
         </div>
 
         <!-- 关闭按钮 -->
-        <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:24px;padding-right:24px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+        <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
             <button class="modal-btn modal-btn-secondary" id="cd-back-btn" onclick="(function(){hideModal(document.getElementById('companion-diary-modal'));showModal(document.getElementById('advanced-modal'))})()">
                 <i class="fas fa-arrow-left"></i> 返回
             </button>

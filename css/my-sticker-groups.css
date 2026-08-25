@@ -112,7 +112,7 @@
 .my-sticker-move-row.current { border-color: var(--accent-color); background: rgba(var(--accent-color-rgb), 0.08); }
 
 .my-sticker-pick-item {
-    aspect-ratio: 1;
+    position: relative;
     border: 2px solid transparent;
     border-radius: 10px;
     padding: 0;
@@ -120,7 +120,23 @@
     cursor: pointer;
     background: var(--primary-bg);
 }
-.my-sticker-pick-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* aspect-ratio:1 在网格里跟自动行高计算会冲突，格子实际渲染高度算错，
+   缩略图就会超出自己的格子、跟上下行叠在一起——项目里其他地方（styles.css/cinema.css）
+   都是用百分比 padding 撑高度绕开这个坑，这里之前漏了，改成同样的写法 */
+.my-sticker-pick-item::before {
+    content: '';
+    display: block;
+    padding-top: 100%;
+}
+.my-sticker-pick-item img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
 .my-sticker-pick-item.picked { border-color: var(--accent-color); }
 
 /* 管理界面 */

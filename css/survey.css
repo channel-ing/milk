@@ -411,10 +411,11 @@
     background: rgba(var(--accent-color-rgb), 0.08);
 }
 .survey-detail-opt-img {
-    width: 100%;
-    max-width: 240px;
-    max-height: 240px;
-    object-fit: cover;
+    max-width: 130px;
+    max-height: 130px;
+    width: auto;
+    height: auto;
+    object-fit: contain; /* 用contain不裁切——之前用cover硬切+240px上限，贴纸这种长宽比不规则的图会显得特别大特别怪 */
     border-radius: 10px;
     display: block;
     background: var(--secondary-bg); /* 加载中/加载失败时占位色，别是一片透明看着像没渲染出来 */

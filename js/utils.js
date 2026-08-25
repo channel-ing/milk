@@ -492,6 +492,12 @@ async function importAllData(file) {
                 localStorageNeedles: ['disabledStickerItems']
             },
             {
+                id: 'music',
+                label: '自定义歌单',
+                indexedDBNeedles: ['customSongs'],
+                localStorageNeedles: []
+            },
+            {
                 id: 'period',
                 label: '经期记录',
                 indexedDBNeedles: ['periodData'],

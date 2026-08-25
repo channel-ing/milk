@@ -1086,7 +1086,18 @@ function manageAutoSendTimer() {
 
         const updateAvatar = (element, src) => {
             if (src) {
-                element.innerHTML = `<img src="${src}" alt="avatar">`;
+                // src 可能是本地 base64（直接能当 img src 用），也可能是配置了云端之后
+                // 迁移出来的 oss:// 引用——这种要走 CloudMedia 懒加载解析成真正的图片地址，
+                // 直接塞进 src 浏览器认不出协议，会裂图
+                if (window.CloudMedia && window.CloudMedia.isCloudRef && window.CloudMedia.isCloudRef(src)) {
+                    var avatarImg = document.createElement('img');
+                    avatarImg.alt = 'avatar';
+                    element.innerHTML = '';
+                    element.appendChild(avatarImg);
+                    window.CloudMedia.bindLazyImage(avatarImg, src);
+                } else {
+                    element.innerHTML = `<img src="${src}" alt="avatar">`;
+                }
                 // 同时写内存缓存，供 saveData 读取（不从 DOM img.src 读，不可靠）
                 if (!window._avatarCache) window._avatarCache = {};
                 if (element === DOMElements.partner.avatar) window._avatarCache.partner = src;
@@ -1099,6 +1110,17 @@ function manageAutoSendTimer() {
                     else if (element === DOMElements.me.avatar) window._avatarCache.me = null;
                 }
             }
+        };
+        // 给云端迁移脚本用的重新加载钩子——迁移是直接写 localforage 把头像换成 oss:// 引用，
+        // 不走这里的 updateAvatar，如果内存里的 window._avatarCache 不刷新，
+        // 下一次 saveData() 存档时就会把迁移好的地址覆盖回旧的本地 base64，等于白迁移
+        window._refreshAvatarsFromStorage = async function () {
+            try {
+                var pv = await localforage.getItem(getStorageKey('partnerAvatar'));
+                var mv = await localforage.getItem(getStorageKey('myAvatar'));
+                updateAvatar(DOMElements.partner.avatar, pv);
+                updateAvatar(DOMElements.me.avatar, mv);
+            } catch (e) {}
         };
 
         const removeBackground = () => {

@@ -563,7 +563,7 @@ const loadData = async () => {
             var base = Date.now();
             myStickerLibrary = myStickerLibrary.map(function (s, i) {
                 if (typeof s === 'string') {
-                    return { id: 'stk_' + base + '_' + i, src: s, groupId: null, addedAt: base + i };
+                    return { id: 'stk_' + base + '_' + i, src: s, groupId: null, addedAt: base + i, groupJoinedAt: base + i };
                 }
                 return s; // 已经是新格式的，原样保留
             });

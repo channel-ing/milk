@@ -1979,10 +1979,13 @@ function initComboMenu() {
                 var isSel = !!selectedIds[e.id];
                 var isCloud = typeof e.src === 'string' && e.src.indexOf('oss://') === 0;
                 var imgTag = isCloud ? '<img loading="lazy" data-cover-ref="' + e.src + '">' : '<img loading="lazy" src="' + e.src + '">';
-                return '<button class="my-sticker-pick-item' + (isSel ? ' picked' : '') + '" data-id="' + e.id + '" style="position:relative;">' +
+                // 之前这里用的是 <button>——同一套"用百分比 padding 撑高度"的技巧在 <button> 上不生效
+                // （浏览器给表单控件的默认渲染跟普通块级元素不是一回事），格子被撑成长方形。
+                // 新建分组那边预览用的是 <div> 就没这个问题，这里换成一样的 <div>（配 role/tabindex 保留可访问性）
+                return '<div class="my-sticker-pick-item' + (isSel ? ' picked' : '') + '" data-id="' + e.id + '" role="button" tabindex="0" style="position:relative;">' +
                     imgTag +
                     (isSel ? '<div style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:var(--accent-color);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;"><i class="fas fa-check"></i></div>' : '') +
-                '</button>';
+                '</div>';
             }).join('');
             _myStickerBindCoverRefs(grid);
             grid.querySelectorAll('.my-sticker-pick-item').forEach(function (btn) {

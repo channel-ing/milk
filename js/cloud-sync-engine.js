@@ -56,6 +56,8 @@
         'customReplyGroups', 'customPokeGroups', 'customStatusGroups',
         // 经期记录（日历标记、每日打卡、梦角留言状态）
         'periodData',
+        // 调查问卷（我问梦角/梦角问我，图片选项是 oss:// 引用或未配置OSS时的本地 base64，体积小）
+        'surveyData',
         // 纪念日
         'anniversaries', 'annCoverBg_',
         // 相册（相册列表/照片归属/收藏/回收站，图片本身是 oss:// 引用，体积小）

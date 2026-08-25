@@ -14,6 +14,7 @@
  *   - 陪伴媒体（companionData.backgrounds/voices/noises）→ 云端引用
  *   - 收藏语音（favAudio_*）→ 云端引用（旧键名 + 旧格式 base64 全覆盖）
  *   - 聊天图片（chatMessages[].image）→ 云端引用（base64 替换，消息内容不变）
+ *   - 问卷选项图片（surveyData.askPartner[].questions[].options[].value）→ 云端引用
  */
 (function (global) {
     'use strict';
@@ -765,7 +766,89 @@
             console.warn('[migration] 无法统计动态图片数量（数据过大？），将在迁移时尝试处理', e2);
         }
 
+        // 问卷选项图片（"我问梦角"里图片类型选项的存量 base64）
+        try {
+            var sv = await localforage.getItem(APP_PREFIX_STR + sid + '_surveyData');
+            if (sv && Array.isArray(sv.askPartner)) {
+                sv.askPartner.forEach(function (survey) {
+                    if (!survey || !Array.isArray(survey.questions)) return;
+                    survey.questions.forEach(function (q) {
+                        if (!q || !Array.isArray(q.options)) return;
+                        q.options.forEach(function (opt) {
+                            if (opt && opt.kind === 'image' && _isBase64Image(opt.value)) count++;
+                        });
+                    });
+                });
+            }
+        } catch (eSv) {
+            console.warn('[migration] 无法统计问卷选项图片数量', eSv);
+        }
+
         return count;
+    }
+
+    // ==== 问卷选项图片迁移（"我问梦角"问卷里图片类型选项的存量 base64 → oss://）====
+    async function _migrateSurveyOptionImages(sid) {
+        var key = APP_PREFIX_STR + sid + '_surveyData';
+        var data;
+        try {
+            data = await localforage.getItem(key);
+        } catch (loadErr) {
+            console.warn('[migration] 问卷选项图片：加载 surveyData 失败，跳过', loadErr);
+            return;
+        }
+        if (!data || !Array.isArray(data.askPartner) || !data.askPartner.length) return;
+
+        var toMigrate = [];
+        data.askPartner.forEach(function (survey, si) {
+            if (!survey || !Array.isArray(survey.questions)) return;
+            survey.questions.forEach(function (q, qi) {
+                if (!q || !Array.isArray(q.options)) return;
+                q.options.forEach(function (opt, oi) {
+                    if (opt && opt.kind === 'image' && _isBase64Image(opt.value)) {
+                        toMigrate.push({ si: si, qi: qi, oi: oi });
+                    }
+                });
+            });
+        });
+        if (!toMigrate.length) return;
+
+        var changed = false;
+        for (var i = 0; i < toMigrate.length; i++) {
+            var loc = toMigrate[i];
+            var opt = data.askPartner[loc.si].questions[loc.qi].options[loc.oi];
+            _state.currentTask = '问卷选项图片 ' + (i + 1) + '/' + toMigrate.length;
+            _notify();
+            try {
+                var r = await window.CloudMedia.upload(opt.value, 'survey-options');
+                opt.value = r.url;
+                changed = true;
+                _state.completed++;
+            } catch (e) {
+                console.warn('[migration] 问卷选项图片上传失败', loc, e);
+                _state.failed++;
+            }
+            _state.progress++;
+            _notify();
+        }
+
+        if (changed) {
+            try {
+                await localforage.setItem(key, data);
+            } catch (saveErr) {
+                console.error('[migration] 问卷选项图片写回失败', saveErr);
+                throw saveErr;
+            }
+            // survey.js 自己维护一份内存里的 _data，不重新加载一下的话，
+            // 之后它随便调一次 _save() 就会把刚迁移好的云端地址覆盖回旧 base64
+            try {
+                if (typeof window._surveyReloadFromStorage === 'function') {
+                    await window._surveyReloadFromStorage();
+                }
+            } catch (syncErr) {
+                console.warn('[migration] 问卷模块内存同步失败（不影响已写入的迁移结果）', syncErr);
+            }
+        }
     }
 
     // ==== 主入口 ====
@@ -829,6 +912,9 @@
 
             // 动态图片（贴文配图 + 评论图片，分批，每批同步内存变量）
             await _migrateMomentsImages(sid);
+
+            // 问卷选项图片（"我问梦角"里图片类型选项的存量 base64）
+            await _migrateSurveyOptionImages(sid);
 
             _state.currentTask = '完成';
             _notify();

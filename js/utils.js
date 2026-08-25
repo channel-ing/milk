@@ -488,7 +488,7 @@ async function importAllData(file) {
             {
                 id: 'stickers',
                 label: '表情库（贴纸）',
-                indexedDBNeedles: ['stickerLibrary', 'myStickerLibrary'],
+                indexedDBNeedles: ['stickerLibrary', 'myStickerLibrary', 'myStickerGroups'],
                 localStorageNeedles: ['disabledStickerItems']
             },
             {

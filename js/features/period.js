@@ -87,7 +87,27 @@
         }
     }
 
+    // 等 SESSION_ID 真正就绪再往下走——避免"读数据时账号信息还没准备好，
+    // 存数据时却已经准备好了"这种前后不一致，导致读、存实际用的是两个不同的
+    // 存储位置：读的时候找不到真实数据（因为找错了地方），存的时候却把这个
+    // "看起来是空的"结果存到了真正正确的位置，把已有的真实数据覆盖掉。
+    // 正常情况下 SESSION_ID 很快就会就绪，这里最多等5秒兜底。
+    function _waitForSessionId(maxWaitMs) {
+        return new Promise(function (resolve) {
+            var waited = 0;
+            (function check() {
+                if ((typeof SESSION_ID !== 'undefined' && SESSION_ID) || waited >= maxWaitMs) {
+                    resolve();
+                } else {
+                    waited += 100;
+                    setTimeout(check, 100);
+                }
+            })();
+        });
+    }
+
     async function _load() {
+        await _waitForSessionId(5000);
         try {
             var key = await _getKey();
             var saved = await localforage.getItem(key);

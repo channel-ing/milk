@@ -2477,8 +2477,50 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
         </div>
     </div>
 
-    <!-- ========== 问卷功能 Step 1：创建问卷弹窗（我问梦角） ==========
-         历史列表页/详情页在 Step 2 才做，这一步先让"问卷"入口直接打开创建弹窗，方便先测数据结构 -->
+    <!-- ========== 问卷功能：历史记录列表页 ========== -->
+    <div class="modal" id="survey-modal">
+        <div class="modal-content" id="survey-list-content" style="max-width:400px;max-height:85vh;">
+            <div class="modal-title" style="justify-content:space-between;">
+                <span><i class="fas fa-clipboard-list"></i> 问卷</span>
+                <div style="display:flex;gap:14px;flex-shrink:0;">
+                    <button type="button" class="survey-icon-btn" id="survey-trash-btn" title="回收站"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="survey-icon-btn" id="survey-add-btn" title="创建问卷"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div id="survey-list-body"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="survey-list-close">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 问卷功能：历史记录详情页 ========== -->
+    <div class="modal" id="survey-detail-modal">
+        <div class="modal-content" id="survey-detail-content" style="max-width:400px;max-height:85vh;">
+            <div class="modal-title">
+                <button type="button" class="survey-icon-btn" id="survey-detail-back" style="margin-right:2px;"><i class="fas fa-arrow-left"></i></button>
+                <span>问卷详情</span>
+            </div>
+            <div id="survey-detail-body"></div>
+            <div class="modal-buttons" id="survey-detail-actions"></div>
+        </div>
+    </div>
+
+    <!-- ========== 问卷功能：回收站 ========== -->
+    <div class="modal" id="survey-trash-modal">
+        <div class="modal-content" style="max-width:380px;max-height:80vh;">
+            <div class="modal-title">
+                <i class="fas fa-trash"></i><span>问卷回收站</span>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:10px;">删除的问卷会保留30天，之后自动清除</div>
+            <div id="survey-trash-body"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="survey-trash-close">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 问卷功能 Step 1：创建问卷弹窗（我问梦角） ========== -->
     <div class="modal" id="survey-create-modal">
         <div class="modal-content" id="survey-create-content">
             <div class="modal-title">

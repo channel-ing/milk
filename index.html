@@ -2480,14 +2480,16 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <!-- ========== 问卷功能：历史记录列表页 ========== -->
     <div class="modal" id="survey-modal">
         <div class="modal-content" id="survey-list-content" style="max-width:400px;max-height:85vh;">
-            <div class="modal-title" style="justify-content:space-between;">
+            <div class="modal-title">
                 <span><i class="fas fa-clipboard-list"></i> 问卷</span>
-                <div style="display:flex;gap:14px;flex-shrink:0;">
+            </div>
+            <div class="survey-toolbar-row" id="survey-toolbar-row">
+                <div id="survey-fav-filter-bar"></div>
+                <div class="survey-toolbar-actions">
                     <button type="button" class="survey-icon-btn" id="survey-trash-btn" title="回收站"><i class="fas fa-trash"></i></button>
                     <button type="button" class="survey-icon-btn" id="survey-add-btn" title="创建问卷"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
-            <div id="survey-fav-filter-bar"></div>
             <div id="survey-list-body"></div>
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-secondary" id="survey-list-close">关闭</button>

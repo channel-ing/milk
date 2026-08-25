@@ -183,6 +183,13 @@
     cursor: default;
 }
 
+#survey-add-q-btn {
+    /* 底部按钮区是 sticky 定位悬浮在滚动区底部——内容没比视口高多少的时候（比如只有1-2道题），
+       "新增问题"按钮的自然位置刚好落在 sticky footer要占的那块地方，会被它盖住一部分。
+       给这个按钮留够跟 footer 差不多高的下边距，保证怎么滚都不会被盖住 */
+    margin-bottom: 90px;
+}
+
 .survey-q-kind-toggle {
     display: flex;
     gap: 6px;

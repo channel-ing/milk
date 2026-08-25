@@ -1600,6 +1600,16 @@ autoSendSlider.addEventListener('change', () => {
                 });
             }
 
+            // 问卷 Step 1：先直接打开创建弹窗方便测数据结构，Step 2 做完历史列表页后，
+            // 这里要改成先打开列表页，"+"里选"问梦角"才打开创建弹窗
+            const surveyEntry = document.getElementById('survey-function');
+            if (surveyEntry) {
+                surveyEntry.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    if (typeof window._surveyOpenCreateModal === 'function') window._surveyOpenCreateModal();
+                });
+            }
+
             const flEntry = document.getElementById('fortune-lenormand-function');
             if (flEntry) {
                 flEntry.addEventListener('click', () => {

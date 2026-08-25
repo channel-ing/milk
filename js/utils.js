@@ -492,6 +492,12 @@ async function importAllData(file) {
                 localStorageNeedles: ['disabledStickerItems']
             },
             {
+                id: 'period',
+                label: '经期记录',
+                indexedDBNeedles: ['periodData'],
+                localStorageNeedles: []
+            },
+            {
                 id: 'ann',
                 label: '纪念日',
                 indexedDBNeedles: ['anniversaries', 'annCoverBg_', 'annMeetOverride', 'annPinnedId'],

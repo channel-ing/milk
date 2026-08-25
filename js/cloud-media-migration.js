@@ -187,21 +187,31 @@
         var newArr = [];
         for (var i = 0; i < arr.length; i++) {
             var item = arr[i];
-            if (typeof item !== 'string' || item.indexOf('oss://') === 0) {
+            // "我的表情库"现在是 {id, src, groupId, addedAt} 对象（为了支持分组），
+            // "对方表情库"还是纯字符串——这里兼容两种形状，取到实际要判断/上传的字符串值
+            var isObjShape = item && typeof item === 'object' && typeof item.src === 'string';
+            var rawStr = isObjShape ? item.src : item;
+
+            if (typeof rawStr !== 'string' || rawStr.indexOf('oss://') === 0) {
                 newArr.push(item);
                 continue;
             }
-            if (!_isBase64Image(item)) {
+            if (!_isBase64Image(rawStr)) {
                 newArr.push(item);
                 continue;
             }
             _state.currentTask = label + ' ' + (i + 1) + '/' + arr.length;
             _notify();
             try {
-                var r = await window.CloudMedia.upload(item, category);
-                newArr.push(r.url);
-                if (disabledSet && disabledSet.has(item)) {
-                    disabledSet.delete(item);
+                var r = await window.CloudMedia.upload(rawStr, category);
+                if (isObjShape) {
+                    item.src = r.url;
+                    newArr.push(item);
+                } else {
+                    newArr.push(r.url);
+                }
+                if (disabledSet && disabledSet.has(rawStr)) {
+                    disabledSet.delete(rawStr);
                     disabledSet.add(r.url);
                 }
                 _state.completed++;
@@ -665,7 +675,10 @@
         }
         var ml = await localforage.getItem(APP_PREFIX_STR + sid + '_myStickerLibrary');
         if (Array.isArray(ml)) {
-            ml.forEach(function (item) { if (_isBase64Image(item)) count++; });
+            ml.forEach(function (item) {
+                var raw = (item && typeof item === 'object') ? item.src : item;
+                if (_isBase64Image(raw)) count++;
+            });
         }
 
         // 陪伴媒体

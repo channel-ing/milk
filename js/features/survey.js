@@ -14,6 +14,7 @@
  *       answeredAt, deletedAt,
  *       viewed: bool,             // 仅 status==='answered' 时有意义：到点变answered时置false（角标显示"new"），
  *                                  // 用户点开详情页那一刻置true（角标变"已回复"）
+ *       favorited: bool,          // 收藏——只有 status==='answered' 时才允许收藏
  *       selections: null | { [questionId]: [optionId, ...] },  // 倒计时结束那一刻才算，之前一直是 null
  *       questions: [
  *         { id, type: 'single'|'multi', text, options: [ { id, kind:'text'|'image', value } ] }
@@ -25,6 +26,7 @@
  *       id, sentAt, status: 'sent' | 'answered_pending' | 'received', receivedAt, deletedAt,
  *       viewed: bool,             // 仅 status==='sent' 时有意义：生成时置false（角标显示"new"），
  *                                  // 用户点开详情页那一刻置true（角标变"未回答"）
+ *       favorited: bool,          // 收藏——status==='answered_pending' 或 'received' 时才允许收藏
  *       answeredAt,               // 用户提交回答的时间点（status变answered_pending那一刻）
  *       receiveDueAt,             // 提交后随机2-5小时算出的"梦角看到"时间点，到点才变成 received
  *       answers: null | { [questionId]: answerText },
@@ -120,6 +122,9 @@
                     if (s.viewed === undefined) s.viewed = true;
                     // 老数据的 status 只有 'sent'/'received' 两种，'received' 直接映射成新的最终态即可，不用改名
                 });
+                // 兼容"收藏"上线前的旧数据
+                _data.askPartner.forEach(function (s) { if (s.favorited === undefined) s.favorited = false; });
+                _data.askMe.forEach(function (s) { if (s.favorited === undefined) s.favorited = false; });
             }
         } catch (e) { console.warn('[survey] load failed:', e); }
         if (!Array.isArray(_data.bank) || !_data.bank.length) _seedBuiltinBank();
@@ -536,6 +541,8 @@
                 status: 'pending',
                 answeredAt: null,
                 deletedAt: null,
+                viewed: true,
+                favorited: false,
                 selections: null,
                 questions: questionsPayload
             };
@@ -643,6 +650,7 @@
             sentAt: Date.now(),
             status: 'sent',
             viewed: false, // 梦角刚提问，角标先显示"new"，用户点开详情页之后才变"未回答"
+            favorited: false,
             answeredAt: null,
             receiveDueAt: null,
             receivedAt: null,
@@ -1259,6 +1267,43 @@
         return (t && t.trim()) ? t.trim() : '（无标题问题）';
     }
 
+    // 能不能收藏：只有"已经有结果/有回答"的才能收藏——等待中/已撤回/梦角问题还没答
+    // 这几种半成品状态不给收藏，避免收藏了一份内容还会变的东西
+    function _canFavorite(s, src) {
+        if (src === 'partner') return s.status === 'answered';
+        return s.status === 'answered_pending' || s.status === 'received';
+    }
+
+    function _toggleFavorite(id, src) {
+        var arr = src === 'me' ? _data.askMe : _data.askPartner;
+        var rec = arr.find(function (x) { return x.id === id; });
+        if (!rec || !_canFavorite(rec, src)) return;
+        rec.favorited = !rec.favorited;
+        _save();
+        _renderListBody();
+        if (typeof showNotification === 'function') showNotification(rec.favorited ? '已收藏' : '已取消收藏', 'success');
+    }
+
+    var _activeSurveyFavFilter = false; // false=全部, true=只看收藏
+
+    // 全部/收藏 这两个胶囊——不影响置顶排序，纯粹是个过滤器
+    function _renderFavFilterBar(allItems) {
+        var bar = document.getElementById('survey-fav-filter-bar');
+        if (!bar) return;
+        var favCount = allItems.filter(function (it) { return it.ref.favorited; }).length;
+        if (!favCount && !_activeSurveyFavFilter) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+        bar.innerHTML =
+            '<button class="gfp-btn' + (!_activeSurveyFavFilter ? ' gfp-active' : '') + '" data-fav-filter="all">全部 <span class="gfp-count">' + allItems.length + '</span></button>' +
+            '<button class="gfp-btn' + (_activeSurveyFavFilter ? ' gfp-active' : '') + '" data-fav-filter="fav"><i class="fas fa-star" style="font-size:10px;margin-right:3px;"></i>收藏 <span class="gfp-count">' + favCount + '</span></button>';
+        bar.querySelectorAll('.gfp-btn').forEach(function (btn) {
+            btn.onclick = function () {
+                _activeSurveyFavFilter = btn.dataset.favFilter === 'fav';
+                _renderListBody();
+            };
+        });
+    }
+
     function _openListModal() {
         _renderListBody();
         if (typeof window.showModal === 'function') window.showModal(document.getElementById('survey-modal'));
@@ -1275,15 +1320,22 @@
         var partnerItems = _data.askPartner.filter(function (s) { return !s.deletedAt; }).map(function (s) { return { ref: s, src: 'partner' }; });
         var meItems = _data.askMe.filter(function (s) { return !s.deletedAt; }).map(function (s) { return { ref: s, src: 'me' }; });
         var all = partnerItems.concat(meItems);
-        if (!all.length) {
+
+        _renderFavFilterBar(all);
+        var list = _activeSurveyFavFilter ? all.filter(function (it) { return it.ref.favorited; }) : all;
+
+        if (!list.length) {
+            var emptyText = _activeSurveyFavFilter ? '还没有收藏的问卷' : '还没有问卷，问点什么给梦角吧';
             body.innerHTML =
                 '<div class="survey-list-empty">' +
                     '<i class="fas fa-clipboard-list"></i>' +
-                    '<p>还没有问卷，问点什么给梦角吧</p>' +
-                    '<button type="button" class="survey-empty-create-btn" id="survey-empty-create-btn"><i class="fas fa-plus"></i> 创建问卷</button>' +
+                    '<p>' + emptyText + '</p>' +
+                    (_activeSurveyFavFilter ? '' : '<button type="button" class="survey-empty-create-btn" id="survey-empty-create-btn"><i class="fas fa-plus"></i> 创建问卷</button>') +
                 '</div>';
-            var emptyBtn = document.getElementById('survey-empty-create-btn');
-            if (emptyBtn) emptyBtn.onclick = function () { _openCreateModal(); };
+            if (!_activeSurveyFavFilter) {
+                var emptyBtn = document.getElementById('survey-empty-create-btn');
+                if (emptyBtn) emptyBtn.onclick = function () { _openCreateModal(); };
+            }
             _sizeListBody();
             return;
         }
@@ -1293,8 +1345,8 @@
             if (it.src === 'partner') return it.ref.status === 'pending' || (it.ref.status === 'answered' && !it.ref.viewed);
             return it.ref.status === 'sent';
         };
-        var pinned = all.filter(isPinned).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
-        var rest = all.filter(function (it) { return !isPinned(it); }).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
+        var pinned = list.filter(isPinned).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
+        var rest = list.filter(function (it) { return !isPinned(it); }).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
 
         var html = '';
         pinned.forEach(function (it) { html += _cardHTML(it.ref, it.src); });
@@ -1303,6 +1355,12 @@
 
         body.querySelectorAll('.survey-card').forEach(function (el) {
             el.onclick = function () { _openDetailModal(el.dataset.sid, el.dataset.src); };
+        });
+        body.querySelectorAll('.survey-fav-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                _toggleFavorite(btn.dataset.favId, btn.dataset.favSrc);
+            };
         });
         _sizeListBody();
     }
@@ -1329,10 +1387,16 @@
         var srcTagText = (src === 'partner' ? _myName() : _partnerName()) + '问的';
         var createdAt = s.createdAt || s.sentAt;
         var answeredAt = s.answeredAt || s.receivedAt;
+        // 只有"已经有结果/有回答"的才给星星按钮，等待中/已撤回/还没回答的不显示——
+        // 点星星要 stopPropagation，不然会一起触发卡片本身的"打开详情"点击
+        var favStar = _canFavorite(s, src)
+            ? '<button class="survey-fav-btn' + (s.favorited ? ' favorited' : '') + '" data-fav-id="' + s.id + '" data-fav-src="' + src + '" title="' + (s.favorited ? '取消收藏' : '收藏') + '"><i class="' + (s.favorited ? 'fas' : 'far') + ' fa-star"></i></button>'
+            : '';
         return '<div class="survey-card" data-sid="' + s.id + '" data-src="' + src + '">' +
             '<div class="survey-card-top">' +
                 '<span class="survey-tag ' + srcTagCls + '">' + _esc(srcTagText) + '</span>' +
                 '<span class="survey-tag survey-tag-status survey-tag-status-' + badge.cls + '">' + _esc(badge.text) + '</span>' +
+                favStar +
             '</div>' +
             '<div class="survey-card-title">' + _esc(_surveyTitle(s)) + '</div>' +
             '<div class="survey-card-meta">' + _fmtTime(createdAt) +
@@ -1541,6 +1605,7 @@
             answeredAt: null,
             deletedAt: null,
             viewed: true,
+            favorited: false,
             selections: null,
             questions: JSON.parse(JSON.stringify(s.questions))
         };

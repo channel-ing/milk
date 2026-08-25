@@ -1,11 +1,14 @@
 /**
  * global-msg-banner.js — 全局新消息推送横条（微信风格）
  *
- * 需求：梦角在主聊天发新消息时，只要用户不在下面这三种情况里，就在当前页面顶部弹一条横条：
+ * 需求：梦角在主聊天发新消息时，只要用户不在下面这几种情况里，就在当前页面顶部弹一条横条：
  *   1）用户当前就在主聊天本身（消息本来就实时显示在眼前，不需要再弹）
  *   2）陪伴模式（陪伴页里本来就会同步显示气泡）
  *   3）电影院沉浸模式（全屏剧场，本来就在这个聊天场景里）
- * 点一下横条：关掉当前打开的情侣空间页面，跳回主聊天并滚动到最新消息。
+ * 反过来，下面这些"盖在主聊天上面的弹窗"要弹（弹窗盖住了聊天，用户看不到新消息）：
+ *   设置弹窗、信箱弹窗、情侣空间设置弹窗、还没进陪伴页之前的陪伴邀请弹窗……等等，
+ *   不一一列举，走的是"当前有没有弹窗盖在上面"这个通用判断。
+ * 点一下横条：把当前挡着的弹窗/情侣空间都关掉，跳回主聊天并滚动到最新消息。
  *
  * 挂载方式：走 core.js 里已有的 window._registerPartnerMessageListener 钩子——
  * 这个钩子只对"梦角发的普通文字消息"触发（message.type === 'normal'），
@@ -34,16 +37,31 @@
         return _banner;
     }
 
-    // 判断当前是不是"不需要弹"的三种情况之外——只有情侣空间页面打开着、且不是电影院沉浸模式时才弹。
-    // 情侣空间没打开＝主聊天本身就是当前可见页面，不用弹；companion-page.active＝陪伴模式，不用弹；
-    // 情侣空间开着但同时是 cinema-theater-mode（沉浸剧场）也不用弹。
+    // 弹窗大多用 .modal 这个通用类（设置、信箱、情侣空间设置……），显示时 display 不是 none。
+    // 陪伴邀请弹窗是个例外——它是动态创建的 #companion-modal-dynamic，故意没用 .modal 类
+    // （companion.js 里有注释写了是为了不被原来的 hideModal 干扰），这里单独认一下这个 id。
+    function _isAnyModalOpen() {
+        var dyn = document.getElementById('companion-modal-dynamic');
+        if (dyn && getComputedStyle(dyn).display !== 'none') return true;
+        var modals = document.querySelectorAll('.modal');
+        for (var i = 0; i < modals.length; i++) {
+            if (getComputedStyle(modals[i]).display !== 'none') return true;
+        }
+        return false;
+    }
+
+    // 判断要不要弹：陪伴模式/电影院沉浸模式不弹；有弹窗盖在上面（不管是不是在情侣空间里点出来的）要弹；
+    // 情侣空间开着（非沉浸模式）要弹；剩下的（主聊天本身可见、什么弹窗都没开）不弹。
     function _shouldShow() {
         var companionPage = document.getElementById('companion-page');
         if (companionPage && companionPage.classList.contains('active')) return false;
+
         var csPage = document.getElementById('couple-space-page');
-        if (!csPage || !csPage.classList.contains('cs-open')) return false;
-        if (csPage.classList.contains('cinema-theater-mode')) return false;
-        return true;
+        if (csPage && csPage.classList.contains('cinema-theater-mode')) return false;
+
+        if (_isAnyModalOpen()) return true;
+        if (csPage && csPage.classList.contains('cs-open')) return true;
+        return false;
     }
 
     function _previewText(msg) {
@@ -56,10 +74,27 @@
         if (_banner) _banner.classList.remove('gmb-show');
     }
 
+    // 点一下横条：不管当前是弹窗、还是情侣空间、还是两者都有（比如情侣空间设置弹窗），
+    // 一律强制关掉，跳回主聊天。弹窗直接关，不走各自的取消/保存逻辑——用户点的是"跳转"，
+    // 等于主动放弃当前正在填的东西，跟点了弹窗外面把它关掉是一个意思。
+    function _closeAllOverlays() {
+        var dyn = document.getElementById('companion-modal-dynamic');
+        if (dyn) dyn.remove(); // 这个本来就是"用完就 remove"的动态节点，不是简单隐藏
+
+        document.querySelectorAll('.modal').forEach(function (m) {
+            if (getComputedStyle(m).display !== 'none') {
+                if (typeof window.hideModal === 'function') window.hideModal(m);
+                else m.style.display = 'none';
+            }
+        });
+
+        if (typeof window.closeCoupleSpace === 'function') window.closeCoupleSpace();
+    }
+
     function _onTap() {
         clearTimeout(_hideTimer);
         _hide();
-        if (typeof window.closeCoupleSpace === 'function') window.closeCoupleSpace();
+        _closeAllOverlays();
         // closeCoupleSpace 内部关闭动画是 380ms，等它跑完再回到底部，避免动画进行中跳转看起来很突兀
         setTimeout(function () {
             if (typeof window._backToLatestMessages === 'function') window._backToLatestMessages();

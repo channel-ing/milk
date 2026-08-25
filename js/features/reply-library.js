@@ -154,6 +154,10 @@ function _renderListContentOnly() {
         else if (currentSubTab === 'mottos') itemsToRender = customMottos;
         else if (currentSubTab === 'intros') itemsToRender = customIntros;
         else if (currentSubTab === 'period') itemsToRender = customPeriodCare;
+        else if (currentSubTab === 'surveyBank') {
+            if (typeof window._surveyRenderBankTab === 'function') window._surveyRenderBankTab(list);
+            return;
+        }
     }
 
     if (renderType === 'emoji') { _renderEmojiTab(list, itemsToRender); return; }
@@ -243,6 +247,10 @@ function renderReplyLibrary() {
         else if (currentSubTab === 'mottos') itemsToRender = customMottos;
         else if (currentSubTab === 'intros') itemsToRender = customIntros;
         else if (currentSubTab === 'period') itemsToRender = customPeriodCare;
+        else if (currentSubTab === 'surveyBank') {
+            if (typeof window._surveyRenderBankTab === 'function') window._surveyRenderBankTab(list);
+            return;
+        }
     }
 
     if (renderType === 'emoji') { _renderEmojiTab(list, itemsToRender); return; }
@@ -265,6 +273,12 @@ function renderReplyLibrary() {
 
 function _renderModernToolbar() {
     let toolbar = document.getElementById('batch-ops-toolbar');
+    // 问卷题库这个 tab 是自己单独一套渲染（对象结构，不是纯字符串数组），
+    // 不走下面这套批量管理/分组/去重逻辑——那些都是照着字符串数组写的，硬塞进来只会出岔子
+    if (currentMajorTab === 'atmosphere' && currentSubTab === 'surveyBank') {
+        if (toolbar) toolbar.style.display = 'none';
+        return;
+    }
     const isMainCustom = currentMajorTab === 'reply' && currentSubTab === 'custom';
     const isStickersTab = currentMajorTab === 'reply' && currentSubTab === 'stickers';
     const hasGroupSupport = _tabHasGroups();

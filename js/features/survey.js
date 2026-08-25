@@ -431,7 +431,21 @@
             wrap.className = 'survey-option-img-wrap';
             var thumb = document.createElement('div');
             thumb.className = 'survey-option-img-thumb';
-            thumb.innerHTML = opt.value ? '<img src="' + opt.value + '">' : '<i class="fas fa-image"></i>';
+            // opt.value 可能是本地 base64（直接能当 src 用），也可能是已经传到云端后的 oss:// 引用
+            // （这种要走 CloudMedia 懒加载解析成真正能显示的 blob URL，直接塞进 src 浏览器认不出协议，
+            // 图裂了——之前这里就是漏了这一步，只是拿 opt.value 原样当 src 用）
+            if (opt.value) {
+                if (window.CloudMedia && window.CloudMedia.isCloudRef && window.CloudMedia.isCloudRef(opt.value)) {
+                    var thumbImg = document.createElement('img');
+                    thumb.innerHTML = '';
+                    thumb.appendChild(thumbImg);
+                    window.CloudMedia.bindLazyImage(thumbImg, opt.value);
+                } else {
+                    thumb.innerHTML = '<img src="' + opt.value + '">';
+                }
+            } else {
+                thumb.innerHTML = '<i class="fas fa-image"></i>';
+            }
             wrap.appendChild(thumb);
 
             var pickLabel = document.createElement('label');
@@ -1152,6 +1166,12 @@
     }
 
     window._surveyRenderBankTab = _renderBankTab;
+    // 给云端迁移脚本（cloud-media-migration.js）用的重新加载钩子——迁移是直接写 localforage，
+    // 不走这边的 _save()，如果不重新读一遍，survey.js 内存里还留着老的 base64，
+    // 之后随便一个操作触发 _save() 就会把迁移好的云端地址覆盖回去，等于白迁移
+    window._surveyReloadFromStorage = function () {
+        return _load().then(function () { _refreshOpenViews(); });
+    };
 
     // ── 提醒合并：不管什么来源（问卷回复、以后 Step 3 的反向问卷新提问……），
     //    只要短时间内一起发生，就合并成一条弹窗，不用逐条打扰 ──
@@ -1478,8 +1498,11 @@
             var selected = (s.selections && s.selections[q.id]) || [];
             var optsHtml = q.options.map(function (o) {
                 var isSel = selected.indexOf(o.id) !== -1;
+                // 图片选项这里先不直接写 src——o.value 可能是 oss:// 云端引用，浏览器认不出这个协议，
+                // 直接当 src 用会直接裂图。先存进 data-src，等 innerHTML 真正插入 DOM 之后，
+                // 再统一过一遍，是 oss:// 的走 CloudMedia 懒加载解析成 blob URL，本地 base64 的直接当 src 用
                 var inner = (o.kind === 'image')
-                    ? '<img class="survey-detail-opt-img" src="' + o.value + '">'
+                    ? '<img class="survey-detail-opt-img" data-src="' + _esc(o.value) + '">'
                     : '<span>' + _esc(o.value) + '</span>';
                 return '<div class="survey-detail-opt' + (isSel ? ' selected' : '') + '">' + inner +
                     (isSel ? '<i class="fas fa-check-circle survey-detail-opt-check"></i>' : '') +
@@ -1492,6 +1515,15 @@
         }).join('');
 
         body.innerHTML = metaHtml + qHtml;
+        body.querySelectorAll('.survey-detail-opt-img[data-src]').forEach(function (img) {
+            var v = img.getAttribute('data-src');
+            if (!v) return;
+            if (window.CloudMedia && window.CloudMedia.isCloudRef && window.CloudMedia.isCloudRef(v)) {
+                window.CloudMedia.bindLazyImage(img, v);
+            } else {
+                img.src = v;
+            }
+        });
 
         if (s.status === 'pending') {
             actions.className = 'modal-buttons';

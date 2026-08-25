@@ -1027,18 +1027,18 @@
             '<input type="file" id="cinema-image-input" accept="image/*" style="display:none;">' +
         '</div>';
     }
-    // 量出 header + 分组条的实际渲染高度，给 scrollwrap 钉一个字面意义的 max-height（不是flex属性）——
-    // 表情多的时候超出这个高度会在 scrollwrap 内部滚动，表情少的时候 scrollwrap 会正常缩短，不占满整块空间
+    // 量出 header + 分组条的实际渲染高度，给 scrollwrap 钉一个字面意义的 height（不是flex属性，也不是max-height）——
+    // 面板固定 260px 高度不随表情数量变化，表情少的时候滚动区就空着，不会把面板往小缩
     function _sizeCinemaStickerScrollwrap() {
         var scrollWrap = document.getElementById('cinema-sticker-scrollwrap');
         var popover = document.getElementById('cinema-sticker-picker');
         var hd = popover ? popover.querySelector('.cinema-sticker-popover-hd') : null;
         var groupRow = document.getElementById('cinema-sticker-group-row');
         if (!scrollWrap) return;
-        var POPOVER_MAX = 260; // 对应 .cinema-sticker-popover 的 max-height
+        var POPOVER_H = 260; // 对应 .cinema-sticker-popover 的固定 height
         var hdH = hd ? hd.offsetHeight : 0;
         var groupRowH = (groupRow && groupRow.style.display !== 'none') ? groupRow.offsetHeight : 0;
-        scrollWrap.style.maxHeight = Math.max(POPOVER_MAX - hdH - groupRowH, 60) + 'px';
+        scrollWrap.style.height = Math.max(POPOVER_H - hdH - groupRowH, 60) + 'px';
     }
     function _renderCinemaStickerGrid() {
         var grid = document.getElementById('cinema-sticker-grid');

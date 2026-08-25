@@ -787,12 +787,148 @@
         var searchInput = list.querySelector('#survey-bank-search');
         searchInput.oninput = function () { _bankSearchQuery = searchInput.value; _renderBankRows(); };
         list.querySelector('#survey-bank-groups-btn').onclick = function () { _showBankGroupManager(); };
-        list.querySelector('#survey-bank-add-btn').onclick = function () {
-            _bankPromptModal('新增问卷题目', '', function (text) {
-                if (text && text.trim()) { _bankAdd(text); _renderBankRows(); }
-            });
-        };
+        list.querySelector('#survey-bank-add-btn').onclick = function () { _showBankBatchAddDialog(); };
         _renderBankRows();
+    }
+
+    // 批量添加题目——照抄主字卡"批量添加"那套：每行一条+自动去重+可选分组，
+    // 唯一区别是分组只能单选一个（用 groupId 挂在题目自己身上，不是分组记数组），
+    // 如果打开的时候题库正筛选在某个具体分组下，就默认把那个分组预选上——
+    // 这也是修之前那个bug的地方：原来"新增"完全不认当前筛选是什么，新题永远进"未分组"
+    function _showBankBatchAddDialog() {
+        var groups = _data.bankGroups || [];
+        var overlay = (typeof _makeOverlay === 'function') ? _makeOverlay() : _bankFallbackOverlay();
+        var hasGroups = groups.length > 0;
+        var groupPillsHTML = hasGroups ? (
+            '<button class="ba-grp-pill" data-gidx="-1" style="padding:5px 13px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer;border:1.5px solid var(--accent-color);background:var(--accent-color);color:#fff;font-weight:700;flex-shrink:0;">不分组</button>' +
+            groups.map(function (g, i) {
+                return '<button class="ba-grp-pill" data-gidx="' + i + '" style="padding:5px 13px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer;border:1.5px solid ' + g.color + '44;background:' + g.color + '18;color:' + g.color + ';font-weight:600;flex-shrink:0;">' +
+                    '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + g.color + ';margin-right:4px;vertical-align:middle;"></span>' + _esc(g.name) +
+                '</button>';
+            }).join('')
+        ) : '';
+
+        var panel = document.createElement('div');
+        panel.style.cssText = 'background:var(--secondary-bg);border-radius:22px;padding:24px;width:92%;max-width:420px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.45);animation:survPopIn 0.22s cubic-bezier(.34,1.56,.64,1);';
+        panel.innerHTML =
+            '<style>@keyframes survPopIn { from{opacity:0;transform:scale(.93)} to{opacity:1;transform:scale(1)} } @keyframes survBaGroupSlide { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }</style>' +
+            '<div style="flex-shrink:0;font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">批量添加题目</div>' +
+            '<div style="flex-shrink:0;font-size:12px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">每行一条，自动去重</div>' +
+            '<div style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;">' +
+                '<textarea id="survey-ba-input" rows="10" placeholder="在此粘贴内容，每行一条…" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid var(--border-color);border-radius:13px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;font-family:inherit;outline:none;resize:vertical;line-height:1.6;"></textarea>' +
+                '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;margin-bottom:12px;"><span id="survey-ba-count">0 条</span></div>' +
+                (hasGroups ? (
+                    '<div id="survey-ba-group-section" style="margin-bottom:4px;">' +
+                        '<button id="survey-ba-group-toggle" style="display:flex;align-items:center;gap:7px;width:100%;padding:9px 12px;border-radius:11px;cursor:pointer;border:1.5px solid var(--border-color);background:var(--primary-bg);color:var(--text-secondary);font-size:12px;font-family:inherit;font-weight:600;text-align:left;">' +
+                            '<i class="fas fa-folder" style="font-size:12px;color:var(--accent-color);"></i>' +
+                            '<span id="survey-ba-toggle-label">添加到分组</span>' +
+                            '<span id="survey-ba-toggle-arrow" style="margin-left:auto;font-size:10px;transition:transform .2s;">▼</span>' +
+                        '</button>' +
+                        '<div id="survey-ba-group-drawer" style="display:none;overflow-x:auto;overflow-y:hidden;padding:10px 2px 4px;">' +
+                            '<div id="survey-ba-group-list" style="display:flex;gap:7px;width:max-content;">' + groupPillsHTML + '</div>' +
+                        '</div>' +
+                    '</div>'
+                ) : '') +
+            '</div>' +
+            '<div style="flex-shrink:0;padding-top:14px;display:flex;gap:10px;">' +
+                '<button id="survey-ba-cancel" style="flex:1;padding:12px;border:1.5px solid var(--border-color);border-radius:13px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">取消</button>' +
+                '<button id="survey-ba-confirm" style="flex:2;padding:12px;border:none;border-radius:13px;background:var(--accent-color);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">添加</button>' +
+            '</div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        var ta = panel.querySelector('#survey-ba-input');
+        var countEl = panel.querySelector('#survey-ba-count');
+        ta.addEventListener('input', function () {
+            var lines = ta.value.split('\n').filter(function (l) { return l.trim(); });
+            countEl.textContent = lines.length + ' 条';
+        });
+        ta.addEventListener('focus', function () { ta.style.borderColor = 'var(--accent-color)'; });
+        ta.addEventListener('blur', function () { ta.style.borderColor = 'var(--border-color)'; });
+
+        var groupToggle = panel.querySelector('#survey-ba-group-toggle');
+        var groupDrawer = panel.querySelector('#survey-ba-group-drawer');
+        var toggleArrow = panel.querySelector('#survey-ba-toggle-arrow');
+        var toggleLabel = panel.querySelector('#survey-ba-toggle-label');
+        var _drawerOpen = false;
+        function _setDrawer(open) {
+            _drawerOpen = open;
+            if (!groupDrawer) return;
+            groupDrawer.style.display = open ? 'block' : 'none';
+            if (open) groupDrawer.style.animation = 'survBaGroupSlide 0.18s ease forwards';
+            if (toggleArrow) toggleArrow.style.transform = open ? 'rotate(180deg)' : '';
+            if (groupToggle) {
+                groupToggle.style.borderColor = open ? 'var(--accent-color)' : 'var(--border-color)';
+                groupToggle.style.color = open ? 'var(--text-primary)' : 'var(--text-secondary)';
+            }
+        }
+        if (groupToggle) groupToggle.onclick = function () { _setDrawer(!_drawerOpen); };
+
+        var _selectedGroupIdx = -1;
+        // 如果打开批量添加时题库正筛选在某个具体分组，默认预选那个分组
+        if (_activeBankGroupFilter && _activeBankGroupFilter !== 'ungrouped') {
+            var preIdx = groups.findIndex(function (g) { return g.id === _activeBankGroupFilter; });
+            if (preIdx !== -1) _selectedGroupIdx = preIdx;
+        }
+        var pillContainer = panel.querySelector('#survey-ba-group-list');
+        function _refreshPillVisual() {
+            if (!pillContainer) return;
+            pillContainer.querySelectorAll('.ba-grp-pill').forEach(function (p) {
+                var gidx = parseInt(p.dataset.gidx);
+                if (gidx === -1) {
+                    var isActive = _selectedGroupIdx === -1;
+                    p.style.background = isActive ? 'var(--accent-color)' : 'transparent';
+                    p.style.color = isActive ? '#fff' : 'var(--text-secondary)';
+                    p.style.borderColor = isActive ? 'var(--accent-color)' : 'var(--border-color)';
+                } else {
+                    var g = groups[gidx];
+                    if (!g) return;
+                    var isActive2 = _selectedGroupIdx === gidx;
+                    p.style.background = isActive2 ? g.color : g.color + '18';
+                    p.style.color = isActive2 ? '#fff' : g.color;
+                    p.style.borderColor = isActive2 ? g.color : g.color + '44';
+                }
+            });
+            if (toggleLabel) {
+                if (_selectedGroupIdx === -1) toggleLabel.textContent = '添加到分组';
+                else { var gg = groups[_selectedGroupIdx]; toggleLabel.textContent = gg ? ('分组：' + gg.name) : '添加到分组'; }
+            }
+        }
+        if (pillContainer) {
+            pillContainer.onclick = function (e) {
+                var pill = e.target.closest('.ba-grp-pill');
+                if (!pill) return;
+                _selectedGroupIdx = parseInt(pill.dataset.gidx);
+                _refreshPillVisual();
+            };
+        }
+        if (_selectedGroupIdx !== -1) _setDrawer(true); // 有预选分组的话，抽屉默认展开，别藏起来
+        _refreshPillVisual();
+
+        panel.querySelector('#survey-ba-cancel').onclick = function () { overlay.remove(); };
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        panel.querySelector('#survey-ba-confirm').onclick = function () {
+            var lines = ta.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+            if (!lines.length) { if (typeof showNotification === 'function') showNotification('请输入内容', 'warning'); return; }
+            var seen = {};
+            _data.bank.forEach(function (x) { seen[normalizeStringStrict(x.text)] = true; });
+            var targetGroupId = (_selectedGroupIdx >= 0 && groups[_selectedGroupIdx]) ? groups[_selectedGroupIdx].id : null;
+            var added = 0, skipped = 0;
+            lines.forEach(function (val) {
+                var norm = normalizeStringStrict(val);
+                if (!norm || seen[norm]) { skipped++; return; }
+                seen[norm] = true;
+                _data.bank.push({ id: _uid('bk'), text: val, builtin: false, hidden: false, usedInRound: false, groupId: targetGroupId });
+                added++;
+            });
+            _save();
+            overlay.remove();
+            _renderBankRows();
+            var groupHint = targetGroupId && groups[_selectedGroupIdx] ? ('，已加入「' + groups[_selectedGroupIdx].name + '」') : '';
+            if (typeof showNotification === 'function') {
+                showNotification('✓ 添加 ' + added + ' 条' + (skipped ? ('，跳过 ' + skipped + ' 条重复') : '') + groupHint, 'success');
+            }
+        };
     }
 
     // 题目行的html——不管是"分组视图"里嵌在某个分组下面，还是"筛选出单个分组/未分组"时的平铺列表，都是这一套

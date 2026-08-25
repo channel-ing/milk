@@ -46,7 +46,9 @@
         // 带着正确的用户身份前缀（云同步会检查这个前缀，带错前缀的数据同步不了）
         var properKey = null;
         try {
-            if (typeof window.getStorageKey === 'function') properKey = window.getStorageKey('periodData');
+            if (typeof SESSION_ID !== 'undefined' && SESSION_ID && typeof window.getStorageKey === 'function') {
+                properKey = window.getStorageKey('periodData');
+            }
         } catch (e) { /* SESSION_ID 可能还没初始化，走下面的兜底 */ }
 
         try {
@@ -189,7 +191,17 @@
             : 5;
 
         // 区间代表"这整段时间都可能在经期里"——把"哪天开始"的不确定性(swing)
-        // 和"经期本身大概几天"(avgDur)合起来算成一个窗口，不是只给"开始日"的浮动范围
+        // 和"经期本身大概几天"(avgDur)合起来算成一个窗口，不是只给"开始日"的浮动范围。
+        //
+        // 总长度封顶8天：样本量太小时（比如只有2、3段记录），标准差这个统计工具本身
+        // 会失真，随便两个数字差一点就会把波动算得很夸张。与其纠结"样本够不够才敢信公式"，
+        // 更直接的办法是给最终显示的窗口设一个硬性上限——不管波动算出来多大，
+        // 总长度不会超过8天。经期天数是已经真实发生过的数据，不该被压缩，
+        // 所以封顶只压缩"波动"这部分，经期天数原样保留。
+        var MAX_WINDOW_SPAN = 8;
+        var maxSwing = Math.max(0, Math.floor((MAX_WINDOW_SPAN - avgDur) / 2));
+        swing = Math.min(swing, maxSwing);
+
         return { lo: _addD(predStart, -swing), hi: _addD(predStart, swing + avgDur - 1), irregular: swingInfo.irregular };
     }
 

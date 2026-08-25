@@ -178,7 +178,7 @@
     function buildModuleSkipPatterns(flags) {
         flags = flags || {};
         var p = [];
-        if (!flags.inclStickers) p.push('stickerLibrary', 'myStickerLibrary');
+        if (!flags.inclStickers) p.push('stickerLibrary', 'myStickerLibrary', 'myStickerGroups');
         if (!flags.inclThemes) p.push('backgroundGallery', 'chatBackground', 'partnerAvatar', 'myAvatar', 'playerCover');
         if (!flags.inclMsgs) p.push('chatMessages');
         if (!flags.inclSet) p.push('chatSettings', 'partnerPersonas', 'showPartnerNameInChat');

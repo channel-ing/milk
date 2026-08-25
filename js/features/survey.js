@@ -12,6 +12,8 @@
  *       id, createdAt, dueAt,                 // dueAt = 倒计时结束时间点，到点才真正"算"梦角选了什么
  *       status: 'pending' | 'answered' | 'withdrawn',
  *       answeredAt, deletedAt,
+ *       viewed: bool,             // 仅 status==='answered' 时有意义：到点变answered时置false（角标显示"new"），
+ *                                  // 用户点开详情页那一刻置true（角标变"已回复"）
  *       selections: null | { [questionId]: [optionId, ...] },  // 倒计时结束那一刻才算，之前一直是 null
  *       questions: [
  *         { id, type: 'single'|'multi', text, options: [ { id, kind:'text'|'image', value } ] }
@@ -20,7 +22,11 @@
  *   ],
  *   askMe: [                     // 反向问卷（梦角问我）
  *     {
- *       id, sentAt, status: 'sent' | 'received', receivedAt, deletedAt,
+ *       id, sentAt, status: 'sent' | 'answered_pending' | 'received', receivedAt, deletedAt,
+ *       viewed: bool,             // 仅 status==='sent' 时有意义：生成时置false（角标显示"new"），
+ *                                  // 用户点开详情页那一刻置true（角标变"未回答"）
+ *       answeredAt,               // 用户提交回答的时间点（status变answered_pending那一刻）
+ *       receiveDueAt,             // 提交后随机2-5小时算出的"梦角看到"时间点，到点才变成 received
  *       answers: null | { [questionId]: answerText },
  *       questions: [ { id, text } ]   // 纯文字开放式提问，没有选项
  *     }, ...
@@ -100,6 +106,13 @@
                 // 兼容 Step 1 时创建的旧数据（那会儿还没有 deletedAt 字段）
                 _data.askPartner.forEach(function (s) { if (s.deletedAt === undefined) s.deletedAt = null; });
                 _data.askMe.forEach(function (s) { if (s.deletedAt === undefined) s.deletedAt = null; });
+                // 兼容"已读/未读角标"上线前的旧数据：老记录一律当成"已经看过"，
+                // 避免一上线一大批老问卷全变成"new"炸用户一脸
+                _data.askPartner.forEach(function (s) { if (s.viewed === undefined) s.viewed = true; });
+                _data.askMe.forEach(function (s) {
+                    if (s.viewed === undefined) s.viewed = true;
+                    // 老数据的 status 只有 'sent'/'received' 两种，'received' 直接映射成新的最终态即可，不用改名
+                });
             }
         } catch (e) { console.warn('[survey] load failed:', e); }
         if (!Array.isArray(_data.bank) || !_data.bank.length) _seedBuiltinBank();
@@ -540,6 +553,7 @@
                 s.selections = selections;
                 s.status = 'answered';
                 s.answeredAt = now;
+                s.viewed = false; // 刚到点算出结果，角标先显示"new"，用户点开详情页之后才变"已回复"
                 newlyAnswered.push(s);
             }
         });
@@ -596,6 +610,9 @@
             id: _uid('am'),
             sentAt: Date.now(),
             status: 'sent',
+            viewed: false, // 梦角刚提问，角标先显示"new"，用户点开详情页之后才变"未回答"
+            answeredAt: null,
+            receiveDueAt: null,
             receivedAt: null,
             deletedAt: null,
             answers: null,
@@ -610,12 +627,30 @@
         var b = _data.askMe.find(function (x) { return x.id === id; });
         if (!b) return;
         b.answers = answersMap;
-        b.status = 'received';
-        b.receivedAt = Date.now();
+        b.status = 'answered_pending';
+        b.answeredAt = Date.now();
+        // 模拟梦角要过一会儿才"看到"用户的回答，2-5小时后由 _checkAskMeReceiveDue 自动翻成 received
+        b.receiveDueAt = Date.now() + _randHours(2, 5) * 3600000;
         _save();
         _closeDetailModal();
         _refreshOpenViews();
-        if (typeof showNotification === 'function') showNotification('已提交', 'success');
+        if (typeof showNotification === 'function') showNotification('已发送回复', 'success');
+    }
+
+    // 到点检查：提交回答后过了2-5小时，"梦角已阅"——跟 _checkDueSurveys 是同一个思路，
+    // 挂在同一个60秒定时器里一起跑
+    function _checkAskMeReceiveDue() {
+        if (!_loaded) return;
+        var now = Date.now();
+        var changed = false;
+        _data.askMe.forEach(function (s) {
+            if (s.status === 'answered_pending' && !s.deletedAt && s.receiveDueAt && now >= s.receiveDueAt) {
+                s.status = 'received';
+                s.receivedAt = now;
+                changed = true;
+            }
+        });
+        if (changed) { _save(); _refreshOpenViews(); }
     }
 
     // ── 问卷题库管理（回复库 → 氛围感 → "问卷题库" tab）──────────
@@ -643,6 +678,11 @@
         if (!q) return;
         q.hidden = !q.hidden;
         _save();
+        // 跟主字卡"屏蔽"的交互习惯保持一致：置灰 + toast提示。屏蔽之后这道题真的不会
+        // 再被抽到（_createAskMeBatch 本来就过滤掉 hidden 的），这里只是把提示补齐
+        if (typeof showNotification === 'function') {
+            showNotification(q.hidden ? '已屏蔽，这道题不会再出现' : '已启用', q.hidden ? 'info' : 'success');
+        }
     }
 
     // 新增/编辑用小弹窗输入，不用浏览器原生 prompt()——iOS Safari 下原生对话框这类东西
@@ -696,29 +736,19 @@
         _renderBankRows();
     }
 
-    function _renderBankRows() {
-        var rows = document.getElementById('survey-bank-rows');
-        if (!rows) return;
-        var q = _bankSearchQuery.toLowerCase().trim();
-        var items = _data.bank.filter(function (x) { return !q || x.text.toLowerCase().indexOf(q) !== -1; });
-        if (!items.length) {
-            rows.innerHTML = '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:20px 0;">' +
-                (q ? ('未找到 "' + _esc(q) + '"') : '还没有题目') + '</div>';
-            return;
-        }
-        rows.innerHTML = items.map(function (item) {
-            return '<div class="custom-reply-item' + (item.hidden ? ' survey-bank-row-hidden' : '') + '" data-id="' + item.id + '">' +
-                '<span class="custom-reply-text">' +
-                    (item.builtin ? '<span class="survey-bank-builtin-tag">内置</span>' : '') +
-                    _esc(item.text) +
-                '</span>' +
-                '<div class="custom-reply-actions">' +
-                    '<button class="reply-action-mini hide-btn" title="' + (item.hidden ? '取消隐藏' : '隐藏') + '"><i class="fas fa-eye' + (item.hidden ? '-slash' : '') + '"></i></button>' +
-                    '<button class="reply-action-mini edit-btn" title="编辑"><i class="fas fa-pen"></i></button>' +
-                    '<button class="reply-action-mini delete-btn" title="删除"><i class="fas fa-trash"></i></button>' +
-                '</div>' +
-            '</div>';
-        }).join('');
+    // 题目行的html——内置/自定义共用同一套渲染，区别只在有没有"默认问题"分组标题包着它
+    function _bankRowHTML(item) {
+        return '<div class="custom-reply-item' + (item.hidden ? ' survey-bank-row-hidden' : '') + '" data-id="' + item.id + '">' +
+            '<span class="custom-reply-text">' + _esc(item.text) + '</span>' +
+            '<div class="custom-reply-actions">' +
+                '<button class="reply-action-mini hide-btn" title="' + (item.hidden ? '取消隐藏' : '隐藏') + '"><i class="fas fa-eye' + (item.hidden ? '-slash' : '') + '"></i></button>' +
+                '<button class="reply-action-mini edit-btn" title="编辑"><i class="fas fa-pen"></i></button>' +
+                '<button class="reply-action-mini delete-btn" title="删除"><i class="fas fa-trash"></i></button>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function _bindBankRowEvents(rows) {
         rows.querySelectorAll('.custom-reply-item').forEach(function (row) {
             var id = row.dataset.id;
             row.querySelector('.hide-btn').onclick = function () { _bankToggleHide(id); _renderBankRows(); };
@@ -733,6 +763,34 @@
                 _renderBankRows();
             };
         });
+    }
+
+    function _renderBankRows() {
+        var rows = document.getElementById('survey-bank-rows');
+        if (!rows) return;
+        var q = _bankSearchQuery.toLowerCase().trim();
+        var matches = function (x) { return !q || x.text.toLowerCase().indexOf(q) !== -1; };
+        // 内置题统一归到"默认问题"这一组，自定义题跟在后面，不用组名——
+        // 搜索的时候两边各自按关键词过滤，哪边没有匹配项就不显示那部分（含分组标题）
+        var builtinItems = _data.bank.filter(function (x) { return x.builtin && matches(x); });
+        var customItems = _data.bank.filter(function (x) { return !x.builtin && matches(x); });
+
+        if (!builtinItems.length && !customItems.length) {
+            rows.innerHTML = '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:20px 0;">' +
+                (q ? ('未找到 "' + _esc(q) + '"') : '还没有题目') + '</div>';
+            return;
+        }
+
+        var html = '';
+        if (builtinItems.length) {
+            html += '<div class="survey-bank-group-label">默认问题</div>';
+            html += builtinItems.map(_bankRowHTML).join('');
+        }
+        if (customItems.length) {
+            html += customItems.map(_bankRowHTML).join('');
+        }
+        rows.innerHTML = html;
+        _bindBankRowEvents(rows);
     }
     window._surveyRenderBankTab = _renderBankTab;
 
@@ -755,6 +813,10 @@
     function _partnerName() {
         return (typeof settings !== 'undefined' && settings.partnerName) || '对方';
     }
+    function _myName() {
+        return (typeof settings !== 'undefined' && settings.myName) || '我';
+    }
+    function _randHours(a, b) { return a + Math.random() * (b - a); }
 
     // 提醒弹窗样式照抄经期记录那套（js/features/period.js 的 _showPdNotif）——
     // 头像+一句话+"稍后/立即查看"两个按钮，8秒自动消失。
@@ -824,7 +886,22 @@
         return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
     }
 
-    var STATUS_LABEL = { pending: '等待中', answered: '已回复', withdrawn: '已撤回', sent: '已发送', received: '已收到' };
+    // 角标状态：src==='partner' 对应"我问梦角"这条线（_data.askPartner），
+    // src==='me' 对应"梦角问我"这条线（_data.askMe）——这两个命名是历史遗留，
+    // 跟"谁提的问"没关系，别被字面误导
+    function _statusBadge(s, src) {
+        if (src === 'partner') {
+            if (s.status === 'pending') return { text: '等待' + _partnerName() + '回复中', cls: 'pending' };
+            if (s.status === 'withdrawn') return { text: '已撤回', cls: 'withdrawn' };
+            // status === 'answered'
+            return s.viewed ? { text: '已回复', cls: 'answered' } : { text: 'new', cls: 'new' };
+        } else {
+            if (s.status === 'sent') return s.viewed ? { text: '未回答', cls: 'unanswered' } : { text: 'new', cls: 'new' };
+            if (s.status === 'answered_pending') return { text: '已发送回复', cls: 'awaiting-receipt' };
+            // status === 'received'
+            return { text: '已收到回复', cls: 'received' };
+        }
+    }
 
     function _surveyTitle(s) {
         var t = s.questions[0] && s.questions[0].text;
@@ -852,17 +929,24 @@
                 '<div class="survey-list-empty">' +
                     '<i class="fas fa-clipboard-list"></i>' +
                     '<p>还没有问卷，问点什么给梦角吧</p>' +
+                    '<button type="button" class="survey-empty-create-btn" id="survey-empty-create-btn"><i class="fas fa-plus"></i> 创建问卷</button>' +
                 '</div>';
+            var emptyBtn = document.getElementById('survey-empty-create-btn');
+            if (emptyBtn) emptyBtn.onclick = function () { _openCreateModal(); };
             _sizeListBody();
             return;
         }
-        var isPinned = function (it) { return it.src === 'partner' ? it.ref.status === 'pending' : it.ref.status === 'sent'; };
+        // 置顶：还需要用户处理/关注的（等待中、有未读新动态、梦角新提问还没答），
+        // 不再单独分"已完成"一块——每条记录的状态全靠角标区分，不用分组标题
+        var isPinned = function (it) {
+            if (it.src === 'partner') return it.ref.status === 'pending' || (it.ref.status === 'answered' && !it.ref.viewed);
+            return it.ref.status === 'sent';
+        };
         var pinned = all.filter(isPinned).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
         var rest = all.filter(function (it) { return !isPinned(it); }).sort(function (a, b) { return (b.ref.createdAt || b.ref.sentAt) - (a.ref.createdAt || a.ref.sentAt); });
 
         var html = '';
         pinned.forEach(function (it) { html += _cardHTML(it.ref, it.src); });
-        if (pinned.length && rest.length) html += '<div class="survey-pin-divider">已完成</div>';
         rest.forEach(function (it) { html += _cardHTML(it.ref, it.src); });
         body.innerHTML = html;
 
@@ -889,15 +973,15 @@
     }
 
     function _cardHTML(s, src) {
-        var statusCls = 'survey-tag-status-' + s.status;
+        var badge = _statusBadge(s, src);
         var srcTagCls = src === 'partner' ? 'survey-tag-src-me' : 'survey-tag-src-partner';
-        var srcTagText = src === 'partner' ? '我问的' : '它问的';
+        var srcTagText = (src === 'partner' ? _myName() : _partnerName()) + '问的';
         var createdAt = s.createdAt || s.sentAt;
         var answeredAt = s.answeredAt || s.receivedAt;
         return '<div class="survey-card" data-sid="' + s.id + '" data-src="' + src + '">' +
             '<div class="survey-card-top">' +
-                '<span class="survey-tag ' + srcTagCls + '">' + srcTagText + '</span>' +
-                '<span class="survey-tag survey-tag-status ' + statusCls + '">' + STATUS_LABEL[s.status] + '</span>' +
+                '<span class="survey-tag ' + srcTagCls + '">' + _esc(srcTagText) + '</span>' +
+                '<span class="survey-tag survey-tag-status survey-tag-status-' + badge.cls + '">' + _esc(badge.text) + '</span>' +
             '</div>' +
             '<div class="survey-card-title">' + _esc(_surveyTitle(s)) + '</div>' +
             '<div class="survey-card-meta">' + _fmtTime(createdAt) +
@@ -919,9 +1003,19 @@
     function _openDetailModal(id, src) {
         _detailCurrentId = id;
         _detailCurrentSrc = src || 'partner';
+        // 点开详情页那一刻标记"已读"——"new"角标只在用户还没点开过的时候显示
+        var arr = _detailCurrentSrc === 'me' ? _data.askMe : _data.askPartner;
+        var rec = arr.find(function (x) { return x.id === id; });
+        if (rec && rec.viewed === false) {
+            rec.viewed = true;
+            _save();
+        }
         _renderDetail();
         if (typeof window.showModal === 'function') window.showModal(document.getElementById('survey-detail-modal'));
         else document.getElementById('survey-detail-modal').style.display = 'flex';
+        // 列表页可能就在详情页底下开着，角标要立刻跟着变，不用等关闭详情页再刷新
+        var listModal = document.getElementById('survey-modal');
+        if (listModal && getComputedStyle(listModal).display !== 'none') _renderListBody();
     }
     function _closeDetailModal() {
         if (typeof window.hideModal === 'function') window.hideModal(document.getElementById('survey-detail-modal'));
@@ -939,8 +1033,9 @@
         var actions = document.getElementById('survey-detail-actions');
         if (!s || !body || !actions) return;
 
+        var badge = _statusBadge(s, 'partner');
         var metaHtml = '<div class="survey-detail-meta-row">' +
-            '<span class="survey-tag survey-tag-status survey-tag-status-' + s.status + '">' + STATUS_LABEL[s.status] + '</span>' +
+            '<span class="survey-tag survey-tag-status survey-tag-status-' + badge.cls + '">' + badge.text + '</span>' +
             '<span>提问于 ' + _fmtTime(s.createdAt) + '</span>' +
             (s.answeredAt ? ('<span>回复于 ' + _fmtTime(s.answeredAt) + '</span>') : '') +
         '</div>';
@@ -998,8 +1093,9 @@
         var actions = document.getElementById('survey-detail-actions');
         if (!s || !body || !actions) return;
 
+        var badge = _statusBadge(s, 'me');
         var metaHtml = '<div class="survey-detail-meta-row">' +
-            '<span class="survey-tag survey-tag-status survey-tag-status-' + s.status + '">' + STATUS_LABEL[s.status] + '</span>' +
+            '<span class="survey-tag survey-tag-status survey-tag-status-' + badge.cls + '">' + badge.text + '</span>' +
             '<span>提问于 ' + _fmtTime(s.sentAt) + '</span>' +
             (s.receivedAt ? ('<span>回复于 ' + _fmtTime(s.receivedAt) + '</span>') : '') +
         '</div>';
@@ -1093,9 +1189,13 @@
             status: 'pending',
             answeredAt: null,
             deletedAt: null,
+            viewed: true,
             selections: null,
             questions: JSON.parse(JSON.stringify(s.questions))
         };
+        // 撤回后重发，原来那份撤回记录就不再占列表位置了——软删除挪进回收站，
+        // 30天内还能恢复，跟"彻底消失"和"误删无法找回"都不一样
+        s.deletedAt = Date.now();
         _data.askPartner.push(fresh);
         _save();
         _migrateOptionImagesToCloud(fresh); // 万一原问卷的图片选项当时是本地base64、现在配了OSS，顺手迁移一下
@@ -1186,6 +1286,16 @@
     window._surveyOpenListModal = _openListModal;
     window._surveyOpenDetailModal = _openDetailModal;
     window._surveyDebugListAskMe = function () { console.log(JSON.parse(JSON.stringify(_data.askMe))); return _data.askMe; };
+    // 把某条"已发送回复"记录的 receiveDueAt 改成"刚刚"，方便测试"梦角已阅"这一步不用真等2-5小时
+    window._surveyDebugForceReceive = function (idOrIndex, checkNow) {
+        var s = (typeof idOrIndex === 'number') ? _data.askMe[idOrIndex] : _data.askMe.find(function (x) { return x.id === idOrIndex; });
+        if (!s) { console.warn('[survey] 没找到这条反向问卷'); return; }
+        if (s.status !== 'answered_pending') { console.warn('[survey] 这条不是"已发送回复"状态，当前状态：', s.status); return; }
+        s.receiveDueAt = Date.now() - 1000;
+        _save();
+        console.log('[survey] 已把这条的 receiveDueAt 改成刚刚：', s.id);
+        if (checkNow) _checkAskMeReceiveDue();
+    };
     window._surveyDebugBank = function () { console.log(JSON.parse(JSON.stringify(_data.bank))); return _data.bank; };
     // 强制立刻触发一次反向问卷（不用等5-10天），传 true 强制必中（跳过概率判定），方便测试抽题/去重逻辑
     window._surveyDebugForceAskMe = function (forceHit) {
@@ -1244,11 +1354,11 @@
 
     // 每分钟检查一次到点的问卷（照抄 period.js 的轮询方式）；反向问卷的触发检查间隔是"天"级别的，
     // 不需要这么密，但挂在同一个 60秒 定时器里跑一下也没什么成本，简单点，不用另开一个定时器
-    setInterval(function () { _checkDueSurveys(); _checkAskMeTrigger(); }, 60000);
+    setInterval(function () { _checkDueSurveys(); _checkAskMeTrigger(); _checkAskMeReceiveDue(); }, 60000);
 
     _load().then(function () {
         _cleanTrash();
         _save();
-        setTimeout(function () { _checkDueSurveys(); _checkAskMeTrigger(); }, 4000);
+        setTimeout(function () { _checkDueSurveys(); _checkAskMeTrigger(); _checkAskMeReceiveDue(); }, 4000);
     });
 })();

@@ -1199,6 +1199,20 @@
         _save();
         _checkAskMeTrigger();
     };
+    // 跟上面那个不一样：这个会连提醒弹窗一起触发，走的是跟真实流程完全一样的路径
+    // （生成问卷 → missStreak清零 → 排队提醒 → 刷新已打开的界面），方便测试提醒弹窗长什么样
+    window._surveyDebugForceAskMeWithNotify = function () {
+        var batch = _createAskMeBatch();
+        if (batch) {
+            _data.askMeTrigger.missStreak = 0;
+            _queueNotify({ type: 'askme_new', survey: batch });
+            _refreshOpenViews();
+            _save();
+            console.log('[survey] 已生成一批反向问卷并触发提醒：', batch.id);
+        } else {
+            console.warn('[survey] 题库里没有可用（未隐藏）的题目');
+        }
+    };
 
     // ── 初始化 ────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {

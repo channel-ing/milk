@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="css/music-local.css">
     <link rel="stylesheet" href="css/my-sticker-groups.css">
     <link rel="stylesheet" href="css/global-msg-banner.css">
+    <link rel="stylesheet" href="css/survey.css">
 
     <style id="css-live-preview-style"></style>
     <style>
@@ -1991,6 +1992,20 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                         </div>
                     </div>
 
+                    <p class="cs-group-label" style="margin-top:4px;">问卷回复时间</p>
+                    <div class="cs-card" style="margin-bottom:10px;">
+                        <div class="cs-slider-row">
+                            <span class="cs-slider-label">最短等待</span>
+                            <input type="range" min="1" max="24" step="1" value="1" class="font-size-slider" id="survey-delay-min-slider">
+                            <span class="cs-slider-val" id="survey-delay-min-value">1h</span>
+                        </div>
+                        <div class="cs-slider-row">
+                            <span class="cs-slider-label">最长等待</span>
+                            <input type="range" min="1" max="24" step="1" value="24" class="font-size-slider" id="survey-delay-max-slider">
+                            <span class="cs-slider-val" id="survey-delay-max-value">24h</span>
+                        </div>
+                    </div>
+
                     <p class="cs-group-label" style="margin-top:4px;">主动发送</p>
                     <div class="cs-card">
                         <div class="setting-pill-row" id="auto-send-toggle">
@@ -2346,6 +2361,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <div class="settings-item" id="period-function">
                         <i class="fas fa-tint"></i><span>经期记录</span>
                     </div>
+                    <div class="settings-item" id="survey-function">
+                        <i class="fas fa-clipboard-list"></i><span>问卷</span>
+                    </div>
                     <div class="settings-item" id="envelope-function" style="display:none;">
                         <i class="fas fa-envelope-open-text"></i><span>信箱</span>
                     </div>
@@ -2455,6 +2473,27 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
 
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-secondary" id="close-period" onclick="hideModal(document.getElementById('period-modal'))">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 问卷功能 Step 1：创建问卷弹窗（我问梦角） ==========
+         历史列表页/详情页在 Step 2 才做，这一步先让"问卷"入口直接打开创建弹窗，方便先测数据结构 -->
+    <div class="modal" id="survey-create-modal">
+        <div class="modal-content" id="survey-create-content">
+            <div class="modal-title">
+                <i class="fas fa-clipboard-list"></i><span>创建问卷</span>
+            </div>
+
+            <div id="survey-q-list"></div>
+
+            <button type="button" class="modal-btn modal-btn-secondary" id="survey-add-q-btn" style="width:100%;margin-top:6px;">
+                <i class="fas fa-plus"></i> 新增问题
+            </button>
+
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:14px;margin-left:-24px;margin-right:-24px;padding-left:24px;padding-right:24px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="survey-create-cancel">取消</button>
+                <button class="modal-btn modal-btn-primary" id="survey-create-send" disabled>发送</button>
             </div>
         </div>
     </div>
@@ -3496,6 +3535,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <script src="js/app.js"></script>
     <script src="js/features/cinema.js"></script>
     <script src="js/features/global-msg-banner.js"></script>
+    <script src="js/features/survey.js"></script>
 <!-- 相册图片详情（全屏） -->
 <div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">
     <div class="al-detail-topbar">

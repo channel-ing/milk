@@ -73,7 +73,7 @@
         // 主题人设
         'partnerPersonas',
         // 贴纸库（文字索引，实际图片阶段三B处理）
-        'stickerLibrary', 'myStickerLibrary',
+        'stickerLibrary', 'myStickerLibrary', 'myStickerGroups',
         // 陪伴日记文字
         'companionData', 'companionDiary',
         // 信件

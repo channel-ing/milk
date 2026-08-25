@@ -1713,6 +1713,18 @@
         if (checkNow) _checkAskMeReceiveDue();
     };
     window._surveyDebugBank = function () { console.log(JSON.parse(JSON.stringify(_data.bank))); return _data.bank; };
+    // 直接切换某条记录的收藏状态，不用在列表页里翻找星星按钮点——src 传 'partner'（我问梦角，默认）
+    // 或 'me'（梦角问我）；idOrIndex 可以是序号（配合 _surveyDebugList/_surveyDebugListAskMe 看序号）也可以是id。
+    // 走的是跟点星星按钮完全一样的 _toggleFavorite，所以还没到"已完成"状态的记录一样收藏不了
+    window._surveyDebugFavorite = function (idOrIndex, src) {
+        src = src || 'partner';
+        var arr = src === 'me' ? _data.askMe : _data.askPartner;
+        var rec = (typeof idOrIndex === 'number') ? arr[idOrIndex] : arr.find(function (x) { return x.id === idOrIndex; });
+        if (!rec) { console.warn('[survey] 没找到这条记录'); return; }
+        if (!_canFavorite(rec, src)) { console.warn('[survey] 这条还不能收藏（不是"已完成"状态），当前状态：', rec.status); return; }
+        _toggleFavorite(rec.id, src);
+        console.log('[survey] 收藏状态：', rec.favorited);
+    };
     // 强制立刻触发一次反向问卷（不用等5-10天），传 true 强制必中（跳过概率判定），方便测试抽题/去重逻辑
     window._surveyDebugForceAskMe = function (forceHit) {
         if (forceHit) {

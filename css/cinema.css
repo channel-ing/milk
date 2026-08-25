@@ -489,7 +489,7 @@
     left: 12px;
     right: 12px;
     bottom: calc(100% + 8px);
-    max-height: 260px;
+    height: 260px; /* 固定高度，不随表情数量变化——表情少时面板不会跟着缩短 */
     background: var(--secondary-bg, #fff);
     border: 1px solid var(--border-color, #e0e0e0);
     border-radius: 16px;

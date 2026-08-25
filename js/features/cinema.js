@@ -978,7 +978,9 @@
         return '<div class="cinema-sticker-popover" id="cinema-sticker-picker">' +
             '<div class="cinema-sticker-popover-hd">我的表情</div>' +
             '<div class="my-sticker-group-row" id="cinema-sticker-group-row" style="flex-shrink:0;padding:0 12px 8px;"></div>' +
-            '<div class="cinema-sticker-grid" id="cinema-sticker-grid"></div>' +
+            '<div class="cinema-sticker-scrollwrap" id="cinema-sticker-scrollwrap">' +
+                '<div class="cinema-sticker-grid" id="cinema-sticker-grid"></div>' +
+            '</div>' +
         '</div>';
     }
     // 分组筛选条——纯展示 + 切换，不提供新建/管理分组的入口（那些功能只在主聊天"我的表情库"里）
@@ -1025,6 +1027,19 @@
             '<input type="file" id="cinema-image-input" accept="image/*" style="display:none;">' +
         '</div>';
     }
+    // 量出 header + 分组条的实际渲染高度，给 scrollwrap 钉一个字面意义的 max-height（不是flex属性）——
+    // 表情多的时候超出这个高度会在 scrollwrap 内部滚动，表情少的时候 scrollwrap 会正常缩短，不占满整块空间
+    function _sizeCinemaStickerScrollwrap() {
+        var scrollWrap = document.getElementById('cinema-sticker-scrollwrap');
+        var popover = document.getElementById('cinema-sticker-picker');
+        var hd = popover ? popover.querySelector('.cinema-sticker-popover-hd') : null;
+        var groupRow = document.getElementById('cinema-sticker-group-row');
+        if (!scrollWrap) return;
+        var POPOVER_MAX = 260; // 对应 .cinema-sticker-popover 的 max-height
+        var hdH = hd ? hd.offsetHeight : 0;
+        var groupRowH = (groupRow && groupRow.style.display !== 'none') ? groupRow.offsetHeight : 0;
+        scrollWrap.style.maxHeight = Math.max(POPOVER_MAX - hdH - groupRowH, 60) + 'px';
+    }
     function _renderCinemaStickerGrid() {
         var grid = document.getElementById('cinema-sticker-grid');
         if (!grid) return;
@@ -1042,6 +1057,7 @@
         if (!rawLib.length) {
             if (groupRow) { groupRow.innerHTML = ''; groupRow.style.display = 'none'; }
             grid.innerHTML = '<div class="cinema-sticker-empty">暂无表情，去主聊天页的"我的表情库"里添加吧</div>';
+            _sizeCinemaStickerScrollwrap();
             return;
         }
 
@@ -1058,6 +1074,7 @@
 
         if (!itemsToShow.length) {
             grid.innerHTML = '<div class="cinema-sticker-empty">这个分组还没有表情</div>';
+            _sizeCinemaStickerScrollwrap();
             return;
         }
 
@@ -1084,6 +1101,7 @@
             grid.appendChild(item);
         });
 
+        _sizeCinemaStickerScrollwrap();
         // 用JS直接量出格子实际宽度，把高度钉成一样的数字，强制变成正方形——
         // 不再依赖任何CSS的自动计算技巧（试过两次都在这个面板的布局环境下失效），这样不会再有出错的空间
         requestAnimationFrame(function () {

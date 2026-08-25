@@ -311,9 +311,7 @@ window._mToggleSticker=function(postId){
 
     const grid=document.createElement('div');
     grid.id='cs-sticker-grid';
-    // flex:1 占满面板剩余高度；align-content:start 防止表情数量少时，浏览器把这几行拉伸铺满整个高度
-    // （grid 默认会把多余空间摊派给每一行，行一拉伸格子就不再是正方形了）；overflow-y:auto 表情多了自己滚动
-    grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);align-content:start;gap:8px;flex:1;overflow-y:auto;';
+    grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;';
     if(!pool.length){
         grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);opacity:.5;font-size:12px;padding:16px 0;">这个分组还没有表情</div>';
     }
@@ -329,7 +327,14 @@ window._mToggleSticker=function(postId){
         b.onclick=()=>window._mSelectSticker(postId,src);
         grid.appendChild(b);
     });
-    picker.appendChild(grid);
+    // grid 本身不直接当 flex 子项——grid 内部格子靠 padding-top 百分比撑出正方形，是靠"宽度"算的，
+    // 但如果 grid 自己是 flex:1 的那个元素，浏览器（尤其是 Safari）算 flex 高度那一步会先把
+    // grid 的行高按分配到的 flex 高度整体摊平重算一遍，行数一多格子就被压扁成长方形。
+    // 套一层专门负责"占满剩余高度 + 滚动"的容器，grid 退回普通块级元素，格子的正方形就不会再被这层布局干扰
+    const scrollWrap=document.createElement('div');
+    scrollWrap.style.cssText='flex:1;min-height:0;overflow-y:auto;';
+    scrollWrap.appendChild(grid);
+    picker.appendChild(scrollWrap);
 
     document.body.appendChild(picker);
     _bindLazy(picker);

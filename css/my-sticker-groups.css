@@ -9,12 +9,27 @@
 #user-sticker-picker .combo-content-area.show-title::before {
     content: none;
 }
+.my-sticker-add-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 10px;
+}
 .my-sticker-add-title {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
-    padding: 4px 4px 10px;
     opacity: 0.9;
+}
+.my-sticker-manage-link {
+    border: none;
+    background: none;
+    color: var(--accent-color);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-family: inherit;
 }
 
 .my-sticker-group-row {
@@ -28,7 +43,6 @@
 .my-sticker-group-row::-webkit-scrollbar { display: none; }
 
 .my-sticker-group-add,
-.my-sticker-group-settings,
 .my-sticker-group-chip {
     flex-shrink: 0;
     width: 34px;
@@ -50,10 +64,6 @@
     border-width: 2px;
 }
 .my-sticker-group-chip img { width: 100%; height: 100%; object-fit: cover; }
-.my-sticker-group-settings {
-    margin-left: auto;
-    color: var(--text-secondary);
-}
 
 /* 长按弹出的小浮窗 */
 .my-sticker-action-popover {
@@ -148,4 +158,34 @@
     color: var(--text-secondary);
     font-size: 11px;
     cursor: pointer;
+}
+
+/* 新建分组：预览格右上角的删除小按钮 */
+.my-sticker-preview-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+/* 弹窗底部按钮的安全边距——基础 .modal-content 默认没有留白，
+   按钮会紧贴弹窗边缘，这里给这几个弹窗单独补上 */
+#my-sticker-newgroup-modal .modal-content,
+#my-sticker-manage-modal .modal-content {
+    padding-bottom: 22px;
+}
+#my-sticker-newgroup-modal .modal-buttons,
+#my-sticker-manage-modal .modal-buttons {
+    margin-bottom: 4px;
 }

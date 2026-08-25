@@ -1483,8 +1483,12 @@ function initComboMenu() {
         // 点在任何弹窗（新建分组/移动分组/管理这些）或长按浮窗内部，
         // 不算"点了面板外面"——这几个弹窗都是挂在页面最外层的，不在 picker 的DOM范围内，
         // 之前没排除这种情况，导致点弹窗里任何按钮都会被误判成"点击外部"，把主面板意外关掉
-        if (e.target.closest('.modal') || e.target.closest('.my-sticker-action-popover')) return;
+        if (e.target.closest('.modal') || e.target.closest('.my-sticker-action-popover')) {
+            console.log('[sticker-debug] 点在弹窗/长按浮窗内部，跳过关闭面板', e.target);
+            return;
+        }
         if (!picker.contains(e.target) && !comboBtn.contains(e.target)) {
+            console.log('[sticker-debug] 判定为点击面板外部，即将关闭面板。点击目标：', e.target);
             picker.classList.remove('active');
         }
     });
@@ -2015,10 +2019,13 @@ function initComboMenu() {
             pick.querySelector('#my-sticker-batchmove-cancel').onclick = function () { pick.remove(); };
             pick.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
                 row.onclick = function () {
+                    console.log('[sticker-debug] 批量移动前，面板active状态：', picker.classList.contains('active'));
                     _myStickerMoveMultipleToGroup(ids, row.dataset.gid || null);
                     selectedIds = {};
                     pick.remove();
+                    console.log('[sticker-debug] pick.remove()后，面板active状态：', picker.classList.contains('active'));
                     showNotification('已移动 ' + ids.length + ' 张', 'success');
+                    console.log('[sticker-debug] toast之后，面板active状态：', picker.classList.contains('active'));
                     renderGrid();
                 };
             });
@@ -2027,9 +2034,12 @@ function initComboMenu() {
         modal.querySelector('#my-sticker-manage-delete').onclick = async function () {
             var ids = Object.keys(selectedIds);
             if (!ids.length) return;
+            console.log('[sticker-debug] 批量删除前，面板active状态：', picker.classList.contains('active'));
             await _myStickerDeleteMultiple(ids);
+            console.log('[sticker-debug] 批量删除后，面板active状态：', picker.classList.contains('active'));
             selectedIds = {};
             showNotification('已删除 ' + ids.length + ' 张', 'success');
+            console.log('[sticker-debug] toast之后，面板active状态：', picker.classList.contains('active'));
             renderGrid();
         };
 

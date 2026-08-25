@@ -267,6 +267,12 @@
 }
 .survey-list-empty i { font-size: 32px; opacity: 0.35; }
 .survey-list-empty p { font-size: 13px; opacity: 0.7; margin: 0; }
+#survey-fav-filter-bar {
+    display: flex;
+    gap: 6px;
+    padding: 2px 0 10px;
+    flex-shrink: 0;
+}
 .survey-empty-create-btn {
     margin-top: 6px;
     padding: 9px 20px;
@@ -310,6 +316,23 @@
 .survey-tag-src-partner { background: rgba(120, 150, 255, 0.15); color: #7896ff; }
 
 .survey-tag-status { margin-left: auto; }
+.survey-fav-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    padding: 0;
+}
+.survey-fav-btn:active { opacity: 0.8; }
+.survey-fav-btn.favorited { color: #e6af3c; opacity: 1; }
 .survey-tag-status-pending          { background: rgba(230, 175, 60, 0.18); color: #c98b1f; }
 .survey-tag-status-answered         { background: rgba(90, 180, 120, 0.18); color: #3f9e64; }
 .survey-tag-status-withdrawn        { background: rgba(150, 150, 150, 0.18); color: var(--text-secondary); }

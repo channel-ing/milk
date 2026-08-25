@@ -180,12 +180,14 @@
 }
 
 /* 弹窗底部按钮的安全边距——基础 .modal-content 默认没有留白，
-   按钮会紧贴弹窗边缘，这里给这几个弹窗单独补上 */
+   按钮会紧贴弹窗边缘，这里给所有表情分组相关的弹窗统一补上 */
 #my-sticker-newgroup-modal .modal-content,
-#my-sticker-manage-modal .modal-content {
+#my-sticker-manage-modal .modal-content,
+.my-sticker-sub-modal .modal-content {
     padding-bottom: 22px;
 }
 #my-sticker-newgroup-modal .modal-buttons,
-#my-sticker-manage-modal .modal-buttons {
+#my-sticker-manage-modal .modal-buttons,
+.my-sticker-sub-modal .modal-buttons {
     margin-bottom: 4px;
 }

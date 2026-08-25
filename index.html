@@ -2374,7 +2374,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                 <!-- 统计卡片行 -->
                 <div class="pd-stats-row">
                     <div class="pd-stat-card">
-                        <div class="pd-stat-label" id="pd-next-date-label">下次预测</div>
+                        <div class="pd-stat-label" id="pd-next-date-label">预测时间</div>
                         <div class="pd-stat-value" id="pd-next-date">暂无预测</div>
                     </div>
                     <div class="pd-stat-card">
@@ -2382,7 +2382,8 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                         <div class="pd-stat-value" id="pd-avg-days">--</div>
                     </div>
                 </div>
-                <div class="pd-longpress-hint"><i class="fas fa-info-circle"></i>预测仅供参考，实际可能因身体状态波动</div>
+                <div class="pd-longpress-hint" id="pd-predict-disclaimer"><i class="fas fa-info-circle"></i>预测仅供参考，实际可能因身体状态波动</div>
+                <div class="pd-longpress-hint" id="pd-irregular-hint" style="display:none;color:#d97757;"><i class="fas fa-exclamation-triangle"></i>你最近几次周期波动较大，这个预测的参考价值有限</div>
 
                 <!-- 日历卡片 -->
                 <div class="pd-cal-card">

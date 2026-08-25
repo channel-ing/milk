@@ -41,18 +41,48 @@
     // ── Storage ───────────────────────────────────────
     async function _getKey() {
         if (_storageKey) return _storageKey;
+
+        // 优先用 app 统一的取 key 方法，保证经期数据的 key 跟其他数据一样，
+        // 带着正确的用户身份前缀（云同步会检查这个前缀，带错前缀的数据同步不了）
+        var properKey = null;
+        try {
+            if (typeof window.getStorageKey === 'function') properKey = window.getStorageKey('periodData');
+        } catch (e) { /* SESSION_ID 可能还没初始化，走下面的兜底 */ }
+
         try {
             var allKeys = await localforage.keys();
+
+            if (properKey) {
+                if (allKeys.indexOf(properKey) === -1) {
+                    // 规范 key 下还没数据——之前的版本有个bug：猜"消息记录"的key时，
+                    // 用的字符串特征('_messages')跟实际的key名（'chatMessages'）对不上，
+                    // 导致经期数据一直存在一个不带用户身份前缀的错误key里。
+                    // 这里做一次性搬家：找到旧key、把数据搬到规范key下、删掉旧的，不会丢数据。
+                    var legacyKey = allKeys.find(function (k) { return k.indexOf('_periodData') !== -1 && k !== properKey; });
+                    if (legacyKey) {
+                        try {
+                            var legacyVal = await localforage.getItem(legacyKey);
+                            if (legacyVal) {
+                                await localforage.setItem(properKey, legacyVal);
+                                await localforage.removeItem(legacyKey);
+                            }
+                        } catch (e) { console.warn('[period] 旧数据迁移失败:', e); }
+                    }
+                }
+                _storageKey = properKey;
+                return properKey;
+            }
+
+            // getStorageKey 暂时不可用（比如脚本刚加载、SESSION_ID还没初始化完）——
+            // 用能找到的现成 key 顶用一次，但不缓存，等下次真正需要时再重新尝试规范方式
             var found = allKeys.find(function (k) { return k.indexOf('_periodData') !== -1; });
-            if (found) { _storageKey = found; return found; }
-            // 推导 session prefix
-            var msgKey = allKeys.find(function (k) { return k.indexOf('_messages') !== -1; });
-            var prefix = msgKey ? msgKey.replace('_messages', '') : 'CHAT_APP_V3_';
-            _storageKey = prefix + '_periodData';
+            if (found) return found;
+            var msgKey = allKeys.find(function (k) { return k.indexOf('_chatMessages') !== -1; });
+            var prefix = msgKey ? msgKey.replace('_chatMessages', '') : 'CHAT_APP_V3_';
+            return prefix + '_periodData';
         } catch (e) {
-            _storageKey = 'CHAT_APP_V3__periodData';
+            return 'CHAT_APP_V3__periodData';
         }
-        return _storageKey;
     }
 
     async function _load() {

@@ -267,10 +267,34 @@
 }
 .survey-list-empty i { font-size: 32px; opacity: 0.35; }
 .survey-list-empty p { font-size: 13px; opacity: 0.7; margin: 0; }
+.survey-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    flex-shrink: 0;
+}
+.survey-toolbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
 #survey-fav-filter-bar {
     display: flex;
-    padding: 2px 0 10px;
-    flex-shrink: 0;
+    min-width: 0; /* 允许在需要时缩小，不撑爆右边trash/+按钮的位置 */
+}
+/* 筛选chip的下拉菜单默认是贴右边往左长的（陪伴日记那边是这么设计的，因为它的chip本来就靠右）。
+   问卷这边chip靠左放，如果昵称比较长（比如"梦角发的"换成用户自定义的长昵称），下拉框往左长
+   很容易顶到屏幕外面去，所以这里反过来贴左边往右长，同时允许换行、给个宽度上限，不会无限变宽 */
+#survey-filter-dropdown {
+    left: 0;
+    right: auto;
+    max-width: 200px;
+}
+#survey-filter-dropdown .cd-dropdown-item {
+    white-space: normal;
+    line-height: 1.4;
 }
 .survey-empty-create-btn {
     margin-top: 6px;

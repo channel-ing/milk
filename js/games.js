@@ -1483,12 +1483,8 @@ function initComboMenu() {
         // 点在任何弹窗（新建分组/移动分组/管理这些）或长按浮窗内部，
         // 不算"点了面板外面"——这几个弹窗都是挂在页面最外层的，不在 picker 的DOM范围内，
         // 之前没排除这种情况，导致点弹窗里任何按钮都会被误判成"点击外部"，把主面板意外关掉
-        if (e.target.closest('.modal') || e.target.closest('.my-sticker-action-popover')) {
-            console.log('[sticker-debug] 点在弹窗/长按浮窗内部，跳过关闭面板', e.target);
-            return;
-        }
+        if (e.target.closest('.modal') || e.target.closest('.my-sticker-action-popover')) return;
         if (!picker.contains(e.target) && !comboBtn.contains(e.target)) {
-            console.log('[sticker-debug] 判定为点击面板外部，即将关闭面板。点击目标：', e.target);
             picker.classList.remove('active');
         }
     });
@@ -1609,6 +1605,7 @@ function initComboMenu() {
                 if (g) { g.cover = entry.src; _myStickerSaveGroups(); showNotification('已设为该分组封面', 'success'); }
             }
             pop.remove();
+            picker.classList.add('active');
             renderMyStickerLibrary();
         };
         pop.querySelector('[data-act="move"]').onclick = function (e) {
@@ -1746,12 +1743,13 @@ function initComboMenu() {
         document.body.appendChild(modal);
         if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
         _myStickerBindCoverRefs(modal);
-        modal.querySelector('#my-sticker-move-cancel').onclick = function () { modal.remove(); };
+        modal.querySelector('#my-sticker-move-cancel').onclick = function () { modal.remove(); picker.classList.add('active'); };
         modal.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
             row.onclick = function () {
                 var gid = row.dataset.gid || null;
                 _myStickerMoveToGroup(entry.id, gid);
                 modal.remove();
+                picker.classList.add('active');
                 showNotification('已移动分组', 'success');
                 renderMyStickerLibrary();
             };
@@ -1816,7 +1814,7 @@ function initComboMenu() {
             fileInput.value = '';
         });
 
-        modal.querySelector('#my-sticker-newgroup-cancel').onclick = function () { modal.remove(); };
+        modal.querySelector('#my-sticker-newgroup-cancel').onclick = function () { modal.remove(); picker.classList.add('active'); };
         confirmBtn.onclick = async function () {
             var name = nameInput.value.trim();
             if (!name) return; // 按钮本来就是disabled，这里是双重保险
@@ -1850,6 +1848,7 @@ function initComboMenu() {
             _myStickerSaveLibrary();
             window._myStickerActiveGroup = newGroup.id;
             modal.remove();
+            picker.classList.add('active');
             showNotification('分组已创建', 'success');
             renderMyStickerLibrary();
         };
@@ -1893,6 +1892,7 @@ function initComboMenu() {
         if (typeof window.showModal === 'function') window.showModal(modal); else modal.style.display = 'flex';
         modal.querySelector('#my-sticker-manage-close').onclick = function () {
             modal.remove();
+            picker.classList.add('active');
             renderMyStickerLibrary();
         };
 
@@ -1940,11 +1940,12 @@ function initComboMenu() {
                 '</div>';
             document.body.appendChild(sub);
             if (typeof window.showModal === 'function') window.showModal(sub); else sub.style.display = 'flex';
-            sub.querySelector('#my-sticker-del-cancel').onclick = function () { sub.remove(); };
+            sub.querySelector('#my-sticker-del-cancel').onclick = function () { sub.remove(); picker.classList.add('active'); };
             sub.querySelector('#my-sticker-del-keep').onclick = function () {
                 _myStickerDeleteGroup(groupId, true);
                 sub.remove();
                 modal.remove();
+                picker.classList.add('active');
                 showNotification('分组已删除，表情已退回默认分组', 'success');
                 window._myStickerActiveGroup = null;
                 renderMyStickerLibrary();
@@ -1953,6 +1954,7 @@ function initComboMenu() {
                 _myStickerDeleteGroup(groupId, false);
                 sub.remove();
                 modal.remove();
+                picker.classList.add('active');
                 showNotification('分组和里面的表情已全部删除', 'success');
                 window._myStickerActiveGroup = null;
                 renderMyStickerLibrary();
@@ -2016,16 +2018,14 @@ function initComboMenu() {
             document.body.appendChild(pick);
             if (typeof window.showModal === 'function') window.showModal(pick); else pick.style.display = 'flex';
             _myStickerBindCoverRefs(pick);
-            pick.querySelector('#my-sticker-batchmove-cancel').onclick = function () { pick.remove(); };
+            pick.querySelector('#my-sticker-batchmove-cancel').onclick = function () { pick.remove(); picker.classList.add('active'); };
             pick.querySelectorAll('.my-sticker-move-row').forEach(function (row) {
                 row.onclick = function () {
-                    console.log('[sticker-debug] 批量移动前，面板active状态：', picker.classList.contains('active'));
                     _myStickerMoveMultipleToGroup(ids, row.dataset.gid || null);
                     selectedIds = {};
                     pick.remove();
-                    console.log('[sticker-debug] pick.remove()后，面板active状态：', picker.classList.contains('active'));
+                    picker.classList.add('active');
                     showNotification('已移动 ' + ids.length + ' 张', 'success');
-                    console.log('[sticker-debug] toast之后，面板active状态：', picker.classList.contains('active'));
                     renderGrid();
                 };
             });
@@ -2034,12 +2034,10 @@ function initComboMenu() {
         modal.querySelector('#my-sticker-manage-delete').onclick = async function () {
             var ids = Object.keys(selectedIds);
             if (!ids.length) return;
-            console.log('[sticker-debug] 批量删除前，面板active状态：', picker.classList.contains('active'));
             await _myStickerDeleteMultiple(ids);
-            console.log('[sticker-debug] 批量删除后，面板active状态：', picker.classList.contains('active'));
+            picker.classList.add('active');
             selectedIds = {};
             showNotification('已删除 ' + ids.length + ' 张', 'success');
-            console.log('[sticker-debug] toast之后，面板active状态：', picker.classList.contains('active'));
             renderGrid();
         };
 

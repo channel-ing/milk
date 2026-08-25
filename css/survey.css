@@ -269,15 +269,9 @@
 .survey-list-empty p { font-size: 13px; opacity: 0.7; margin: 0; }
 #survey-fav-filter-bar {
     display: flex;
-    gap: 6px;
     padding: 2px 0 10px;
     flex-shrink: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
 }
-#survey-fav-filter-bar::-webkit-scrollbar { display: none; }
-#survey-fav-filter-bar .gfp-btn { white-space: nowrap; }
 .survey-empty-create-btn {
     margin-top: 6px;
     padding: 9px 20px;

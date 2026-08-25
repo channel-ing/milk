@@ -15,6 +15,7 @@
  *   - 收藏语音（favAudio_*）→ 云端引用（旧键名 + 旧格式 base64 全覆盖）
  *   - 聊天图片（chatMessages[].image）→ 云端引用（base64 替换，消息内容不变）
  *   - 问卷选项图片（surveyData.askPartner[].questions[].options[].value）→ 云端引用
+ *   - 头像（partnerAvatar / myAvatar）→ 云端引用
  */
 (function (global) {
     'use strict';
@@ -163,6 +164,26 @@
         try {
             var r = await window.CloudMedia.upload(bg, category);
             await localforage.setItem(key, r.url);
+            _state.completed++;
+        } catch (e) {
+            console.warn('[migration] ' + label + '上传失败', e);
+            _state.failed++;
+        }
+        _state.progress++;
+        _notify();
+    }
+
+    // 跟 _migrateSingleImage 几乎一样，区别是这个不拼 sid——给"不分账号、全局共享"的
+    // 单值图片key用（目前只有通话背景图这一个），key本身就是完整的、调用方直接传全key
+    async function _migrateGlobalSingleImage(fullKey, category, label) {
+        var bg = await localforage.getItem(fullKey);
+        if (!_isBase64Image(bg)) return;
+
+        _state.currentTask = label;
+        _notify();
+        try {
+            var r = await window.CloudMedia.upload(bg, category);
+            await localforage.setItem(fullKey, r.url);
             _state.completed++;
         } catch (e) {
             console.warn('[migration] ' + label + '上传失败', e);
@@ -660,6 +681,16 @@
         var cb = await localforage.getItem(APP_PREFIX_STR + sid + '_chatBackground');
         if (_isBase64Image(cb)) count++;
 
+        // 头像
+        var pAv = await localforage.getItem(APP_PREFIX_STR + sid + '_partnerAvatar');
+        if (_isBase64Image(pAv)) count++;
+        var mAv = await localforage.getItem(APP_PREFIX_STR + sid + '_myAvatar');
+        if (_isBase64Image(mAv)) count++;
+
+        // 通话背景图（全局key，不分账号）
+        var callBg = await localforage.getItem(APP_PREFIX_STR + 'callBgImageData');
+        if (_isBase64Image(callBg)) count++;
+
         // 日记背景图库
         var dg = await localforage.getItem(APP_PREFIX_STR + sid + '_companionDiaryBgGallery');
         if (Array.isArray(dg)) {
@@ -886,6 +917,30 @@
             // 聊天背景
             await _migrateObjectGallery(sid, 'backgroundGallery', 'backgrounds', '背景图库');
             await _migrateSingleImage(sid, 'chatBackground', 'backgrounds', '当前聊天背景');
+
+            // 头像（你的头像 + 梦角的头像，各自一个单值key，复用跟"当前聊天背景"一样的单图迁移逻辑）
+            await _migrateSingleImage(sid, 'partnerAvatar', 'avatars', '梦角头像');
+            await _migrateSingleImage(sid, 'myAvatar', 'avatars', '我的头像');
+            // 头像是直接显示在页面顶部的，不像背景图那样要等用户切进对应页面才会用到——
+            // 迁移完必须立刻让 core.js 重新读一遍并刷新显示 + 内存缓存，不然存档的时候
+            // 会拿内存里还没刷新的旧base64把刚迁移好的oss://地址覆盖回去，等于白迁移
+            try {
+                if (typeof window._refreshAvatarsFromStorage === 'function') {
+                    await window._refreshAvatarsFromStorage();
+                }
+            } catch (eAvatar) {
+                console.warn('[migration] 头像内存同步失败（不影响已写入的迁移结果）', eAvatar);
+            }
+
+            // 通话背景图（全局key，不分账号，用专门的不拼sid版本迁移）
+            await _migrateGlobalSingleImage(APP_PREFIX_STR + 'callBgImageData', 'call-backgrounds', '通话背景图');
+            try {
+                if (typeof window._refreshCallBgFromStorage === 'function') {
+                    await window._refreshCallBgFromStorage();
+                }
+            } catch (eCallBg) {
+                console.warn('[migration] 通话背景内存同步失败（不影响已写入的迁移结果）', eCallBg);
+            }
 
             // 日记背景
             await _migrateObjectGallery(sid, 'companionDiaryBgGallery', 'diary-backgrounds', '日记背景图库');

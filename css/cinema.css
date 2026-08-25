@@ -485,10 +485,13 @@
     flex-shrink: 0;
 }
 .cinema-sticker-popover {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: calc(100% + 8px);
+    /* 原来是 position:absolute，相对 .cinema-input-bar-wrap 定位——但输入栏这层本身在
+       .cinema-body（overflow-y:auto 的滚动容器）里面，面板往上展开的这一段空间不一定够，
+       嵌入模式下视频播放器+工具栏占掉大半屏幕，可视区域不够高，面板顶部就被滚动容器"卷"没了，
+       看起来像面板消失了，其实是被卷到当前可视范围外面去了。
+       改成 position:fixed，直接相对整个视口定位（打开面板时用 JS 量一次输入栏的实际屏幕位置），
+       不再受任何滚动容器影响——跟动态/陪伴模式的表情面板是同一个思路 */
+    position: fixed;
     height: 260px; /* 固定高度，不随表情数量变化——表情少时面板不会跟着缩短 */
     background: var(--secondary-bg, #fff);
     border: 1px solid var(--border-color, #e0e0e0);
@@ -497,7 +500,7 @@
     display: none;
     flex-direction: column;
     overflow: hidden;
-    z-index: 20;
+    z-index: 200;
 }
 .cinema-sticker-popover.active {
     display: flex;

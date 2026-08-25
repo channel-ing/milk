@@ -1122,8 +1122,17 @@
             emojiBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 var picker = document.getElementById('cinema-sticker-picker');
+                var wrap = document.querySelector('.cinema-input-bar-wrap');
                 if (!picker) return;
                 var willOpen = !picker.classList.contains('active');
+                if (willOpen && wrap) {
+                    // position:fixed 相对整个视口定位，用输入栏当前的实际屏幕位置量一次——
+                    // 不用每次滚动都重新量，跟动态/陪伴模式那两个面板是同一个做法
+                    var rect = wrap.getBoundingClientRect();
+                    picker.style.left = (rect.left + 12) + 'px';
+                    picker.style.right = (window.innerWidth - rect.right + 12) + 'px';
+                    picker.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+                }
                 picker.classList.toggle('active', willOpen);
                 if (willOpen) _renderCinemaStickerGrid();
             });

@@ -504,6 +504,12 @@ async function importAllData(file) {
                 localStorageNeedles: []
             },
             {
+                id: 'survey',
+                label: '问卷（我问梦角 / 梦角问我 / 题库）',
+                indexedDBNeedles: ['surveyData'],
+                localStorageNeedles: []
+            },
+            {
                 id: 'ann',
                 label: '纪念日',
                 indexedDBNeedles: ['anniversaries', 'annCoverBg_', 'annMeetOverride', 'annPinnedId'],

@@ -32,8 +32,15 @@
  *     }, ...
  *   ],
  *   bank: [                      // 反向问卷题库（回复库→氛围感→"问卷题库"tab 管理）
- *     { id, text, builtin: bool, hidden: bool, usedInRound: bool }
+ *     { id, text, builtin: bool, hidden: bool, usedInRound: bool, groupId: null|string }
  *   ],
+ *   bankGroups: [                // 题库分组——交互对齐主字卡的"字卡分组"（新建/编辑/删除、筛选胶囊），
+ *                                 // 但数据结构反过来：不是分组记着自己有哪些题（按文字匹配，容易重名撞车），
+ *                                 // 而是每道题自己记着 groupId，用id对应更稳
+ *     { id, name, color, disabled: bool }
+ *   ],
+ *   bankDefaultGroupSeeded: bool, // 是否已经自动创建过"默认问题"这个分组——只在第一次种一次，
+ *                                  // 用户之后删了就不会再自动冒出来
  *   askMeTrigger: { nextCheckAt: timestamp, missStreak: 0|1|2+ },
  *     // 触发概率：missStreak 0→50%，1→80%，2+→100%；中了清零；每次检查后不管中没中都重排 5-10 天后的 nextCheckAt
  *   replyDelayMinHours: 1,       // 问卷回复时间区间（小时），聊天设置→节奏tab 那两个新滑块
@@ -116,6 +123,7 @@
             }
         } catch (e) { console.warn('[survey] load failed:', e); }
         if (!Array.isArray(_data.bank) || !_data.bank.length) _seedBuiltinBank();
+        _ensureDefaultBankGroup();
         if (!_data.askMeTrigger) {
             _data.askMeTrigger = { nextCheckAt: Date.now() + _randDays(5, 10), missStreak: 0 };
         }
@@ -167,9 +175,26 @@
         var already = new Set(existing.filter(function (q) { return q.builtin; }).map(function (q) { return q.text; }));
         BUILTIN_BANK_TEXTS.forEach(function (t, i) {
             if (already.has(t)) return;
-            existing.push({ id: 'bk_' + i, text: t, builtin: true, hidden: false, usedInRound: false });
+            existing.push({ id: 'bk_' + i, text: t, builtin: true, hidden: false, usedInRound: false, groupId: undefined });
         });
         _data.bank = existing;
+    }
+
+    // 题库分组：内置题第一次加载时统一塞进一个叫"默认问题"的分组，跟主字卡的"字卡分组"
+    // 是同一套交互（新建/编辑/删除分组、把题目分到不同组），但数据结构不一样——主字卡是
+    // "分组记着自己有哪些内容(items数组，按文字匹配)"，这里反过来是"每道题记着自己属于哪个
+    // 分组(groupId)"，用id对应，不怕两条题目文字凑巧写重复
+    function _ensureDefaultBankGroup() {
+        if (!Array.isArray(_data.bankGroups)) _data.bankGroups = [];
+        // 只在"从来没种过默认分组"这一次自动创建+把内置题挂上去；之后哪怕用户把这个分组删了，
+        // 也不会又冒出来一个——跟主字卡分组一样，删了就是删了，不会硬塞回来
+        if (!_data.bankDefaultGroupSeeded) {
+            var defaultGroup = { id: _uid('bg'), name: '默认问题', color: '#748FFC', disabled: false };
+            _data.bankGroups.unshift(defaultGroup);
+            _data.bank.forEach(function (item) { if (item.builtin) item.groupId = defaultGroup.id; });
+            _data.bankDefaultGroupSeeded = true;
+        }
+        _data.bank.forEach(function (item) { if (item.groupId === undefined) item.groupId = null; });
     }
 
     // ── 问卷回复时间滑块（聊天设置→节奏tab）──────────────────────
@@ -591,9 +616,16 @@
         _save();
     }
 
-    // 抽题：不放回抽取，题库（排除隐藏的）问完一轮就整体重置再开始新一轮
+    // 抽题：不放回抽取，题库（排除隐藏的、以及所在分组被屏蔽的）问完一轮就整体重置再开始新一轮
     function _createAskMeBatch() {
-        var pool = _data.bank.filter(function (q) { return !q.hidden; });
+        var pool = _data.bank.filter(function (q) {
+            if (q.hidden) return false;
+            if (q.groupId) {
+                var g = (_data.bankGroups || []).find(function (x) { return x.id === q.groupId; });
+                if (g && g.disabled) return false; // 分组被屏蔽，组里的题目也一起不参与抽题
+            }
+            return true;
+        });
         if (!pool.length) return null;
         var available = pool.filter(function (q) { return !q.usedInRound; });
         if (!available.length) {
@@ -658,7 +690,7 @@
     function _bankAdd(text) {
         text = (text || '').trim();
         if (!text) return;
-        _data.bank.push({ id: _uid('bk'), text: text, builtin: false, hidden: false, usedInRound: false });
+        _data.bank.push({ id: _uid('bk'), text: text, builtin: false, hidden: false, usedInRound: false, groupId: null });
         _save();
     }
     function _bankEdit(id, text) {
@@ -716,11 +748,15 @@
     }
 
     var _bankSearchQuery = '';
+    var _activeBankGroupFilter = null; // null=全部（分组视图）, 'ungrouped'=未分组, 或某个分组的id
+
     function _renderBankTab(list) {
         list.innerHTML =
-            '<div class="survey-bank-toolbar">' +
+            '<div class="survey-bank-toolbar-row">' +
                 '<input type="text" class="survey-bank-search" id="survey-bank-search" placeholder="搜索题目…" value="' + _esc(_bankSearchQuery) + '">' +
+                '<button type="button" class="survey-bank-icon-btn" id="survey-bank-groups-btn" title="分组管理"><i class="fas fa-folder"></i></button>' +
             '</div>' +
+            '<div class="survey-bank-filter-pills" id="survey-bank-filter-pills"></div>' +
             '<div id="survey-bank-rows"></div>' +
             '<button type="button" class="survey-add-option-btn" id="survey-bank-add-btn" style="margin-top:8px;">' +
                 '<i class="fas fa-plus"></i> 新增题目' +
@@ -728,6 +764,7 @@
 
         var searchInput = list.querySelector('#survey-bank-search');
         searchInput.oninput = function () { _bankSearchQuery = searchInput.value; _renderBankRows(); };
+        list.querySelector('#survey-bank-groups-btn').onclick = function () { _showBankGroupManager(); };
         list.querySelector('#survey-bank-add-btn').onclick = function () {
             _bankPromptModal('新增问卷题目', '', function (text) {
                 if (text && text.trim()) { _bankAdd(text); _renderBankRows(); }
@@ -736,12 +773,21 @@
         _renderBankRows();
     }
 
-    // 题目行的html——内置/自定义共用同一套渲染，区别只在有没有"默认问题"分组标题包着它
+    // 题目行的html——不管是"分组视图"里嵌在某个分组下面，还是"筛选出单个分组/未分组"时的平铺列表，都是这一套
     function _bankRowHTML(item) {
+        var g = item.groupId ? (_data.bankGroups || []).find(function (x) { return x.id === item.groupId; }) : null;
+        var groupBadge = g ? (
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px 1px 4px;border-radius:10px;font-size:10px;' +
+            'background:' + g.color + '18;color:' + g.color + ';border:1px solid ' + g.color + '30;margin-top:5px;">' +
+            '<span style="width:5px;height:5px;border-radius:50%;background:' + g.color + ';flex-shrink:0;"></span>' + _esc(g.name) + '</span>'
+        ) : '';
         return '<div class="custom-reply-item' + (item.hidden ? ' survey-bank-row-hidden' : '') + '" data-id="' + item.id + '">' +
-            '<span class="custom-reply-text">' + _esc(item.text) + '</span>' +
+            '<span class="custom-reply-text" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">' +
+                '<span>' + _esc(item.text) + '</span>' + groupBadge +
+            '</span>' +
             '<div class="custom-reply-actions">' +
                 '<button class="reply-action-mini hide-btn" title="' + (item.hidden ? '取消隐藏' : '隐藏') + '"><i class="fas fa-eye' + (item.hidden ? '-slash' : '') + '"></i></button>' +
+                '<button class="reply-action-mini tag-btn" title="分组"><i class="fas fa-tag"></i></button>' +
                 '<button class="reply-action-mini edit-btn" title="编辑"><i class="fas fa-pen"></i></button>' +
                 '<button class="reply-action-mini delete-btn" title="删除"><i class="fas fa-trash"></i></button>' +
             '</div>' +
@@ -752,6 +798,7 @@
         rows.querySelectorAll('.custom-reply-item').forEach(function (row) {
             var id = row.dataset.id;
             row.querySelector('.hide-btn').onclick = function () { _bankToggleHide(id); _renderBankRows(); };
+            row.querySelector('.tag-btn').onclick = function () { _showSingleBankItemGroupPicker(id); };
             row.querySelector('.edit-btn').onclick = function () {
                 var cur = _data.bank.find(function (x) { return x.id === id; });
                 _bankPromptModal('编辑题目', cur ? cur.text : '', function (text) {
@@ -765,33 +812,337 @@
         });
     }
 
+    // 筛选胶囊：全部 / 未分组 / 各个分组（带颜色圆点+数量，屏蔽的分组带一个小眼睛图标）——
+    // 跟主字卡回复库那套 .gfp-btn 胶囊是同一份样式（reply-library.js 已经全局注入过了，这里直接借用）
+    function _renderBankFilterPills() {
+        var wrap = document.getElementById('survey-bank-filter-pills');
+        if (!wrap) return;
+        var groups = _data.bankGroups || [];
+        if (!groups.length) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+        wrap.style.display = '';
+        var allCount = _data.bank.length;
+        var ungroupedCount = _data.bank.filter(function (x) { return !x.groupId || !groups.some(function (g) { return g.id === x.groupId; }); }).length;
+        var html = '<button class="gfp-btn' + (_activeBankGroupFilter === null ? ' gfp-active' : '') + '" data-filter="all">全部 <span class="gfp-count">' + allCount + '</span></button>';
+        html += '<button class="gfp-btn' + (_activeBankGroupFilter === 'ungrouped' ? ' gfp-active' : '') + '" data-filter="ungrouped">未分组 <span class="gfp-count">' + ungroupedCount + '</span></button>';
+        groups.forEach(function (g) {
+            var cnt = _data.bank.filter(function (x) { return x.groupId === g.id; }).length;
+            var active = _activeBankGroupFilter === g.id;
+            html += '<button class="gfp-btn' + (active ? ' gfp-active' : '') + (g.disabled ? ' gfp-disabled' : '') + '" data-filter="' + g.id + '"' +
+                (active ? ' style="background:' + g.color + '22;border-color:' + g.color + ';color:' + g.color + ';"' : '') + '>' +
+                '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (g.color || '#aaa') + ';margin-right:4px;flex-shrink:0;vertical-align:middle;"></span>' +
+                _esc(g.name) + ' <span class="gfp-count">' + cnt + '</span>' +
+                (g.disabled ? ' <span style="font-size:9px;opacity:0.7;margin-left:2px;"><i class="fas fa-eye-slash"></i></span>' : '') +
+            '</button>';
+        });
+        wrap.innerHTML = html;
+        wrap.querySelectorAll('.gfp-btn').forEach(function (btn) {
+            btn.onclick = function () {
+                var f = btn.dataset.filter;
+                _activeBankGroupFilter = f === 'all' ? null : (f === 'ungrouped' ? 'ungrouped' : f);
+                _renderBankRows();
+            };
+        });
+    }
+
+    function _bankEmptyHTML(q, customText) {
+        return '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:20px 0;">' +
+            (customText || (q ? ('未找到 "' + _esc(q) + '"') : '还没有题目')) + '</div>';
+    }
+
     function _renderBankRows() {
+        _renderBankFilterPills();
         var rows = document.getElementById('survey-bank-rows');
         if (!rows) return;
         var q = _bankSearchQuery.toLowerCase().trim();
         var matches = function (x) { return !q || x.text.toLowerCase().indexOf(q) !== -1; };
-        // 内置题统一归到"默认问题"这一组，自定义题跟在后面，不用组名——
-        // 搜索的时候两边各自按关键词过滤，哪边没有匹配项就不显示那部分（含分组标题）
-        var builtinItems = _data.bank.filter(function (x) { return x.builtin && matches(x); });
-        var customItems = _data.bank.filter(function (x) { return !x.builtin && matches(x); });
+        var groups = _data.bankGroups || [];
 
-        if (!builtinItems.length && !customItems.length) {
-            rows.innerHTML = '<div style="text-align:center;font-size:12.5px;color:var(--text-secondary);opacity:0.6;padding:20px 0;">' +
-                (q ? ('未找到 "' + _esc(q) + '"') : '还没有题目') + '</div>';
-            return;
+        if (_activeBankGroupFilter === null) {
+            // 默认视图：每个分组一个可折叠的区块（跟主字卡"分组管理"里展开/收起是同一个交互），
+            // 未分组的（含分组被删掉、groupId 指向不存在分组的孤儿题目）统一放最后一块
+            var pool = _data.bank.filter(matches);
+            if (!pool.length) { rows.innerHTML = _bankEmptyHTML(q); return; }
+            var html = '';
+            var usedIds = {};
+            groups.forEach(function (g) {
+                var items = pool.filter(function (x) { return x.groupId === g.id; });
+                items.forEach(function (x) { usedIds[x.id] = true; });
+                html += _bankGroupBlockHTML(g, items, false);
+            });
+            var restUngrouped = pool.filter(function (x) { return !usedIds[x.id]; });
+            if (restUngrouped.length) {
+                html += _bankGroupBlockHTML({ id: '__ungrouped', name: '未分组', color: '#868E96', disabled: false }, restUngrouped, true);
+            }
+            rows.innerHTML = html;
+            _bindBankGroupBlockEvents(rows);
+        } else if (_activeBankGroupFilter === 'ungrouped') {
+            var items2 = _data.bank.filter(matches).filter(function (x) { return !x.groupId || !groups.some(function (g) { return g.id === x.groupId; }); });
+            if (!items2.length) { rows.innerHTML = _bankEmptyHTML(q, '所有题目都已分组'); return; }
+            rows.innerHTML = items2.map(_bankRowHTML).join('');
+            _bindBankRowEvents(rows);
+        } else {
+            var g2 = groups.find(function (x) { return x.id === _activeBankGroupFilter; });
+            if (!g2) { rows.innerHTML = _bankEmptyHTML(q, '分组不存在'); return; }
+            var items3 = _data.bank.filter(matches).filter(function (x) { return x.groupId === g2.id; });
+            if (!items3.length) { rows.innerHTML = _bankEmptyHTML(q, '此分组暂无题目'); return; }
+            rows.innerHTML = items3.map(_bankRowHTML).join('');
+            _bindBankRowEvents(rows);
         }
+    }
 
-        var html = '';
-        if (builtinItems.length) {
-            html += '<div class="survey-bank-group-label">默认问题</div>';
-            html += builtinItems.map(_bankRowHTML).join('');
-        }
-        if (customItems.length) {
-            html += customItems.map(_bankRowHTML).join('');
-        }
-        rows.innerHTML = html;
+    // 分组区块——复用 reply-library.js 里 .rl-group-block/.rl-group-header/.rl-group-tag/.rl-group-body
+    // 这几个类（它在文件加载时就往 <head> 塞了一份共享样式，这里直接借用，长相能跟主字卡分组一模一样）
+    function _bankGroupBlockHTML(group, items, isUngrouped) {
+        var isCollapsed = group._collapsed || false;
+        var isDisabled = group.disabled;
+        var colorDot = group.color || '#868E96';
+        var body = items.length
+            ? items.map(_bankRowHTML).join('')
+            : '<div style="padding:14px;text-align:center;font-size:12px;color:var(--text-secondary);opacity:0.6;">此分组暂无题目</div>';
+        return '<div class="rl-group-block">' +
+            '<div class="rl-group-header' + (isCollapsed ? ' collapsed' : '') + '" data-gid="' + group.id + '" style="' + (isDisabled ? 'opacity:0.5;' : '') + '">' +
+                '<div class="rl-group-tag" data-gtag="' + group.id + '" title="' + (isDisabled ? '点击启用此分组' : '点击屏蔽此分组') + '">' +
+                    '<span style="width:8px;height:8px;border-radius:50%;background:' + colorDot + ';flex-shrink:0;"></span>' +
+                    '<span style="font-size:12px;font-weight:700;color:' + colorDot + ';">' + _esc(group.name) + '</span>' +
+                    (isDisabled ? '<span title="已屏蔽" style="color:' + colorDot + ';"><i class="fas fa-eye-slash" style="font-size:10px;"></i></span>' : '') +
+                '</div>' +
+                '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">' + items.length + ' 条</span>' +
+                (!isUngrouped ? '<button class="survey-bank-group-edit-btn" data-gid="' + group.id + '" title="编辑分组"><i class="fas fa-pen"></i></button>' : '') +
+                '<div class="survey-bank-group-chevron" style="transform:' + (isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)') + ';"><i class="fas fa-chevron-down"></i></div>' +
+            '</div>' +
+            '<div class="rl-group-body" data-gbody="' + group.id + '" style="display:' + (isCollapsed ? 'none' : 'block') + ';">' + body + '</div>' +
+        '</div>';
+    }
+
+    function _bindBankGroupBlockEvents(rows) {
+        rows.querySelectorAll('.rl-group-header').forEach(function (hdr) {
+            hdr.onclick = function (e) {
+                if (e.target.closest('.survey-bank-group-edit-btn') || e.target.closest('.rl-group-tag')) return;
+                var gid = hdr.dataset.gid;
+                var body = rows.querySelector('.rl-group-body[data-gbody="' + gid + '"]');
+                var nowCollapsed = !(body && body.style.display !== 'none');
+                if (body) body.style.display = nowCollapsed ? 'none' : 'block';
+                hdr.classList.toggle('collapsed', nowCollapsed);
+                var chev = hdr.querySelector('.survey-bank-group-chevron');
+                if (chev) chev.style.transform = nowCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+                var g = (_data.bankGroups || []).find(function (x) { return x.id === gid; });
+                if (g) { g._collapsed = nowCollapsed; _save(); } // "未分组"那个虚拟分组不持久化折叠状态，只在本次渲染内记得住
+            };
+        });
+        rows.querySelectorAll('.rl-group-tag').forEach(function (tag) {
+            tag.onclick = function (e) {
+                e.stopPropagation();
+                var gid = tag.dataset.gtag;
+                var g = (_data.bankGroups || []).find(function (x) { return x.id === gid; });
+                if (!g) return; // "未分组"没有真实分组对象，点了没反应
+                g.disabled = !g.disabled;
+                _save();
+                _renderBankRows();
+                if (typeof showNotification === 'function') showNotification(g.disabled ? '已屏蔽「' + g.name + '」，组内题目不会再被抽到' : '已启用「' + g.name + '」', 'success');
+            };
+        });
+        rows.querySelectorAll('.survey-bank-group-edit-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var gid = btn.dataset.gid;
+                var g = (_data.bankGroups || []).find(function (x) { return x.id === gid; });
+                if (g) _showBankGroupEditor(g);
+            };
+        });
         _bindBankRowEvents(rows);
     }
+
+    // ── 分组管理弹窗：新建/编辑/删除分组——跟主字卡回复库的"分组管理"是同一套交互，
+    //    直接借用它已经加载好的 _makeOverlay() 和 GROUP_COLORS 调色板，长相保持一致 ──
+    function _showBankGroupManager() {
+        if (!_data.bankGroups) _data.bankGroups = [];
+        var groups = _data.bankGroups;
+        var overlay = (typeof _makeOverlay === 'function') ? _makeOverlay() : _bankFallbackOverlay();
+
+        var panel = document.createElement('div');
+        panel.style.cssText = 'background:var(--secondary-bg);border-radius:22px;padding:24px;width:92%;max-width:400px;max-height:85vh;display:flex;flex-direction:column;gap:14px;box-shadow:0 24px 80px rgba(0,0,0,.45);animation:survPopIn 0.22s cubic-bezier(.34,1.56,.64,1);';
+        panel.innerHTML =
+            '<style>@keyframes survPopIn { from{opacity:0;transform:scale(.93)} to{opacity:1;transform:scale(1)} }</style>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+                '<div style="font-size:16px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;"><i class="fas fa-folder"></i> 题库分组管理</div>' +
+                '<button id="sbgm-close" style="width:30px;height:30px;border-radius:50%;border:none;background:var(--primary-bg);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fas fa-times"></i></button>' +
+            '</div>' +
+            '<div id="sbgm-list" style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:55vh;"></div>' +
+            '<button id="sbgm-add" style="width:100%;padding:12px;border:1.5px dashed var(--accent-color);border-radius:13px;background:transparent;color:var(--accent-color);font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;">' +
+                '<i class="fas fa-plus"></i> 新建分组' +
+            '</button>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        function render() {
+            var listEl = panel.querySelector('#sbgm-list');
+            if (!groups.length) {
+                listEl.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--text-secondary);font-size:13px;opacity:0.7;">还没有分组<br><span style="font-size:11px;">点击下方按钮创建第一个分组</span></div>';
+            } else {
+                listEl.innerHTML = groups.map(function (g, i) {
+                    var cnt = _data.bank.filter(function (x) { return x.groupId === g.id; }).length;
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:13px;border:1.5px solid var(--border-color);background:var(--primary-bg);' + (g.disabled ? 'opacity:0.55;' : '') + '">' +
+                        '<span style="width:12px;height:12px;border-radius:50%;background:' + (g.color || '#868E96') + ';flex-shrink:0;box-shadow:0 0 0 2px ' + (g.color || '#868E96') + '30;"></span>' +
+                        '<span style="flex:1;font-size:13px;color:var(--text-primary);font-weight:600;">' + _esc(g.name) + '</span>' +
+                        '<span style="font-size:11px;color:var(--text-secondary);">' + cnt + ' 条</span>' +
+                        '<button data-action="toggle" data-i="' + i + '" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border-color);background:' + (g.disabled ? 'var(--accent-color)' : 'transparent') + ';color:' + (g.disabled ? '#fff' : 'var(--text-secondary)') + ';cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + (g.disabled ? '启用' : '屏蔽') + '"><i class="fas fa-eye' + (g.disabled ? '' : '-slash') + '"></i></button>' +
+                        '<button data-action="edit" data-i="' + i + '" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;" title="编辑"><i class="fas fa-pen"></i></button>' +
+                        '<button data-action="del" data-i="' + i + '" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(224,96,90,.3);background:transparent;color:#e0605a;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="删除"><i class="fas fa-trash"></i></button>' +
+                    '</div>';
+                }).join('');
+            }
+            listEl.querySelectorAll('[data-action]').forEach(function (btn) {
+                btn.onclick = function () {
+                    var i = parseInt(btn.dataset.i);
+                    var action = btn.dataset.action;
+                    if (action === 'toggle') {
+                        groups[i].disabled = !groups[i].disabled;
+                        _save(); render(); _renderBankRows();
+                    } else if (action === 'edit') {
+                        overlay.remove();
+                        _showBankGroupEditor(groups[i]);
+                    } else if (action === 'del') {
+                        if (confirm('删除分组「' + groups[i].name + '」？（题目不会被删除，会变成未分组）')) {
+                            var gid = groups[i].id;
+                            _data.bank.forEach(function (x) { if (x.groupId === gid) x.groupId = null; });
+                            groups.splice(i, 1);
+                            _save(); render(); _renderBankRows();
+                        }
+                    }
+                };
+            });
+        }
+        render();
+
+        panel.querySelector('#sbgm-close').onclick = function () { overlay.remove(); };
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        panel.querySelector('#sbgm-add').onclick = function () { overlay.remove(); _showBankGroupEditor(null); };
+    }
+
+    // 新建/编辑分组——名称+颜色，颜色板直接借用主字卡那份 GROUP_COLORS
+    function _showBankGroupEditor(group) {
+        if (!_data.bankGroups) _data.bankGroups = [];
+        var groups = _data.bankGroups;
+        var isNew = !group;
+        var overlay = (typeof _makeOverlay === 'function') ? _makeOverlay() : _bankFallbackOverlay();
+        var palette = (typeof GROUP_COLORS !== 'undefined' && GROUP_COLORS.length) ? GROUP_COLORS :
+            ['#FF6B6B', '#FF8E53', '#FFC542', '#51CF66', '#20C997', '#4DABF7', '#748FFC', '#DA77F2', '#F783AC', '#FF922B'];
+        var selectedColor = (group && group.color) || palette[Math.floor(Math.random() * palette.length)];
+
+        var panel = document.createElement('div');
+        panel.style.cssText = 'background:var(--secondary-bg);border-radius:22px;padding:24px;width:92%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.45);animation:survPopIn 0.22s cubic-bezier(.34,1.56,.64,1);';
+        panel.innerHTML =
+            '<style>@keyframes survPopIn { from{opacity:0;transform:scale(.93)} to{opacity:1;transform:scale(1)} }</style>' +
+            '<div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:18px;">' + (isNew ? '新建分组' : '编辑分组') + '</div>' +
+            '<div style="margin-bottom:16px;">' +
+                '<label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:7px;letter-spacing:.5px;">分组名称</label>' +
+                '<input id="sbge-name" value="' + _esc(group ? group.name : '') + '" placeholder="分组名称…" style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;">' +
+            '</div>' +
+            '<div style="margin-bottom:20px;">' +
+                '<label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:8px;letter-spacing:.5px;">颜色</label>' +
+                '<div id="sbge-presets" style="display:flex;gap:7px;flex-wrap:wrap;">' +
+                    palette.map(function (c) {
+                        return '<div data-preset="' + c + '" style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;border:2.5px solid ' + (c === selectedColor ? '#fff' : 'transparent') + ';box-shadow:' + (c === selectedColor ? ('0 0 0 2.5px ' + c) : 'none') + ';flex-shrink:0;"></div>';
+                    }).join('') +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:10px;">' +
+                '<button id="sbge-cancel" style="flex:1;padding:12px;border:1.5px solid var(--border-color);border-radius:13px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">取消</button>' +
+                '<button id="sbge-save" style="flex:2;padding:12px;border:none;border-radius:13px;background:var(--accent-color);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">保存</button>' +
+            '</div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        panel.querySelectorAll('[data-preset]').forEach(function (dot) {
+            dot.onclick = function () {
+                selectedColor = dot.dataset.preset;
+                panel.querySelectorAll('[data-preset]').forEach(function (d) {
+                    var isSel = d.dataset.preset === selectedColor;
+                    d.style.border = '2.5px solid ' + (isSel ? '#fff' : 'transparent');
+                    d.style.boxShadow = isSel ? ('0 0 0 2.5px ' + d.dataset.preset) : 'none';
+                });
+            };
+        });
+
+        panel.querySelector('#sbge-cancel').onclick = function () { overlay.remove(); };
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        panel.querySelector('#sbge-save').onclick = function () {
+            var name = panel.querySelector('#sbge-name').value.trim();
+            if (!name) { if (typeof showNotification === 'function') showNotification('请输入分组名称', 'warning'); return; }
+            if (isNew) {
+                groups.push({ id: _uid('bg'), name: name, color: selectedColor, disabled: false });
+            } else {
+                group.name = name;
+                group.color = selectedColor;
+            }
+            _save();
+            overlay.remove();
+            _renderBankRows();
+            if (typeof showNotification === 'function') showNotification(isNew ? '✓ 分组已创建' : '✓ 分组已更新', 'success');
+        };
+    }
+
+    // 单条题目的分组选择——点题目行的"分组"图标弹出来
+    function _showSingleBankItemGroupPicker(itemId) {
+        var groups = _data.bankGroups || [];
+        if (!groups.length) {
+            if (confirm('还没有分组，是否立即创建？')) _showBankGroupEditor(null);
+            return;
+        }
+        var item = _data.bank.find(function (x) { return x.id === itemId; });
+        if (!item) return;
+        var overlay = (typeof _makeOverlay === 'function') ? _makeOverlay() : _bankFallbackOverlay();
+        var currentGroupId = item.groupId;
+
+        var panel = document.createElement('div');
+        panel.style.cssText = 'background:var(--secondary-bg);border-radius:22px;padding:22px;width:92%;max-width:340px;box-shadow:0 24px 80px rgba(0,0,0,.45);animation:survPopIn 0.22s cubic-bezier(.34,1.56,.64,1);';
+        panel.innerHTML =
+            '<style>@keyframes survPopIn { from{opacity:0;transform:scale(.93)} to{opacity:1;transform:scale(1)} }</style>' +
+            '<div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px;">选择分组</div>' +
+            '<div style="display:flex;flex-direction:column;gap:7px;max-height:55vh;overflow-y:auto;margin-bottom:14px;">' +
+                '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border-radius:11px;border:1.5px solid ' + (!currentGroupId ? 'var(--accent-color)' : 'var(--border-color)') + ';background:' + (!currentGroupId ? 'rgba(var(--accent-color-rgb),0.06)' : 'var(--primary-bg)') + ';">' +
+                    '<input type="radio" name="sbgp" value="" ' + (!currentGroupId ? 'checked' : '') + '>' +
+                    '<span style="font-size:13px;color:var(--text-secondary);">不分组</span>' +
+                '</label>' +
+                groups.map(function (g) {
+                    var checked = currentGroupId === g.id;
+                    var cnt = _data.bank.filter(function (x) { return x.groupId === g.id; }).length;
+                    return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border-radius:11px;border:1.5px solid ' + (checked ? g.color : 'var(--border-color)') + ';background:' + (checked ? (g.color + '10') : 'var(--primary-bg)') + ';">' +
+                        '<input type="radio" name="sbgp" value="' + g.id + '" ' + (checked ? 'checked' : '') + '>' +
+                        '<span style="width:9px;height:9px;border-radius:50%;background:' + (g.color || '#aaa') + ';flex-shrink:0;"></span>' +
+                        '<span style="flex:1;font-size:13px;color:var(--text-primary);font-weight:600;">' + _esc(g.name) + '</span>' +
+                        '<span style="font-size:11px;color:var(--text-secondary);">' + cnt + ' 条</span>' +
+                    '</label>';
+                }).join('') +
+            '</div>' +
+            '<div style="display:flex;gap:10px;">' +
+                '<button id="sbgp-cancel" style="flex:1;padding:11px;border:1.5px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:inherit;">取消</button>' +
+                '<button id="sbgp-save" style="flex:2;padding:11px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">确认</button>' +
+            '</div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        panel.querySelector('#sbgp-cancel').onclick = function () { overlay.remove(); };
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        panel.querySelector('#sbgp-save').onclick = function () {
+            var checked = panel.querySelector('input[name="sbgp"]:checked');
+            if (!checked) return;
+            item.groupId = checked.value || null;
+            _save();
+            overlay.remove();
+            _renderBankRows();
+            if (typeof showNotification === 'function') showNotification('✓ 分组已更新', 'success');
+        };
+    }
+
+    // 万一 reply-library.js 因为什么原因没加载到（理论上不会，它排在 survey.js 前面），
+    // 兜底一个一模一样效果的浮层，不至于直接报错
+    function _bankFallbackOverlay() {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;';
+        return overlay;
+    }
+
     window._surveyRenderBankTab = _renderBankTab;
 
     // ── 提醒合并：不管什么来源（问卷回复、以后 Step 3 的反向问卷新提问……），

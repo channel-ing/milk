@@ -26,11 +26,12 @@
     //   periods: [ { id, startDate, endDate|null } ],
     //   dailyRecords: { 'YYYY-MM-DD': { flow:0-5, symptoms:[] } },
     //   customSymptoms: [],
-    //   partnerMsg: { periodId, lines:[] } | null,
+    //   partnerMsg: { periodId, date:'YYYY-MM-DD', lines:[] } | null,
     //   notifyAt: timestamp | null,
-    //   notifyPeriodId: string | null
+    //   notifyPeriodId: string | null,
+    //   dailyNotifDate: 'YYYY-MM-DD' | null   // 已经安排/发出过留言的那一天，防止同一天重复
     // }
-    var _data   = { periods: [], dailyRecords: {}, customSymptoms: [], partnerMsg: null, notifyAt: null, notifyPeriodId: null };
+    var _data   = { periods: [], dailyRecords: {}, customSymptoms: [], partnerMsg: null, notifyAt: null, notifyPeriodId: null, dailyNotifDate: null };
     var _loaded = false;
     var _viewYear, _viewMonth;   // 0-based month
     var _currentFlow     = 0;
@@ -299,7 +300,7 @@
         // 自动接回去合并成一条，避免"经期第几天"从1重新算起
         _reconcilePeriods();
         _save();
-        if (sendNotif) _scheduleNotif();
+        if (sendNotif) _scheduleTodayNotifIfNeeded();
     }
 
     // 把间隔在合理范围内的经期记录自动接成一条——不管是新长按产生的碎片，
@@ -338,20 +339,46 @@
     }
 
     // ── 通知（梦角留言） ──────────────────────────────
-    function _scheduleNotif() {
+    // 经期进行中的每一天都会安排一条新留言（不是整个经期只有一条）：
+    // - 第一天（标记经期那天）：标记后 1~3 小时
+    // - 第二天起：当天 0 点之后的 0~3 小时内随机
+    // 用 dailyNotifDate 记录"今天是不是已经安排过了"，避免重复安排。
+    function _scheduleTodayNotifIfNeeded() {
         var active = _activePeriod();
         if (!active) return;
-        if (_data.notifyPeriodId === active.id) return;  // 已安排过/已经用掉这次机会（含手动取消的情况）
-        var minMin = 8 * 60, maxMin = 12 * 60;  // 8~12小时
-        _data.notifyAt       = Date.now() + (minMin + Math.floor(Math.random() * (maxMin - minMin + 1))) * 60000;
+        var today = _today();
+        if (_data.notifyPeriodId === active.id && _data.dailyNotifDate === today) return;  // 今天已经安排过
+
+        var fireAt;
+        if (today === active.startDate) {
+            // 第一天：标记经期后 1~3 小时
+            var minMin = 60, maxMin = 180;
+            fireAt = Date.now() + (minMin + Math.floor(Math.random() * (maxMin - minMin + 1))) * 60000;
+        } else {
+            // 第二天起：当天 0 点之后的 0~3 小时内随机挑一个时间点
+            var midnight = new Date();
+            midnight.setHours(0, 0, 0, 0);
+            var windowEnd = midnight.getTime() + 3 * 3600000;
+            var now = Date.now();
+            if (now < windowEnd) {
+                fireAt = now + Math.floor(Math.random() * Math.max(1, windowEnd - now));
+            } else {
+                // 已经过了0-3点这个窗口（比如今天很晚才打开app）——
+                // 尽快在10-30分钟内补发一条，不然今天就彻底错过、要等到明天了
+                fireAt = now + (10 + Math.floor(Math.random() * 21)) * 60000;
+            }
+        }
+
+        _data.notifyAt       = fireAt;
         _data.notifyPeriodId = active.id;
+        _data.dailyNotifDate = today;
         _save();
     }
 
     // 用户手动结束/撤销某条记录时调用——如果这条记录正好排着一次还没发出的留言，
-    // 取消掉这次定时（不让它到点还发）。注意 notifyPeriodId 本身不清掉：
+    // 取消掉这次定时（不让它到点还发）。注意 notifyPeriodId/dailyNotifDate 本身不清掉：
     // 这样万一用户之后又把这次经期重新打开（合并回同一条记录，id不变），
-    // 也不会因为"重新安排"而意外弹出一条新留言——同一次经期，机会只有一次。
+    // 也不会因为"重新安排"而意外弹出一条新留言——今天这个名额已经用掉了。
     function _cancelPendingNotifFor(periodId) {
         if (_data.notifyPeriodId === periodId && _data.notifyAt) {
             _data.notifyAt = null;
@@ -361,7 +388,7 @@
     function _checkNotif() {
         if (!_data.notifyAt || !_data.notifyPeriodId) return;
         if (Date.now() < _data.notifyAt) return;
-        if (_data.partnerMsg && _data.partnerMsg.periodId === _data.notifyPeriodId) return;
+        if (_data.partnerMsg && _data.partnerMsg.periodId === _data.notifyPeriodId && _data.partnerMsg.date === _data.dailyNotifDate) return;
 
         // 优先用"经期"专属话术库（氛围感配置里新加的分类）；
         // 用户没配置（数组为空）就退回主字卡库，跟原来的兜底逻辑一致。
@@ -375,7 +402,7 @@
         var shuffled = replies.slice().sort(function () { return Math.random() - 0.5; });
         var lines    = shuffled.slice(0, 1);
 
-        _data.partnerMsg = { periodId: _data.notifyPeriodId, lines: lines };
+        _data.partnerMsg = { periodId: _data.notifyPeriodId, date: _data.dailyNotifDate, lines: lines };
         _data.notifyAt   = null;
         _save();
 
@@ -730,7 +757,7 @@
         // 判断当前经期是否有留言——只认"正在进行中"的这一次，不再退回去找"最后一次经期"，
         // 不然经期都结束了，卡片还会一直显示上一次的旧留言内容，看起来像是没清干净
         var active   = _activePeriod();
-        var hasMsg   = active && _data.partnerMsg && _data.partnerMsg.periodId === active.id;
+        var hasMsg   = active && _data.partnerMsg && _data.partnerMsg.periodId === active.id && _data.partnerMsg.date === _today();
 
         if (hasMsg && _data.partnerMsg.lines && _data.partnerMsg.lines.length) {
             if (emptyEl) emptyEl.style.display = 'none';
@@ -830,6 +857,7 @@
         _updateToggleBtn();
         _updateStatusCard();
         _renderLetterCard();
+        _scheduleTodayNotifIfNeeded();
         _checkNotif();
 
         // 月份切换
@@ -849,7 +877,7 @@
 
     // 每分钟检查一次通知（梦角留言 + 预测经期前一天提醒）
     setInterval(function () {
-        if (_loaded) { _checkNotif(); _checkPredictReminder(); }
+        if (_loaded) { _scheduleTodayNotifIfNeeded(); _checkNotif(); _checkPredictReminder(); }
     }, 60000);
 
     // 脚本一加载（也就是打开网站）就先悄悄读一次数据，不用等用户点开经期记录弹窗，
@@ -858,6 +886,7 @@
     // 欢迎动画正常播放大概3秒左右结束，4秒留了一点余量。
     _load().then(function () {
         setTimeout(function () {
+            _scheduleTodayNotifIfNeeded();
             _checkNotif();
             _checkPredictReminder();
         }, 4000);

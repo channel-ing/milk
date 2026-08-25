@@ -378,15 +378,15 @@ const tourSteps = [
         position: 'bottom'
     },
     {
-        element: '#moments-header-btn',
-        title: "🏠 你们的空间",
-        content: "点击进入你们的专属空间，里面有：<br>• <b>动态</b>：一起分享日常和照片<br>• <b>心情手账</b>：一起记录每天的心情<br>• <b>纪念日</b>：一起倒数重要的日子<br>• <b>电影院</b>：约定时间一起看电影 🎬",
-        position: 'bottom'
-    },
-    {
         element: '#daily-greeting-btn',
         title: "📰 今日公告",
         content: "点击这里查看今日公告，每天会有一张专属的早安卡片，记录对方今日的心情和状态。",
+        position: 'bottom'
+    },
+    {
+        element: '#moments-header-btn',
+        title: "🏠 你们的空间",
+        content: "点击进入你们的专属空间，里面有：<br>• <b>动态</b>：一起分享日常和照片<br>• <b>心情手账</b>：一起记录每天的心情<br>• <b>纪念日</b>：一起倒数重要的日子<br>• <b>电影院</b>：约定时间一起看电影 🎬",
         position: 'bottom'
     },
     {

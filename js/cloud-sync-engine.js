@@ -54,6 +54,8 @@
         'customReplies', 'customPokes', 'customStatuses', 'customMottos',
         'customIntros', 'customEmojis', 'customPeriodCare',
         'customReplyGroups', 'customPokeGroups', 'customStatusGroups',
+        // 经期记录（日历标记、每日打卡、梦角留言状态）
+        'periodData',
         // 纪念日
         'anniversaries', 'annCoverBg_',
         // 相册（相册列表/照片归属/收藏/回收站，图片本身是 oss:// 引用，体积小）

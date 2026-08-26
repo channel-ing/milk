@@ -32,6 +32,15 @@
     font-family: inherit;
 }
 
+/* 外层：只负责吸顶，不设 overflow——sticky 跟 overflow-x:auto 混在同一个元素上，
+   移动端 Safari 滑动时下面的内容会露出来，所以拆成两层 */
+.my-sticker-group-row-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--secondary-bg);
+}
+/* 内层：只负责横向滑动，不设 sticky */
 .my-sticker-group-row {
     display: flex;
     align-items: center;
@@ -39,12 +48,6 @@
     padding: 4px 2px 10px;
     overflow-x: auto;
     scrollbar-width: none;
-    /* 之前这行完全没做定位，跟着下面的表情格子一起在滚动容器里滚，滚两下就看不见了。
-       固定在内容区顶部，表情网格在它下面滚，分组图标一直露在外面方便随时切换 */
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--secondary-bg);
 }
 .my-sticker-group-row::-webkit-scrollbar { display: none; }
 

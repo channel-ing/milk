@@ -39,6 +39,12 @@
     padding: 4px 2px 10px;
     overflow-x: auto;
     scrollbar-width: none;
+    /* 之前这行完全没做定位，跟着下面的表情格子一起在滚动容器里滚，滚两下就看不见了。
+       固定在内容区顶部，表情网格在它下面滚，分组图标一直露在外面方便随时切换 */
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--secondary-bg);
 }
 .my-sticker-group-row::-webkit-scrollbar { display: none; }
 

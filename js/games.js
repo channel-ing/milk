@@ -1548,6 +1548,11 @@ function initComboMenu() {
     }
 
     function renderMyStickerGroupRow() {
+        // sticky（吸顶）+ overflow-x:auto（横向滑动）这两个不能加在同一个元素上——
+        // 移动端 Safari 对这个组合支持得不好，滑动的时候下面的表情格子会从吸顶条的缝隙里"漏"出来。
+        // 拆成两层：外层只管吸顶（不设 overflow），内层只管横向滑动（不设 sticky）
+        var wrap = document.createElement('div');
+        wrap.className = 'my-sticker-group-row-sticky';
         var row = document.createElement('div');
         row.className = 'my-sticker-group-row';
         var list = _myStickerGroupsList();
@@ -1577,7 +1582,8 @@ function initComboMenu() {
                 renderMyStickerLibrary();
             };
         });
-        return row;
+        wrap.appendChild(row);
+        return wrap;
     }
 
     // 长按一个表情，弹出"设为分组封面 / 移动分组"的小浮窗

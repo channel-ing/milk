@@ -39,6 +39,8 @@
     padding: 8px 16px 0;
     background: var(--secondary-bg);
     flex-shrink: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 .my-sticker-group-row-slot:empty { padding: 0; }
 /* JS 里还留着这层包装，纯粹是历史原因（之前 sticky 方案用过），现在只是个透传容器 */

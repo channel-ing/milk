@@ -849,6 +849,11 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             </div>
 
             <div id="env-compose-form" style="display:none;">
+                <div id="env-compose-quote-ctx" style="display:none;margin:0 0 10px;background:rgba(var(--accent-color-rgb),0.06);border:1px solid rgba(var(--accent-color-rgb),0.18);border-radius:10px;padding:10px 14px;border-left:3px solid rgba(var(--accent-color-rgb),0.5);">
+                    <div style="font-size:11px;color:var(--accent-color);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><i class="fas fa-envelope-open-text" style="font-size:10px;"></i><span id="env-compose-quote-label">对方的来信</span></div>
+                    <div id="env-compose-quote-text" style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;font-style:italic;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden;position:relative;"></div>
+                    <div id="env-compose-quote-expand" style="font-size:11px;color:var(--accent-color);margin-top:5px;cursor:pointer;display:none;" onclick="(function(){var t=document.getElementById('env-compose-quote-text');t.style.maxHeight=t.style.maxHeight==='none'?'80px':'none';document.getElementById('env-compose-quote-expand').textContent=t.style.maxHeight==='none'?'收起':'展开查看全文';})()">展开查看全文</div>
+                </div>
                 <div class="env-compose-paper">
                     <div class="env-compose-heading">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>

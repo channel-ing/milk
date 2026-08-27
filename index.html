@@ -256,7 +256,10 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <i class="ti ti-home-heart" style="font-size:19px;"></i>
                     <span id="moments-header-badge" style="display:none;position:absolute;top:3px;right:3px;width:7px;height:7px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
                 </button>
-                <button id="settings-btn" class="action-btn" title="设置"><i class="fas fa-cog" style="font-size:16px;"></i></button>
+                <button id="settings-btn" class="action-btn" title="设置" style="position:relative;">
+                    <i class="fas fa-cog" style="font-size:16px;"></i>
+                    <span id="settings-entry-badge" style="display:none;position:absolute;top:3px;right:3px;width:7px;height:7px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
+                </button>
             </div>
              <div class="user-info">
                 <div class="username" id="my-name">
@@ -1181,6 +1184,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                 <div class="settings-card" id="advanced-settings">
                     <i class="fas fa-tools"></i>
                     <span>高级功能</span>
+                    <span id="advanced-entry-badge" style="display:none;position:absolute;top:10px;right:10px;width:8px;height:8px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
                 </div>
                 <div class="settings-card" id="data-settings">
                     <i class="fas fa-database"></i>
@@ -2367,6 +2371,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     </div>
                     <div class="settings-item" id="survey-function">
                         <i class="fas fa-clipboard-list"></i><span>问卷</span>
+                        <span id="survey-entry-badge" style="display:none;position:absolute;top:10px;right:10px;width:8px;height:8px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
                     </div>
                     <div class="settings-item" id="envelope-function" style="display:none;">
                         <i class="fas fa-envelope-open-text"></i><span>信箱</span>

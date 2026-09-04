@@ -689,7 +689,7 @@
         var tiers = Object.keys(byCount).map(Number).sort(function (a, b) { return a - b; });
         var picked = [];
         for (var ti = 0; ti < tiers.length && picked.length < k; ti++) {
-            var tierItems = byCount[tiers[ti]].slice().sort(function () { return Math.random() - 0.5; });
+            var tierItems = _shuffleArray(byCount[tiers[ti]]);
             var need = k - picked.length;
             picked = picked.concat(tierItems.slice(0, need));
         }

@@ -1609,6 +1609,14 @@ autoSendSlider.addEventListener('change', () => {
                 });
             }
 
+            const petEntry = document.getElementById('pet-function');
+            if (petEntry) {
+                petEntry.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    if (typeof window._petOpenModal === 'function') window._petOpenModal();
+                });
+            }
+
             const flEntry = document.getElementById('fortune-lenormand-function');
             if (flEntry) {
                 flEntry.addEventListener('click', () => {

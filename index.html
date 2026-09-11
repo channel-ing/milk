@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="css/cinema.css">
     <link rel="stylesheet" href="css/period.css">
     <link rel="stylesheet" href="css/music-local.css">
+    <link rel="stylesheet" href="css/pet.css">
     <link rel="stylesheet" href="css/my-sticker-groups.css">
     <link rel="stylesheet" href="css/global-msg-banner.css">
     <link rel="stylesheet" href="css/survey.css">
@@ -2378,6 +2379,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                         <i class="fas fa-clipboard-list"></i><span>问卷</span>
                         <span id="survey-entry-badge" style="display:none;position:absolute;top:10px;right:10px;width:8px;height:8px;background:var(--accent-color);border-radius:50%;border:1.5px solid var(--primary-bg);pointer-events:none;"></span>
                     </div>
+                    <div class="settings-item" id="pet-function">
+                        <i class="fas fa-paw"></i><span>养宠物</span>
+                    </div>
                     <div class="settings-item" id="envelope-function" style="display:none;">
                         <i class="fas fa-envelope-open-text"></i><span>信箱</span>
                     </div>
@@ -2490,6 +2494,22 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
                     <i class="fas fa-arrow-left"></i> 返回
                 </button>
                 <button class="modal-btn modal-btn-secondary" id="close-period" onclick="hideModal(document.getElementById('period-modal'))">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 宠物功能 ========== -->
+    <div class="modal" id="pet-modal">
+        <div class="modal-content" id="pet-modal-content" style="max-width:400px;max-height:85vh;">
+            <div class="modal-title">
+                <span><i class="fas fa-paw"></i> 宠物</span>
+            </div>
+            <div id="pet-modal-body"></div>
+            <div class="modal-buttons" style="position:sticky;bottom:0;background:var(--secondary-bg);border-top:1px solid var(--border-color);padding:12px 0 0;z-index:10;margin-top:8px;margin-left:-24px;margin-right:-24px;padding-left:max(24px, env(safe-area-inset-left, 24px));padding-right:max(24px, env(safe-area-inset-right, 24px));padding-bottom:max(14px, env(safe-area-inset-bottom, 0px));">
+                <button class="modal-btn modal-btn-secondary" id="pet-back-btn" onclick="(function(){hideModal(document.getElementById('pet-modal'));showModal(document.getElementById('advanced-modal'))})()">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
+                <button class="modal-btn modal-btn-secondary" id="pet-close-btn" onclick="window._petCloseModal()">关闭</button>
             </div>
         </div>
     </div>
@@ -3625,6 +3645,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <script src="js/features/cinema.js"></script>
     <script src="js/features/global-msg-banner.js"></script>
     <script src="js/features/survey.js"></script>
+    <script src="js/features/pet.js"></script>
 <!-- 相册图片详情（全屏） -->
 <div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">
     <div class="al-detail-topbar">

@@ -1,0 +1,185 @@
+/* pet.css — 虚拟宠物功能样式（Step 1：选品种/起名/信息卡） */
+
+.pet-step-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pet-back-btn {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 4px;
+}
+.pet-back-btn:active { opacity: 0.6; }
+
+/* 物种选择 */
+.pet-species-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+.pet-species-card {
+    background: var(--message-received-bg);
+    border-radius: var(--radius-sm);
+    padding: 20px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+}
+.pet-species-card:active { transform: scale(0.97); }
+.pet-species-card i {
+    font-size: 28px;
+    color: var(--accent-color);
+    display: block;
+    margin-bottom: 8px;
+}
+.pet-species-card span {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+.pet-species-card.pet-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.pet-species-card.pet-disabled i { color: var(--text-secondary); }
+.pet-species-card small {
+    display: block;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+/* 品种选择 */
+.pet-breed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.pet-breed-card {
+    background: var(--message-received-bg);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.pet-breed-card:active { transform: scale(0.95); }
+.pet-breed-card img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    display: block;
+}
+.pet-breed-card span {
+    font-size: 12px;
+    color: var(--text-primary);
+    display: block;
+    margin-top: 4px;
+}
+
+/* 起名 */
+.pet-name-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.pet-name-preview img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+}
+.pet-name-preview span {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+.pet-name-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-color);
+    background: var(--primary-bg);
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: var(--font-family);
+}
+.pet-name-input.pet-input-error {
+    border-color: #e0605a;
+}
+
+/* 信息卡 */
+.pet-info-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.pet-info-avatar {
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    animation: pet-breathe 2.4s ease-in-out infinite;
+}
+@keyframes pet-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.035); }
+}
+.pet-info-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 8px;
+}
+.pet-info-breed {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+.pet-info-stats {
+    width: 100%;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.pet-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pet-stat span {
+    font-size: 12px;
+    color: var(--text-secondary);
+    width: 32px;
+    flex-shrink: 0;
+    text-align: left;
+}
+.pet-stat-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--message-received-bg);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.pet-stat-fill {
+    height: 100%;
+    background: var(--accent-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.pet-info-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 14px;
+}

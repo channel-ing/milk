@@ -61,6 +61,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setInterval(checkStatusChange, 60000);
 
+        // 动态/回信 后台定时检查——不管停在哪个页面，每隔30秒自动看一眼有没有该送达的内容了，
+        // 不需要刷新页面或者重新进入情侣空间/信箱才能触发
+        setInterval(() => {
+            try { if (typeof checkEnvelopeStatus === 'function') checkEnvelopeStatus(); } catch(e) { console.warn('[后台轮询] 回信检查失败', e); }
+            try { if (typeof checkMomentsStatus === 'function') checkMomentsStatus(); } catch(e) { console.warn('[后台轮询] 动态检查失败', e); }
+        }, 30000);
+
         if (disclaimerModal) {
             const tourSeen = await safeAwait(localforage?.getItem(APP_PREFIX + 'tour_seen'), false);
             
@@ -182,23 +189,57 @@ const stickerInput = document.getElementById('sticker-file-input');
                     const files = Array.from(e.target.files);
                     if (!files.length) return;
 
-                    const oversized = files.filter(f => f.size > 2 * 1024 * 1024);
+                    // GIF 走单独的上限——原因跟"我的表情包"那边一样：optimizeImage 是拿 canvas
+                    // 重新画一遍再压缩，GIF 动画只能留下第一帧，会变成静态图
+                    const GIF_MAX_SIZE = 600 * 1024;
+                    const NORMAL_MAX_SIZE = 2 * 1024 * 1024;
+                    const isGifFile = f => f.type === 'image/gif' || /\.gif$/i.test(f.name);
+
+                    const oversized = files.filter(f => f.size > (isGifFile(f) ? GIF_MAX_SIZE : NORMAL_MAX_SIZE));
                     if (oversized.length > 0) {
-                        showNotification(oversized.length + ' 张图片超过 2MB 限制，已跳过', 'warning');
+                        const gifCount = oversized.filter(isGifFile).length;
+                        const otherCount = oversized.length - gifCount;
+                        const parts = [];
+                        if (gifCount > 0) parts.push(`${gifCount} 张GIF超过600KB`);
+                        if (otherCount > 0) parts.push(`${otherCount} 张图片超过2MB`);
+                        showNotification(parts.join('，') + '，已跳过', 'warning');
                     }
 
-                    const validFiles = files.filter(f => f.size <= 2 * 1024 * 1024);
+                    const validFiles = files.filter(f => f.size <= (isGifFile(f) ? GIF_MAX_SIZE : NORMAL_MAX_SIZE));
                     if (!validFiles.length) return;
 
                     showNotification('正在批量处理 ' + validFiles.length + ' 张图片...', 'info');
 
                     let successCount = 0;
                     let failCount = 0;
+                    const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
 
                     for (const file of validFiles) {
                         try {
-                            const base64 = await optimizeImage(file, 300, 0.8);
-                            stickerLibrary.push(base64);
+                            let base64;
+                            if (isGifFile(file)) {
+                                // GIF 原样读成 base64，不经过压缩，保留动画
+                                base64 = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = ev => resolve(ev.target.result);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(file);
+                                });
+                            } else {
+                                base64 = await optimizeImage(file, 300, 0.8);
+                            }
+                            let toStore = base64;
+                            // 阶段三B：连了云端就上传，本地只存 oss:// 引用
+                            if (cloudReady) {
+                                try {
+                                    const r = await window.CloudMedia.upload(base64, 'stickers');
+                                    toStore = r.url;
+                                } catch (upErr) {
+                                    console.warn('[cloud-media] 贴纸上传失败，降级本地', upErr);
+                                    // toStore 保持 base64
+                                }
+                            }
+                            stickerLibrary.push(toStore);
                             successCount++;
                         } catch (err) {
                             console.error(err);
@@ -223,17 +264,54 @@ if (myStickerQuickUpload) {
     myStickerQuickUpload.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (!files.length) return;
-        const oversized = files.filter(f => f.size > 2 * 1024 * 1024);
-        if (oversized.length > 0) showNotification(oversized.length + ' 张图片超过 2MB，已跳过', 'warning');
-        const validFiles = files.filter(f => f.size <= 2 * 1024 * 1024);
+
+        // GIF 走单独的上限——不能套用下面给普通图片压缩用的 optimizeImage，
+        // 那个压缩是拿 canvas 重新画一遍，GIF 动画只能留下第一帧，会变成静态图
+        const GIF_MAX_SIZE = 600 * 1024;
+        const NORMAL_MAX_SIZE = 2 * 1024 * 1024;
+        const isGifFile = f => f.type === 'image/gif' || /\.gif$/i.test(f.name);
+
+        const oversized = files.filter(f => f.size > (isGifFile(f) ? GIF_MAX_SIZE : NORMAL_MAX_SIZE));
+        if (oversized.length > 0) {
+            const gifCount = oversized.filter(isGifFile).length;
+            const otherCount = oversized.length - gifCount;
+            const parts = [];
+            if (gifCount > 0) parts.push(`${gifCount} 张GIF超过600KB`);
+            if (otherCount > 0) parts.push(`${otherCount} 张图片超过2MB`);
+            showNotification(parts.join('，') + '，已跳过', 'warning');
+        }
+        const validFiles = files.filter(f => f.size <= (isGifFile(f) ? GIF_MAX_SIZE : NORMAL_MAX_SIZE));
         if (!validFiles.length) return;
         showNotification('正在处理 ' + validFiles.length + ' 张...', 'info');
         let ok = 0, fail = 0;
         const newStickers = [];
+        const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
         for (const file of validFiles) {
             try {
-                const base64 = await optimizeImage(file, 300, 0.8);
-                newStickers.push(base64);
+                let base64;
+                if (isGifFile(file)) {
+                    // GIF 原样读成 base64，不经过压缩，保留动画
+                    base64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = ev => resolve(ev.target.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                } else {
+                    base64 = await optimizeImage(file, 300, 0.8);
+                }
+                let toStore = base64;
+                if (cloudReady) {
+                    try {
+                        const r = await window.CloudMedia.upload(base64, 'my-stickers');
+                        toStore = r.url;
+                    } catch (upErr) {
+                        console.warn('[cloud-media] 我的贴纸上传失败，降级本地', upErr);
+                    }
+                }
+                // 归到"当前正在看的分组"，不是无脑存进默认分组
+                var _targetGroupId = (typeof window._myStickerActiveGroup !== 'undefined') ? window._myStickerActiveGroup : null;
+                newStickers.push({ id: 'stk_' + Date.now() + '_' + ok, src: toStore, groupId: _targetGroupId, addedAt: Date.now(), groupJoinedAt: Date.now() });
                 ok++;
             } catch(err) { fail++; }
         }
@@ -440,6 +518,53 @@ if (myStickerQuickUpload) {
 })();
 
 window.addEventListener('load', function() {
+    // 阶段三B：恢复未完成的图片上传队列（页面刷新后继续传）
+    setTimeout(function () {
+        if (!window.CloudMedia || typeof window.CloudMedia.restorePendingQueue !== 'function') return;
+        window.CloudMedia.restorePendingQueue(function (taskId, record) {
+            var msgId = record && record.messageId;
+            if (msgId == null) return null;
+            return async function (result) {
+                try {
+                    if (typeof messages === 'undefined' || !Array.isArray(messages)) return;
+                    var target = messages.find(function (m) { return String(m.id) === String(msgId); });
+                    if (!target) return;
+                    target.image = result.url;
+                    delete target.uploadStatus;
+                    try { if (typeof throttledSaveData === 'function') throttledSaveData(); } catch (e) {}
+                    try {
+                        var wrapper = document.querySelector('.message-wrapper[data-id="' + msgId + '"]');
+                        if (wrapper) {
+                            var wrap = wrapper.querySelector('.message-image-pending-wrap');
+                            if (wrap) {
+                                var img = wrap.querySelector('img');
+                                var parent = wrap.parentNode;
+                                if (img && parent) {
+                                    var blobUrl = null;
+                                    try {
+                                        blobUrl = window.CloudMedia ? await window.CloudMedia.fetchUrl(result.url) : null;
+                                    } catch (fetchErr) {
+                                        console.warn('[cloud-media] restore 拉图失败', fetchErr);
+                                    }
+                                    img.removeAttribute('data-pending-ref');
+                                    img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                    if (blobUrl) {
+                                        img.src = blobUrl;
+                                    } else {
+                                        img.src = '';
+                                        img.setAttribute('data-lazy-cloud-ref', result.url);
+                                        if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                    }
+                                    parent.replaceChild(img, wrap);
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn('[cloud-media] restore 局部更新失败', e); }
+                } catch (e) { console.warn(e); }
+            };
+        });
+    }, 3000);
+
     setTimeout(function() {
         try {
             if (localStorage.getItem('dailyGreetingShown') === new Date().toDateString()) return;

@@ -276,7 +276,7 @@
 }
 .rp-card-open-circle {
     position: absolute;
-    top: 56%; left: 50%;
+    top: 60%; left: 50%;
     width: 35%; aspect-ratio: 1;
     transform: translateX(-50%);
     border-radius: 50%;

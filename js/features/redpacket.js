@@ -835,22 +835,21 @@
             grid.innerHTML = '<div class="rp-sticker-picker-empty">"我的表情库"里还没有表情，去聊天输入框那边先添加几个吧</div>';
             return;
         }
-        // 这里必须显式读 window.myStickerGroups，不能用裸变量名——
-        // state.js 用 let 声明了同名的 myStickerGroups（一个从来没被填过的空数组），
-        // core.js 实际更新的是 window.myStickerGroups 这个属性，两者是两个不同的东西，
-        // 裸变量名读到的永远是 state.js 那个空数组，会被"遮蔽"成一直读到空分组
-        var groups = (window.myStickerGroups && Array.isArray(window.myStickerGroups)) ? window.myStickerGroups : [];
-        var validIds = groups.map(function (g) { return g.id; });
-        if (_stickerPickerGroup !== null && validIds.indexOf(_stickerPickerGroup) === -1) {
-            _stickerPickerGroup = groups.length ? groups[0].id : null;
+        // 改用项目里现成的 _myStickerGroupsList()——这个函数本来就会在"有内容没归任何分组"时，
+        // 自动在最前面插一个 {id:null, name:'默认分组'} 进来。我自己之前手写的版本只遍历了
+        // window.myStickerGroups（真实分组），没处理这个默认分组，这才是"默认分组不见了"的真正原因
+        var groupList = (typeof _myStickerGroupsList === 'function') ? _myStickerGroupsList() : [];
+        var validIds = groupList.map(function (g) { return g.id; });
+        if (validIds.indexOf(_stickerPickerGroup) === -1) {
+            _stickerPickerGroup = groupList.length ? groupList[0].id : null;
         }
 
         // 分组chip行——直接复用"我的表情库"本来那套圆形头像式分组切换
         // (.my-sticker-group-row / .my-sticker-group-chip 是全局样式，跟主聊天表情选择器长得一模一样)
-        if (!groups.length) {
+        if (!groupList.length) {
             chipRow.innerHTML = '';
         } else {
-            chipRow.innerHTML = groups.map(function (g) {
+            chipRow.innerHTML = groupList.map(function (g) {
                 var isActive = g.id === _stickerPickerGroup;
                 var cover = (typeof _myStickerCoverFor === 'function') ? _myStickerCoverFor(g.id) : null;
                 var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
@@ -870,10 +869,9 @@
             });
         }
 
-        var items = pool.filter(function (s) {
-            if (typeof s === 'string') return _stickerPickerGroup === null;
-            return (s.groupId || null) === _stickerPickerGroup;
-        });
+        var items = (typeof _myStickerItemsInGroup === 'function')
+            ? _myStickerItemsInGroup(_stickerPickerGroup)
+            : pool.filter(function (s) { return typeof s !== 'string' && (s.groupId || null) === _stickerPickerGroup; });
         if (!items.length) {
             grid.innerHTML = '<div class="rp-sticker-picker-empty">这个分组还没有表情</div>';
         } else {

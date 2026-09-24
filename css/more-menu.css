@@ -27,9 +27,13 @@
 }
 
 /* ── 下方展开面板（微信风格，撑开布局，不是浮层） ── */
-/* 不要任何展开/收起动效，切换要立刻到位，所以这里没有 transition */
+/* 不要任何展开/收起动效，切换要立刻到位，所以这里没有 transition。
+   背景色用 --secondary-bg，跟表情面板（#user-sticker-picker）是同一个变量，
+   会跟着主题色走，不会透出后面的聊天内容 */
 .more-menu-panel {
     display: none;
+    background: var(--secondary-bg);
+    border-top: 1px solid var(--border-color);
 }
 .more-menu-panel.active {
     display: block;

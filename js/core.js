@@ -1319,9 +1319,12 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         messageHTML += `<div class="reply-indicator" data-reply-id="${msg.replyTo.id || ''}" style="cursor:pointer;" onclick="scrollToQuotedMessage(this)"><span class="reply-indicator-sender">${repliedSender}</span><span class="reply-indicator-text">${repliedText}</span></div>`;
     }
 
+    const isRedPacket = msg.type === 'redpacket';
     const isImageOnly = !msg.text && !!msg.image;
     let content = msg.text ? `<div>${msg.text.replace(/\n/g, '<br>')}</div>` : '';
-    if (msg.image) {
+    if (isRedPacket) {
+        content = (window.RedPacket && typeof window.RedPacket.renderBubbleHTML === 'function') ? window.RedPacket.renderBubbleHTML(msg) : '';
+    } else if (msg.image) {
         // 阶段三B：识别 oss:// 走懒加载；识别 pending:// 走本地 base64 + 上传中角标
         const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
         const isPendingImg = typeof msg.image === 'string' && msg.image.indexOf('pending://') === 0;
@@ -1341,7 +1344,9 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     messageHTML += content;
 
     const messageDiv = document.createElement('div');
-    if (isImageOnly) {
+    if (isRedPacket) {
+        messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-redpacket-bubble-wrap`;
+    } else if (isImageOnly) {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-image-bubble-none`;
     } else {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} ${settings.bubbleStyle}`;

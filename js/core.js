@@ -1249,20 +1249,8 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         }
     }
 
-    // 红包气泡的"有效发送方"：未领取时正常显示（谁发的算谁的气泡朝向）；
-    // 一旦被领取，气泡朝向/头像要翻到领取方那一侧（"谁领的就该由谁发出这张卡片"），
-    // 但 msg.sender 本身不变——已读判定、云同步这些底层逻辑仍然按真实发送方走，
-    // 这里只影响气泡怎么渲染，不影响数据。
-    let _effectiveSender = msg.sender;
-    if (msg.type === 'redpacket' && window.RedPacket && typeof window.RedPacket.getById === 'function') {
-        const _rpRecord = window.RedPacket.getById(msg.redpacketId);
-        if (_rpRecord && _rpRecord.status === 'received') {
-            _effectiveSender = (msg.sender === 'user') ? 'partner' : 'user';
-        }
-    }
-
     const wrapper = document.createElement('div');
-    wrapper.className = `message-wrapper ${_effectiveSender === 'user' ? 'sent' : 'received'}`;
+    wrapper.className = `message-wrapper ${msg.sender === 'user' ? 'sent' : 'received'}`;
     wrapper.dataset.id = msg.id;
     wrapper.dataset.msgId = msg.id;
 
@@ -1291,7 +1279,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
                 avatarDiv.innerHTML = `<div style="width:100%;height:100%;background:var(--accent-color);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;">${initials}</div>`;
             }
         } else {
-            const isUser = _effectiveSender === 'user';
+            const isUser = msg.sender === 'user';
             const avatarElement = isUser ? DOMElements.me.avatar : DOMElements.partner.avatar;
             const frameSettings = isUser ? settings.myAvatarFrame : settings.partnerAvatarFrame;
             const avatarShape = isUser ? (settings.myAvatarShape || 'circle') : (settings.partnerAvatarShape || 'circle');
@@ -1314,7 +1302,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         nameLabel.textContent = groupMember.name;
         const isSameSenderGroupForName = lastSenderRef.current === 'group_' + groupMember.name;
         if (!isSameSenderGroupForName) contentWrapper.appendChild(nameLabel);
-    } else if (!groupMember && _effectiveSender !== 'user' && _effectiveSender !== null && (settings.showPartnerNameInChat || showPartnerNameInChat)) {
+    } else if (!groupMember && msg.sender !== 'user' && msg.sender !== null && (settings.showPartnerNameInChat || showPartnerNameInChat)) {
         const isSameSenderForName = lastSenderRef.current === msg.sender;
         if (!isSameSenderForName) {
             const nameLabel = document.createElement('div');
@@ -1357,7 +1345,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
 
     const messageDiv = document.createElement('div');
     if (isRedPacket) {
-        messageDiv.className = `message message-${_effectiveSender === 'user' ? 'sent' : 'received'} message-redpacket-bubble-wrap`;
+        messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-redpacket-bubble-wrap`;
     } else if (isImageOnly) {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-image-bubble-none`;
     } else {
@@ -1403,7 +1391,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         metaHTML += `<div class="timestamp">${timeStr}</div>`;
     }
 
-    if (_effectiveSender === 'user' && settings.readReceiptsEnabled && isLastInSenderGroup) {
+    if (msg.sender === 'user' && settings.readReceiptsEnabled && isLastInSenderGroup) {
         const rrStyle = settings.readReceiptStyle || 'icon';
         if (rrStyle === 'text') {
             if (msg.status === 'read') {

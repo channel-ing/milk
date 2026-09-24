@@ -818,7 +818,11 @@
                     return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '">' + imgTag + '</button>';
                 }
                 // 照搬"我的表情库"本来的分组结构渲染，不打散混在一起
-                var groups = (typeof myStickerGroups !== 'undefined' && Array.isArray(myStickerGroups)) ? myStickerGroups : [];
+                // 这里必须显式读 window.myStickerGroups，不能用裸变量名——
+                // state.js 用 let 声明了同名的 myStickerGroups（一个从来没被填过的空数组），
+                // core.js 实际更新的是 window.myStickerGroups 这个属性，两者是两个不同的东西，
+                // 裸变量名读到的永远是 state.js 那个空数组，会被"遮蔽"成一直读到空分组
+                var groups = (window.myStickerGroups && Array.isArray(window.myStickerGroups)) ? window.myStickerGroups : [];
                 var html = '';
                 var usedIds = {};
                 groups.forEach(function (g) {
@@ -869,7 +873,7 @@
     // 顶部统计（总金额+共发出+对方已领取数，已退回不计入统计），
     // 下方按日期分组的明细列表，结构参照电影院观影记录"顶部汇总+按天列表"那套。
     // ================================================================
-    var _historyTab = 'outbox';
+    var _historyTab = 'inbox';
 
     // 拆红包卡片弹窗是从历史记录点进来的，关掉之后要回到历史列表，不是直接消失——
     // 用这个标志记一下，closeViewModal 关的时候会检查它

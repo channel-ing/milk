@@ -29,6 +29,8 @@
     <link rel="stylesheet" href="css/my-sticker-groups.css">
     <link rel="stylesheet" href="css/global-msg-banner.css">
     <link rel="stylesheet" href="css/survey.css">
+    <link rel="stylesheet" href="css/more-menu.css">
+    <link rel="stylesheet" href="css/redpacket.css">
 
     <style id="css-live-preview-style"></style>
     <style>
@@ -409,6 +411,9 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <button class="combo-btn input-btn collapse-hideable" id="combo-btn" title="表情 & 拍一拍">
         <i class="fas fa-laugh-beam"></i>
     </button>
+    <button class="more-menu-btn input-btn collapse-hideable" id="more-menu-btn" title="更多">
+        <i class="fas fa-plus"></i>
+    </button>
 
     <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
     
@@ -435,6 +440,7 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             </div>
         </div>
     </div>
+    <div class="more-menu-popover" id="more-menu-panel"></div>
     <input type="file" id="image-input" class="file-input" accept="image/*">
     <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
 </div>
@@ -814,6 +820,27 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     </div>
 </div>
 
+<div class="modal" id="redpacket-compose-modal">
+    <div class="modal-content rp-compose-content">
+        <div class="rp-compose-header">
+            <div class="rp-compose-title"><i class="fas fa-gift"></i> 发红包</div>
+        </div>
+        <div class="rp-compose-body">
+            <label class="rp-field-label">金额</label>
+            <input type="text" inputmode="decimal" id="rp-compose-amount" class="rp-amount-input" placeholder="0.00" maxlength="12">
+            <div class="rp-amount-hint">100元以内可以带小数（最多两位），超过100元只能是整数，封顶 9,999,999.99</div>
+            <label class="rp-field-label">祝福语</label>
+            <input type="text" id="rp-compose-blessing" class="rp-blessing-input" placeholder="开心一下" maxlength="40">
+        </div>
+        <div class="rp-compose-actions">
+            <button class="rp-btn rp-btn-secondary" onclick="hideModal(document.getElementById('redpacket-compose-modal'))">取消</button>
+            <button class="rp-btn rp-btn-primary" id="rp-compose-send-btn" onclick="window.RedPacket.submitCompose()">塞钱进红包</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="redpacket-view-modal">
+    <div class="modal-content rp-view-content" id="rp-view-content-inner"></div>
+</div>
 <div class="modal" id="envelope-modal">
     <div class="modal-content" style="max-height:92vh; padding:0; overflow:hidden; background:transparent;">
     <div class="env-wrapper">
@@ -3625,6 +3652,8 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <script src="js/features/cinema.js"></script>
     <script src="js/features/global-msg-banner.js"></script>
     <script src="js/features/survey.js"></script>
+    <script src="js/features/more-menu.js"></script>
+    <script src="js/features/redpacket.js"></script>
 <!-- 相册图片详情（全屏） -->
 <div id="al-view-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#000;flex-direction:column;">
     <div class="al-detail-topbar">

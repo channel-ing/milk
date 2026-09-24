@@ -313,6 +313,13 @@
     color: #3a2a10;
     letter-spacing: 2px;
 }
+
+/* 留言库的"编辑"/"批量添加"小弹窗：默认 .modal-buttons 没有底部间距，
+   按钮会直接贴着卡片下边缘，这里单独补上 */
+#rp-bank-prompt-modal .modal-buttons,
+#rp-bank-batchadd-modal .modal-buttons {
+    margin-bottom: 20px;
+}
 .rp-card-waiting {
     position: absolute;
     top: 93%; left: 0; right: 0;

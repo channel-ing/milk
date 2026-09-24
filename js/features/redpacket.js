@@ -87,6 +87,12 @@
         return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // 气泡里"已领取 X元"用这个：整数就不带小数点（52000 不显示成 52000.00），
+    // 有小数就照原样保留（13.14 还是 13.14）——跟卡片弹窗里那个永远两位小数的大字金额是两套格式，不能共用
+    function _formatAmountShort(n) {
+        return Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+    }
+
     function _esc(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -239,7 +245,7 @@
         var statusClass = status === 'received' ? 'rp-bubble-received' : (status === 'returned' ? 'rp-bubble-returned' : 'rp-bubble-pending');
         var extraLine = '';
         if (status === 'received' && record) {
-            extraLine = '<div class="rp-bubble-extra">已领取 ' + _formatAmountDisplay(record.amount) + '元</div>';
+            extraLine = '<div class="rp-bubble-extra">已领取 ' + _formatAmountShort(record.amount) + '元</div>';
         } else if (status === 'returned') {
             extraLine = '<div class="rp-bubble-extra">已过期</div>';
         }
@@ -254,6 +260,7 @@
                 '</div>' +
                 '<div class="rp-bubble-divider"></div>' +
                 '<div class="rp-bubble-bottom">' + _esc(senderName) + '发出的红包</div>' +
+                '<div class="rp-bubble-overlay"></div>' +
             '</div>'
         );
     }

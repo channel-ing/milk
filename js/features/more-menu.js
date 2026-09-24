@@ -165,8 +165,17 @@
         const input = getInput();
         if (input) {
             input.addEventListener('input', syncTrailingButton);
+            // 发消息（回车 或 点发送按钮）都是程序化清空输入框的值，不会触发原生input事件——
+            // 之前只监听了input，导致发完消息按钮状态卡在"发送中"那一刻，永远切不回加号。
+            // keyup 覆盖回车发送，下面对发送按钮的click监听覆盖点击发送，两条路径发完都强制重新同步一次
+            input.addEventListener('keyup', function () { setTimeout(syncTrailingButton, 0); });
             // 聚焦输入框时（唤起软键盘）收起"更多"面板，避免面板和键盘抢屏幕
             input.addEventListener('focus', closeMoreMenu);
+        }
+
+        const sendBtnEl = getSendBtn();
+        if (sendBtnEl) {
+            sendBtnEl.addEventListener('click', function () { setTimeout(syncTrailingButton, 0); });
         }
 
         // 点击面板/输入区以外的地方自动收起

@@ -121,6 +121,27 @@
         '<path d="M12553.5 5486.5C11528.1 5486.5 11007 5237 11007 5237V8544H14072V5237C14072 5237 13578.9 5486.5 12553.5 5486.5Z" fill="white"/>' +
         '</svg>';
 
+    // 关闭按钮：之前完全漏掉了——之前只扫了 <rect>/<path fill>，没扫 <circle>，
+    // 这次补上，圆圈+X都是描边（无填充），色值#FFC97C，三张卡各有一份坐标不同的原样拷贝
+    var _CLOSE_BTN_SEALED =
+        '<svg class="rp-card-close-svg" viewBox="2930 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<circle cx="3099.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
+        '<path d="M3026 9030L3172.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '<path d="M3172.5 9030L3026 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '</svg>';
+    var _CLOSE_BTN_OPENED =
+        '<svg class="rp-card-close-svg" viewBox="7850 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<circle cx="8019.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
+        '<path d="M7946 9030L8092.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '<path d="M8092.5 9030L7946 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '</svg>';
+    var _CLOSE_BTN_RETURNED =
+        '<svg class="rp-card-close-svg" viewBox="12370 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<circle cx="12539.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
+        '<path d="M12466 9030L12612.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '<path d="M12612.5 9030L12466 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
+        '</svg>';
+
     // ── 领取/退回判定（文档 3.1：用户 → 梦角） ──────────────────────
     function _rollOutcome(record) {
         var willReceive = Math.random() < 0.9;
@@ -154,6 +175,27 @@
 
     function getById(id) {
         return _data.outbox.find(function (r) { return r.id === id; }) || null;
+    }
+
+    // ── 已读状态：跟普通消息走同一套逻辑（发送后1.5~4秒随机变已读），
+    // 照抄 core.js 里 _triggerDelayedReply 的已读那一小段，但不触发模拟文字回复——
+    // 红包该不该被接收，是自己另一套90%/10%概率判定的，不需要再叠加一次普通消息的回复逻辑 ──────────────────────
+    function _scheduleReadReceipt() {
+        if (typeof messages === 'undefined') return;
+        var readDelay = 1500 + Math.random() * 2500;
+        setTimeout(function () {
+            var changed = false;
+            messages.forEach(function (msg) {
+                if (msg.sender === 'user' && msg.status !== 'read') {
+                    msg.status = 'read';
+                    changed = true;
+                }
+            });
+            if (changed) {
+                if (typeof _updateReadReceiptsDOM === 'function') _updateReadReceiptsDOM();
+                if (typeof throttledSaveData === 'function') throttledSaveData();
+            }
+        }, readDelay);
     }
 
     // ── 发送（用户 → 梦角） ──────────────────────
@@ -190,6 +232,7 @@
                 favorited: false,
                 note: null
             });
+            _scheduleReadReceipt();
         }
         return true;
     }
@@ -250,38 +293,46 @@
         var wrap = document.getElementById('rp-view-content-inner');
         if (!wrap) return;
         var avatarHtml = _getAvatarHtml(sender);
-        var senderLabel = sender === 'user' ? '你发出的红包' : (settings.partnerName || '梦角') + '发出的红包';
-        var closeBtn = '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))"><i class="fas fa-times"></i></button>';
+        var senderName = sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '梦角');
+        var senderLabel = senderName + '发出的红包';
 
         var html = '';
         if (record.status === 'pending') {
-            // 未拆开红卡：头像+称谓一行，祝福语大字，底部圆形"開"（照SVG稿1:1还原弧线，不是CSS画的）
             html =
-                '<div class="rp-card rp-card-sealed">' + closeBtn + _CARD_BG_SEALED +
-                    '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
-                    '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
+                '<div class="rp-card rp-card-sealed">' + _CARD_BG_SEALED + +
+                    '<div class="rp-card-header-row">' +
+                        '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
+                        '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
+                    '</div>' +
                     '<div class="rp-card-blessing">' + _esc(record.blessing) + '</div>' +
                     '<div class="rp-card-open-circle"><span>開</span></div>' +
-                    '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '查收…</div>' +
+                    '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '领取</div>' +
+                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_SEALED + '</button>' +
                 '</div>';
         } else if (record.status === 'received') {
             var timeStr = new Date(record.receiveTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             html =
-                '<div class="rp-card rp-card-opened">' + closeBtn + _CARD_BG_OPENED +
-                    '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
-                    '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
+                '<div class="rp-card rp-card-opened">' + _CARD_BG_OPENED + +
+                    '<div class="rp-card-header-row">' +
+                        '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
+                        '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
+                    '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
                     '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
                     '<div class="rp-card-link">' + _esc(settings.partnerName || '梦角') + ' 于 ' + timeStr + ' 领取</div>' +
+                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_OPENED + '</button>' +
                 '</div>';
         } else {
             html =
-                '<div class="rp-card rp-card-returned">' + closeBtn + _CARD_BG_RETURNED +
-                    '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
-                    '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
+                '<div class="rp-card rp-card-returned">' + _CARD_BG_RETURNED + +
+                    '<div class="rp-card-header-row">' +
+                        '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
+                        '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
+                    '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
                     '<div class="rp-card-amount rp-card-amount-muted">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
                     '<div class="rp-card-link">超过24小时未领取，已自动退回</div>' +
+                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_RETURNED + '</button>' +
                 '</div>';
         }
         wrap.innerHTML = html;

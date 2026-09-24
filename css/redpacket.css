@@ -48,12 +48,8 @@
 }
 /* 圆角固定死，不跟settings.bubbleStyle走：只有靠近头像那一角保留8px，
    其余三个角缩小到3px——头像在气泡右侧(sent)时保右下角，在左侧(received)时保左下角 */
-.message-sent .redpacket-bubble {
-    border-radius: 3px 3px 8px 3px;
-}
-.message-received .redpacket-bubble {
-    border-radius: 3px 3px 3px 8px;
-}
+.message-sent .redpacket-bubble { border-radius: 12px 12px 4px 12px; }
+.message-received .redpacket-bubble { border-radius: 12px 12px 12px 4px; }
 .redpacket-bubble:active { transform: scale(0.97); }
 
 /* 已领取/已过期：不是换个实色完事，是在整张气泡（图标+文字都算在内）上面盖一层
@@ -173,6 +169,76 @@
 }
 .rp-compose-blessing-input {
     text-align: left;
+}
+.rp-compose-row-blessing-wrap {
+    display: flex;
+    align-items: center;
+}
+.rp-compose-row-blessing-wrap .rp-compose-row-input {
+    flex: 1;
+    min-width: 0;
+}
+.rp-compose-sticker-slot {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    margin-right: 8px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(var(--accent-color-rgb), 0.1);
+    color: var(--accent-color);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0;
+}
+.rp-compose-sticker-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── 表情选择器弹窗（复用"我的表情库"内容） ── */
+.rp-sticker-picker-content {
+    padding: 22px 0 0 !important;
+    width: 88% !important;
+    max-width: 380px !important;
+    max-height: 72vh !important;
+}
+.rp-sticker-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 6px 22px 22px;
+    overflow-y: auto;
+}
+.rp-sticker-picker-item {
+    aspect-ratio: 1;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--primary-bg);
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+}
+.rp-sticker-picker-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.rp-sticker-picker-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    padding: 30px 10px;
+    line-height: 1.6;
 }
 
 .rp-compose-preview {
@@ -604,3 +670,35 @@
         transform: translateX(-50%) rotateY(1080deg) scale(1);
     }
 }
+
+/* ============================================================
+   带表情包的卡片变体——不是同一套布局塞个图进去，是Yuying另外给的
+   专门稿子，头部弧线位置、頭像/祝福语/開按钮/金额的位置都跟着挪了。
+   坐标原样抠自那两份新SVG（未拆红包.svg / 带表情包.svg）。
+   ============================================================ */
+.rp-card-sticker-img {
+    position: absolute;
+    left: 39.3%;
+    width: 21.3%;
+    height: 12.7%;
+    object-fit: contain;
+    z-index: 2;
+}
+
+/* 未拆开红卡+表情包：头部弧线往下收了(73.3%~79.4%，原来68.5%~75.7%)，
+   頭像/祝福语跟着往上提，開按钮往下挪到67.1%，表情包卡在祝福语和開按钮中间 */
+.rp-card-sealed.rp-card-has-sticker .rp-card-header-row { top: 19.1%; }
+.rp-card-sealed.rp-card-has-sticker .rp-card-blessing { top: 28%; }
+.rp-card-sealed.rp-card-has-sticker .rp-card-sticker-img { top: 39.6%; }
+.rp-card-sealed.rp-card-has-sticker .rp-card-open-circle { top: 67.1%; }
+
+/* 拆开白卡/已退回灰卡+表情包：头部弧线往上收了(16.5%~22.8%，原来31.4%~36.6%)，
+   頭像/祝福语跟着往上提，表情包卡在祝福语和金额中间，金额挪到64% */
+.rp-card-opened.rp-card-has-sticker .rp-card-header-row,
+.rp-card-returned.rp-card-has-sticker .rp-card-header-row { top: 28.3%; }
+.rp-card-opened.rp-card-has-sticker .rp-card-blessing-grey,
+.rp-card-returned.rp-card-has-sticker .rp-card-blessing-grey { top: 37%; }
+.rp-card-opened.rp-card-has-sticker .rp-card-sticker-img,
+.rp-card-returned.rp-card-has-sticker .rp-card-sticker-img { top: 45%; }
+.rp-card-opened.rp-card-has-sticker .rp-card-amount,
+.rp-card-returned.rp-card-has-sticker .rp-card-amount { top: 64%; }

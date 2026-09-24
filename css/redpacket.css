@@ -219,15 +219,20 @@
     max-width: 380px !important;
     height: 36vh !important; /* 缩短一半（原来72vh） */
 }
+/* 滚动区不再用 flex:1 让浏览器去"猜"该有多高——跟朋友圈评论表情面板
+   （moments.js _mToggleSticker）踩过的是同一个"flex 高度协商"坑：grid 在这种写法下
+   会被塞进 flex 算出来的高度里重算行高，格子跟着被压扁成长条。改成跟那边一样的方案：
+   grid 保持普通块级元素、只由自身宽度决定格子的正方形；外面套一层滚动容器，
+   高度由 JS 在渲染后量出来、钉一个固定像素值（见 redpacket.js _syncStickerPickerScrollHeight） */
+.rp-sticker-picker-scrollwrap {
+    overflow-y: auto;
+    padding: 6px 22px 22px;
+}
 .rp-sticker-picker-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     align-content: flex-start;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 6px 22px 22px;
 }
 .rp-sticker-picker-item {
     position: relative;

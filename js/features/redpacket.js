@@ -959,9 +959,24 @@
 
     // 所有"×"关闭按钮都走这个，不再直接调 hideModal——如果这张卡片是从历史记录点进来的，
     // 关掉之后要自动重新弹出历史列表，不是就此什么都不剩
-    function closeViewModal() {
+    //
+    // 这里不用全项目通用的 hideModal：那个函数关闭时会让卡片先淡出/缩小(300ms)，
+    // 这段时间背后 .modal 那层毛玻璃背景(backdrop-filter blur)还是实心的，直到最后
+    // 才突然消失，看起来就像多了一层"毛玻璃的框"卡在那，不是想要的效果。
+    // hideModal 是很多其它弹窗共用的（改了会牵连一大片），所以红包详情卡这里单独
+    // 写一个"秒关"版本：不淡出，直接把 modal 藏起来，同时把 content 的内联样式复位，
+    // 下次 showModal 再打开的时候动效还是正常的
+    function _closeViewModalInstant() {
         var viewModal = document.getElementById('redpacket-view-modal');
-        if (viewModal && typeof hideModal === 'function') hideModal(viewModal);
+        if (!viewModal) return;
+        if (viewModal._hideTimeout) { clearTimeout(viewModal._hideTimeout); viewModal._hideTimeout = null; }
+        viewModal.style.display = 'none';
+        var content = viewModal.querySelector('.modal-content');
+        if (content) { content.style.opacity = ''; content.style.transform = ''; }
+    }
+
+    function closeViewModal() {
+        _closeViewModalInstant();
         if (_viewModalFromHistory) {
             _viewModalFromHistory = false;
             openHistoryModal(_historyTab);

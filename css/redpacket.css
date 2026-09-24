@@ -30,7 +30,7 @@
 
 .rp-bubble-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
 }
 .rp-icon-svg {
@@ -207,10 +207,9 @@
     position: relative;
     width: 100%;
     aspect-ratio: 3065 / 4820;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 18px 40px rgba(0,0,0,0.3);
     color: #fff;
+    /* 注意：这里不能 overflow:hidden——关闭按钮按设计稿坐标是画在卡片底边以外的，
+       裁切会把它切掉。圆角改由 .rp-card-bg 自己承担 */
 }
 .rp-card-bg {
     position: absolute;
@@ -218,49 +217,60 @@
     width: 100%;
     height: 100%;
     display: block;
+    border-radius: 3px; /* 未拆开红卡原稿是直角(rx=0)，给个极小值避免弹窗里显得太生硬 */
+    box-shadow: 0 18px 40px rgba(0,0,0,0.3);
+}
+.rp-card-opened .rp-card-bg,
+.rp-card-returned .rp-card-bg {
+    border-radius: 6px; /* 60/3065 按设计稿比例换算出来的，之前10px明显偏大 */
 }
 
 .rp-card-close {
     position: absolute;
-    top: -42px;
-    left: 50%;
+    top: 108.1%; left: 50%;
     transform: translateX(-50%);
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
+    width: 11%; aspect-ratio: 1;
     border: none;
-    background: rgba(255,255,255,0.16);
-    color: #fff;
-    font-size: 14px;
+    background: none;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 0;
     z-index: 5;
 }
+.rp-card-close-svg { width: 100%; height: 100%; display: block; }
 
-/* 未拆开红卡：坐标按 avatar(22.3%,23.4%,9.1%宽) / blessing(36%起) / 開按钮(50%居中,56%起,35%宽) 换算 */
-.rp-card-sealed .rp-card-avatar {
+/* 头像+称谓一行：用flex保证两者垂直居中对齐，不再各自用百分比定位（那样跟卡片宽高比不一致会对不齐） */
+.rp-card-header-row {
     position: absolute;
-    top: 23.4%; left: 22.3%;
-    width: 9.1%; aspect-ratio: 1;
+    left: 8%; right: 8%;
+    display: flex; align-items: center; gap: 10px;
+    z-index: 2;
+}
+.rp-card-sealed .rp-card-header-row { top: 21%; }
+.rp-card-opened .rp-card-header-row,
+.rp-card-returned .rp-card-header-row { top: 42%; }
+
+.rp-card-avatar {
+    width: 32px; height: 32px;
+    flex-shrink: 0;
     border-radius: 22%;
     overflow: hidden;
     background: #eee;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; color: #aaa;
-    z-index: 2;
 }
-.rp-card-sealed .rp-card-sender {
-    position: absolute;
-    top: 23.4%; left: 34%; right: 8%; height: 9.1%;
-    display: flex; align-items: center;
+.rp-card-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.rp-card-sender {
     font-size: 14px; font-weight: 700; color: #F6E3B4;
-    z-index: 2;
 }
-.rp-card-sealed .rp-card-blessing {
+.rp-card-sender-dark {
+    font-size: 14px; font-weight: 700; color: #333;
+}
+
+.rp-card-blessing {
     position: absolute;
-    top: 36%; left: 17%; right: 8%;
+    top: 36%; left: 8%; right: 8%;
+    text-align: center;
     font-size: 17px; font-weight: 700; line-height: 1.4; color: #F6E3B4;
     z-index: 2;
 }
@@ -288,32 +298,12 @@
     z-index: 2;
 }
 
-/* 拆开白卡 / 已退回灰卡：坐标按 avatar(26.8%,44.5%,9.1%宽) / blessing(53%起) / amount(61%起) / link(90%) 换算，
-   两者共用同一套布局，只有背景SVG的底色（F15744 / 8F8F8F）不同 */
-.rp-card-opened .rp-card-avatar,
-.rp-card-returned .rp-card-avatar {
-    position: absolute;
-    top: 44.5%; left: 26.8%;
-    width: 9.1%; aspect-ratio: 1;
-    border-radius: 22%;
-    overflow: hidden;
-    background: #eee;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; color: #aaa;
-    z-index: 2;
-}
-.rp-card-opened .rp-card-sender-dark,
-.rp-card-returned .rp-card-sender-dark {
-    position: absolute;
-    top: 44.5%; left: 39%; right: 8%; height: 9.1%;
-    display: flex; align-items: center;
-    font-size: 14px; font-weight: 700; color: #333;
-    z-index: 2;
-}
+/* 拆开白卡 / 已退回灰卡：blessing(53%起) / amount(61%起) / link(90%)，两者共用同一套布局 */
 .rp-card-opened .rp-card-blessing-grey,
 .rp-card-returned .rp-card-blessing-grey {
     position: absolute;
-    top: 53%; left: 39%; right: 8%;
+    top: 53%; left: 8%; right: 8%;
+    text-align: center;
     font-size: 12px; color: #999; line-height: 1.4;
     z-index: 2;
 }

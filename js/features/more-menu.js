@@ -141,12 +141,17 @@
     }
 
     // "+" 和 "发送" 二选一：输入框有内容时显示发送，没内容时显示"+"（跟微信一样）
+    // "+" 和 "发送" 共用同一个位置：用 setProperty 加 important 优先级来设置显示状态，
+    // 不能只是普通的 style.display='xxx'——因为 styles.css 里有条老规则
+    // #send-btn{display:none!important}（应该是更早某个方案遗留下来的），
+    // 普通内联样式斗不过样式表里的!important，只有内联样式自己也标 important 才压得过去。
+    // 不去动 styles.css 那条规则（受保护文件），从这边把它压制掉就行
     function syncTrailingButton() {
         const input = getInput(), plusBtn = getPlusBtn(), sendBtn = getSendBtn();
         if (!input || !plusBtn || !sendBtn) return;
         const hasText = input.value.trim().length > 0;
-        plusBtn.style.display = hasText ? 'none' : 'flex';
-        sendBtn.style.display = hasText ? 'flex' : 'none';
+        plusBtn.style.setProperty('display', hasText ? 'none' : 'flex', 'important');
+        sendBtn.style.setProperty('display', hasText ? 'flex' : 'none', 'important');
         if (hasText) closeMoreMenu();
     }
 

@@ -1,7 +1,7 @@
 /* ============================================================
    红包功能样式 v2
    独立文件，不动 styles.css 原有内容。
-   这一版的形状/颜色/圆角/图标坐标
+   这一版的形状/颜色/圆角/图标坐标，全部是从 Yuying 提供的 红包ui.svg
    里原样量出来/抠出来的，不是估的。
    ============================================================ */
 
@@ -550,3 +550,26 @@
 .rp-hist-status-received { color: #4CAF50; }
 .rp-hist-status-returned { color: var(--text-secondary); opacity: 0.7; }
 .rp-hist-status-pending { color: #FFA445; }
+
+/* ── 未拆开卡片右上角的"..."菜单按钮，点了直接进历史记录页 ── */
+.rp-card-menu-btn {
+    position: absolute;
+    top: 4%;
+    right: 5%;
+    z-index: 3;
+    width: 11%;
+    aspect-ratio: 1.6;
+    min-width: 30px;
+    border: none;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.16);
+    color: #F6E3B4;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.rp-card-menu-btn:active {
+    background: rgba(255,255,255,0.28);
+}

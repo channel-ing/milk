@@ -63,14 +63,13 @@
     function getSendBtn() { return document.getElementById('send-btn'); }
     function getInput() { return document.getElementById('message-input'); }
 
+    // 不要任何展开/收起动效——切换要立刻到位，所以这里不再用 setTimeout 延迟隐藏
+    // 等过渡播完（那是配合 CSS max-height transition 写的，现在 CSS 那条 transition 已经删了）
     function closeMoreMenu() {
         const panel = getPanel(), btn = getPlusBtn();
         if (panel) {
             panel.classList.remove('active');
-            clearTimeout(panel._hideTimer);
-            panel._hideTimer = setTimeout(function () {
-                if (!panel.classList.contains('active')) panel.style.display = 'none';
-            }, 220);
+            panel.style.display = 'none';
         }
         if (btn) btn.classList.remove('active');
     }
@@ -88,9 +87,8 @@
         // 跟微信一样：展开面板前先收起软键盘，把屏幕空间让给图标网格
         const input = getInput();
         if (input) input.blur();
-        clearTimeout(panel._hideTimer);
         panel.style.display = 'block';
-        requestAnimationFrame(function () { panel.classList.add('active'); });
+        panel.classList.add('active');
         btn.classList.add('active');
     }
 
@@ -140,18 +138,17 @@
         renderMoreMenu();
     }
 
-    // "+" 常驻，不会被输入框里的文字换掉；"发送"是独立的按钮，
-    // 只在输入框有内容时额外出现在"+"旁边，两个按钮各管各的位置，不共用一个坑位。
+    // "+" 常驻，不会被输入框里的文字换掉；"发送"按钮完全不要，永远隐藏——
+    // 发消息统一走回车/其它已有路径，这个坑位上只留"+"一个按钮。
     // 用 setProperty 加 important 优先级来设置显示状态，不能只是普通的 style.display='xxx'——
     // 因为 styles.css 里有条老规则 #send-btn{display:none!important}（应该是更早某个方案遗留下来的），
     // 普通内联样式斗不过样式表里的!important，只有内联样式自己也标 important 才压得过去。
     // 不去动 styles.css 那条规则（受保护文件），从这边把它压制掉就行
     function syncTrailingButton() {
         const input = getInput(), plusBtn = getPlusBtn(), sendBtn = getSendBtn();
-        if (!input || !plusBtn || !sendBtn) return;
-        const hasText = input.value.trim().length > 0;
+        if (!input || !plusBtn) return;
         plusBtn.style.setProperty('display', 'flex', 'important');
-        sendBtn.style.setProperty('display', hasText ? 'flex' : 'none', 'important');
+        if (sendBtn) sendBtn.style.setProperty('display', 'none', 'important');
     }
 
     document.addEventListener('DOMContentLoaded', function () {

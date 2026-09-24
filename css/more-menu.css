@@ -14,6 +14,13 @@
     display: none;
 }
 
+#more-menu-btn {
+    background-color: var(--toolbar-btn-bg, var(--message-received-bg));
+    color: var(--toolbar-btn-color, var(--text-secondary));
+}
+#more-menu-btn:hover {
+    color: var(--text-primary);
+}
 #more-menu-btn.active {
     background: var(--accent-color) !important;
     color: #fff !important;

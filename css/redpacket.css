@@ -1,11 +1,11 @@
 /* ============================================================
-   红包功能样式（Step 1）
+   红包功能样式 v2
    独立文件，不动 styles.css 原有内容。
-   卡片配色取自 SVG 设计稿：红 #CF1812 → #F15744 渐变，金 #EBCD9A。
-   "已退回"状态目前没有正式视觉稿，先用灰紫色占位，Yuying 给了配色方向后再换。
+   这一版的形状/颜色/圆角/图标坐标，全部是从 Yuying 提供的 红包ui.svg
+   里原样量出来/抠出来的，不是估的。
    ============================================================ */
 
-/* ── 聊天气泡（消息列表里显示的红包卡片） ── */
+/* ── 聊天气泡 ── */
 .message-redpacket-bubble-wrap {
     background: none !important;
     padding: 0 !important;
@@ -14,44 +14,36 @@
 }
 
 .redpacket-bubble {
-    width: 220px;
-    border-radius: 14px;
+    width: 226px;
+    border-radius: 8px; /* 115/3613 ≈ 3.2%，按设计稿比例换算，之前14px明显偏大 */
     padding: 12px 14px 10px;
     cursor: pointer;
     color: #fff;
-    transition: transform 0.12s, filter 0.15s;
+    transition: transform 0.12s;
     box-shadow: 0 3px 10px rgba(0,0,0,0.14);
 }
-.redpacket-bubble:active {
-    transform: scale(0.97);
-}
+.redpacket-bubble:active { transform: scale(0.97); }
 
-.rp-bubble-pending {
-    background: linear-gradient(135deg, #F2934D, #E07A2E); /* 未领取：橙色 */
-}
-.rp-bubble-received {
-    background: linear-gradient(135deg, #A6633A, #8A4E29); /* 已领取：更暗的棕橙色 */
-    filter: saturate(0.85);
-}
-.rp-bubble-returned {
-    background: linear-gradient(135deg, #7C7590, #635C77); /* 已退回：灰紫占位色，待Yuying定稿 */
-}
+.rp-bubble-pending { background: #FFA445; }
+.rp-bubble-received { background: #B36E25; } /* #FFA445 叠 #5A2E00 46%不透明度的等效实色 */
+.rp-bubble-returned { background: #B36E25; }
 
 .rp-bubble-top {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    align-items: flex-start;
+    gap: 10px;
 }
-.rp-bubble-icon {
+.rp-icon-svg {
     width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
+    height: 33.6px;
     flex-shrink: 0;
+    display: block;
+}
+.rp-bubble-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
 }
 .rp-bubble-blessing {
     font-size: 13px;
@@ -63,121 +55,171 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }
+.rp-bubble-extra {
+    font-size: 11px;
+    opacity: 0.92;
+}
 .rp-bubble-divider {
     height: 1px;
-    background: rgba(255,255,255,0.28);
-    margin: 9px 0 7px;
+    background: rgba(255,255,255,0.3);
+    margin: 10px 0 7px;
 }
 .rp-bubble-bottom {
     font-size: 11px;
     opacity: 0.85;
 }
-.rp-bubble-extra {
-    font-size: 11px;
-    margin-top: 4px;
-    opacity: 0.95;
-    font-weight: 600;
-}
 
-/* ── 发红包表单弹窗 ── */
+/* ── 发红包表单弹窗（照 SVG 稿里"发红包"那一帧重做，居中弹窗） ── */
 .rp-compose-content {
-    padding: 22px 22px 18px !important;
+    padding: 26px 22px 22px !important;
+    align-items: center;
+    position: relative;
 }
 .rp-compose-header {
     flex-shrink: 0;
-    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+.rp-compose-header-icon {
+    width: 22px;
+    height: 28.4px;
+    display: inline-flex;
+}
+.rp-compose-header-icon .rp-icon-svg {
+    width: 22px;
+    height: 28.4px;
 }
 .rp-compose-title {
     font-size: 17px;
     font-weight: 700;
     color: var(--text-primary);
+}
+
+.rp-compose-row {
+    flex-shrink: 0;
+    width: 100%;
+    background: var(--primary-bg);
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+.rp-compose-row-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 13px 4px 13px 14px;
+    flex-shrink: 0;
+}
+.rp-compose-row-amount {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
 }
-.rp-compose-title i { color: #E0562E; }
-
-.rp-compose-body {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.rp-field-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 10px;
-}
-.rp-field-label:first-child { margin-top: 0; }
-.rp-amount-input, .rp-blessing-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 11px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
-    background: var(--primary-bg);
+.rp-compose-row-input {
+    border: none;
+    background: none;
+    outline: none;
     color: var(--text-primary);
     font-size: 15px;
-    outline: none;
+    padding: 13px 14px;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: right;
 }
-.rp-amount-input:focus, .rp-blessing-input:focus {
-    border-color: var(--accent-color);
-}
-.rp-amount-hint {
-    font-size: 11px;
-    color: var(--text-secondary);
-    opacity: 0.75;
-    line-height: 1.5;
-    margin-top: 2px;
+.rp-compose-blessing-input {
+    text-align: left;
 }
 
-.rp-compose-actions {
+.rp-compose-preview {
     flex-shrink: 0;
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-    padding-bottom: 18px;
+    width: 100%;
+    text-align: center;
+    margin: 18px 0 22px;
+    color: var(--text-primary);
+    font-weight: 800;
 }
-.rp-btn {
-    flex: 1;
-    padding: 11px 0;
-    border-radius: 12px;
-    border: none;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+.rp-compose-preview-sign {
+    font-size: 20px;
+    margin-right: 4px;
+    opacity: 0.75;
 }
-.rp-btn-secondary {
-    background: var(--primary-bg);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
+#rp-compose-preview-amount {
+    font-size: 34px;
+    letter-spacing: 0.5px;
+}
+
+.rp-compose-send-btn {
+    flex-shrink: 0;
+    width: 100%;
 }
 .rp-btn-primary {
-    background: linear-gradient(135deg, #F2934D, #E0562E);
+    background: linear-gradient(135deg, #FF7A52, #E0562E);
     color: #fff;
+    border: none;
+    border-radius: 24px;
+    padding: 13px 0;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
 }
-.rp-btn-primary:disabled {
-    opacity: 0.6;
+.rp-btn-primary:disabled { opacity: 0.6; }
+
+.rp-compose-footnote {
+    flex-shrink: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin-top: 14px;
 }
 
-/* ── 拆红包卡片弹窗 ── */
+.rp-compose-cancel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary-bg);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── 拆红包卡片弹窗：容器用 aspect-ratio 锁死设计稿比例，
+   背景弧线是内嵌的真实SVG（不是CSS画的曲线），文字用百分比定位对齐抠出来的坐标 ── */
 .rp-view-content {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    width: 86% !important;
-    max-width: 320px !important;
+    width: 82% !important;
+    max-width: 300px !important;
     overflow: visible !important;
 }
 .rp-card {
     position: relative;
-    border-radius: 18px;
-    padding: 38px 22px 26px;
-    text-align: center;
-    flex-shrink: 0;
+    width: 100%;
+    aspect-ratio: 3065 / 4820;
+    border-radius: 10px;
+    overflow: hidden;
     box-shadow: 0 18px 40px rgba(0,0,0,0.3);
+    color: #fff;
 }
+.rp-card-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
 .rp-card-close {
     position: absolute;
     top: -42px;
@@ -194,77 +236,101 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 5;
 }
 
-.rp-card-sealed {
-    background: linear-gradient(180deg, #CF1812, #F15744);
-    color: #EBCD9A;
-}
-.rp-card-opened, .rp-card-returned {
-    background: #fff;
-    color: #333;
-}
-
-.rp-card-avatar {
-    width: 62px;
-    height: 62px;
-    border-radius: 50%;
+/* 未拆开红卡：坐标按 avatar(22.3%,23.4%,9.1%宽) / blessing(36%起) / 開按钮(50%居中,56%起,35%宽) 换算 */
+.rp-card-sealed .rp-card-avatar {
+    position: absolute;
+    top: 23.4%; left: 22.3%;
+    width: 9.1%; aspect-ratio: 1;
+    border-radius: 22%;
     overflow: hidden;
-    margin: 0 auto 10px;
     background: #eee;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    color: #aaa;
-    border: 3px solid rgba(255,255,255,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #aaa;
+    z-index: 2;
 }
-.rp-card-opened .rp-card-avatar, .rp-card-returned .rp-card-avatar {
-    border-color: #f0e6d8;
+.rp-card-sealed .rp-card-sender {
+    position: absolute;
+    top: 23.4%; left: 34%; right: 8%; height: 9.1%;
+    display: flex; align-items: center;
+    font-size: 14px; font-weight: 700; color: #F6E3B4;
+    z-index: 2;
 }
-
-.rp-card-sender {
-    font-size: 13px;
-    font-weight: 700;
-    color: #F6E3B4;
-    margin-bottom: 18px;
+.rp-card-sealed .rp-card-blessing {
+    position: absolute;
+    top: 36%; left: 17%; right: 8%;
+    font-size: 17px; font-weight: 700; line-height: 1.4; color: #F6E3B4;
+    z-index: 2;
 }
-.rp-card-sender-dark {
-    font-size: 13px;
-    font-weight: 700;
-    color: #333;
-    margin-bottom: 14px;
+.rp-card-open-circle {
+    position: absolute;
+    top: 56%; left: 50%;
+    width: 35%; aspect-ratio: 1;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: #EBCD9A;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
 }
-.rp-card-blessing {
-    font-size: 17px;
-    font-weight: 700;
-    color: #F6E3B4;
-    line-height: 1.5;
-    min-height: 44px;
-}
-.rp-card-blessing-grey {
-    font-size: 12px;
-    color: #999;
-    line-height: 1.5;
-    margin-bottom: 16px;
+.rp-card-open-circle span {
+    font-size: 22px;
+    font-weight: 800;
+    color: #3a2a10;
+    letter-spacing: 2px;
 }
 .rp-card-waiting {
-    margin-top: 22px;
-    font-size: 12px;
-    color: #F6E3B4;
-    opacity: 0.85;
+    position: absolute;
+    top: 93%; left: 0; right: 0;
+    text-align: center;
+    font-size: 12px; color: #F6E3B4; opacity: 0.85;
+    z-index: 2;
 }
-.rp-card-amount {
-    font-size: 30px;
-    font-weight: 800;
-    color: #D9A441;
-    margin: 4px 0 10px;
+
+/* 拆开白卡 / 已退回灰卡：坐标按 avatar(26.8%,44.5%,9.1%宽) / blessing(53%起) / amount(61%起) / link(90%) 换算，
+   两者共用同一套布局，只有背景SVG的底色（F15744 / 8F8F8F）不同 */
+.rp-card-opened .rp-card-avatar,
+.rp-card-returned .rp-card-avatar {
+    position: absolute;
+    top: 44.5%; left: 26.8%;
+    width: 9.1%; aspect-ratio: 1;
+    border-radius: 22%;
+    overflow: hidden;
+    background: #eee;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #aaa;
+    z-index: 2;
 }
-.rp-card-amount-muted {
-    color: #b8b8b8;
+.rp-card-opened .rp-card-sender-dark,
+.rp-card-returned .rp-card-sender-dark {
+    position: absolute;
+    top: 44.5%; left: 39%; right: 8%; height: 9.1%;
+    display: flex; align-items: center;
+    font-size: 14px; font-weight: 700; color: #333;
+    z-index: 2;
 }
-.rp-card-time-note, .rp-card-returned-note {
-    font-size: 11px;
-    color: #999;
+.rp-card-opened .rp-card-blessing-grey,
+.rp-card-returned .rp-card-blessing-grey {
+    position: absolute;
+    top: 53%; left: 39%; right: 8%;
+    font-size: 12px; color: #999; line-height: 1.4;
+    z-index: 2;
 }
-.rp-card-returned-note i { margin-right: 4px; }
+.rp-card-opened .rp-card-amount,
+.rp-card-returned .rp-card-amount {
+    position: absolute;
+    top: 61%; left: 12%; right: 8%;
+    font-size: 28px; font-weight: 800; color: #D9A441;
+    z-index: 2;
+}
+.rp-card-amount-unit { font-size: 60%; font-weight: 700; }
+.rp-card-amount-muted { color: #b8b8b8 !important; }
+.rp-card-opened .rp-card-link,
+.rp-card-returned .rp-card-link {
+    position: absolute;
+    top: 90%; left: 0; right: 0;
+    text-align: center;
+    font-size: 11px; color: #999;
+    z-index: 2;
+}

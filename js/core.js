@@ -1545,7 +1545,17 @@ window._jumpToMessage = function(id) {
             const containerRect = container.getBoundingClientRect();
             const elRect = el.getBoundingClientRect();
             const offset = (elRect.top - containerRect.top) - (container.clientHeight / 2) + (elRect.height / 2);
-            container.scrollTop += offset;
+            const newScrollTop = container.scrollTop + offset;
+            // 直接赋值 scrollTop 在新一点的浏览器实现里，一样会被 CSS 的 scroll-behavior:smooth
+            // 接管（CSSOM View 规范里，设置 scrollTop 本身也算一次"滚动操作"，跟 scrollIntoView
+            // 是同一套受 CSS 影响的机制，不是只有 scrollIntoView 才会被смооth）。
+            // 改成显式调用 scrollTo 并传 behavior:'instant'——这个选项的优先级最高，
+            // 不管 CSS 怎么设，都会强制瞬间跳到位，不会再半路"跟丢"。
+            if (typeof container.scrollTo === 'function') {
+                container.scrollTo({ top: newScrollTop, behavior: 'instant' });
+            } else {
+                container.scrollTop = newScrollTop;
+            }
             el.style.transition = 'background .3s ease';
             el.style.background = 'rgba(var(--accent-color-rgb),.14)';
             setTimeout(() => { el.style.background = ''; }, 1800);

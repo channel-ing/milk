@@ -865,6 +865,8 @@
                 chip.addEventListener('click', function () {
                     _stickerPickerGroup = chip.dataset.gid || null;
                     _renderStickerPickerBody();
+                    // 切分组后分组条本身高度不会变，但保险起见还是重新量一次，跟初次打开时一致
+                    requestAnimationFrame(_syncStickerPickerScrollHeight);
                 });
             });
         }
@@ -888,10 +890,30 @@
         }
     }
 
+    // 跟朋友圈评论表情面板（moments.js _mToggleSticker）用的是同一套方案：
+    // 不让滚动区用 flex:1 去"猜"该有多高，而是等分组条真正渲染完，量出实际高度后
+    // 用 JS 直接给滚动区钉一个固定像素值——网格永远是普通块级元素，格子的正方形
+    // 只取决于自身宽度，不会被任何弹性布局的高度重算插手
+    function _syncStickerPickerScrollHeight() {
+        var content = document.querySelector('#rp-sticker-picker-modal .rp-sticker-picker-content');
+        var header = content ? content.querySelector('.rp-history-header') : null;
+        var chipRow = document.getElementById('rp-sticker-picker-groups');
+        var scrollWrap = document.getElementById('rp-sticker-picker-scrollwrap');
+        if (!content || !scrollWrap) return;
+        var headerH = header ? header.offsetHeight : 0;
+        var chipRowH = chipRow ? chipRow.offsetHeight : 0;
+        var available = content.clientHeight - headerH - chipRowH;
+        scrollWrap.style.height = Math.max(available, 80) + 'px';
+    }
+
     function _openStickerPicker() {
         _renderStickerPickerBody();
         var modal = document.getElementById('rp-sticker-picker-modal');
         if (modal && typeof showModal === 'function') showModal(modal);
+        // 等 modal 真正撑开（display 生效）之后再量，量早了 offsetHeight 全是 0
+        requestAnimationFrame(function () {
+            requestAnimationFrame(_syncStickerPickerScrollHeight);
+        });
     }
 
     async function submitCompose() {

@@ -37,7 +37,7 @@
 .redpacket-bubble {
     position: relative;
     width: 226px;
-    border-radius: 8px; /* 115/3613 ≈ 3.2%，按设计稿比例换算，之前14px明显偏大 */
+    border-radius: 8px; /* 兜底值，实际会被下面按sent/received分别覆盖 */
     padding: 12px 14px 10px;
     cursor: pointer;
     color: #fff;
@@ -45,6 +45,14 @@
     transition: transform 0.12s;
     box-shadow: 0 3px 10px rgba(0,0,0,0.14);
     overflow: hidden;
+}
+/* 圆角固定死，不跟settings.bubbleStyle走：只有靠近头像那一角保留8px，
+   其余三个角缩小到3px——头像在气泡右侧(sent)时保右下角，在左侧(received)时保左下角 */
+.message-sent .redpacket-bubble {
+    border-radius: 3px 3px 8px 3px;
+}
+.message-received .redpacket-bubble {
+    border-radius: 3px 3px 3px 8px;
 }
 .redpacket-bubble:active { transform: scale(0.97); }
 
@@ -244,6 +252,7 @@
     width: 100%;
     aspect-ratio: 3065 / 4820;
     color: #fff;
+    perspective: 800px; /* 给開按钮的金元宝旋转动效一个3D透视空间 */
     /* 注意：这里不能 overflow:hidden——关闭按钮按设计稿坐标是画在卡片底边以外的，
        裁切会把它切掉。圆角改由 .rp-card-bg 自己承担 */
 }
@@ -572,4 +581,26 @@
 }
 .rp-card-menu-btn:active {
     background: rgba(255,255,255,0.28);
+}
+
+/* ── 開按钮点开时的金元宝旋转动效（照抄抉择助手"抛硬币"那套3D翻转手法：
+   transform-style:preserve-3d + backface-visibility:hidden + rotateY 多圈旋转，
+   只是时长更短——这是个开启的过场，不是要悬念感的结果揭晓） ── */
+.rp-card-open-circle.rp-coin-spinning {
+    animation: rpCoinSpin 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    pointer-events: none;
+    backface-visibility: hidden;
+}
+@keyframes rpCoinSpin {
+    0% {
+        transform: translateX(-50%) rotateY(0deg) scale(1);
+        animation-timing-function: ease-in;
+    }
+    45% {
+        transform: translateX(-50%) rotateY(720deg) scale(1.28);
+        animation-timing-function: ease-out;
+    }
+    100% {
+        transform: translateX(-50%) rotateY(1080deg) scale(1);
+    }
 }

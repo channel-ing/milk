@@ -844,8 +844,12 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
             <span class="rp-compose-row-label">金额</span>
             <input type="text" inputmode="decimal" id="rp-compose-amount" class="rp-compose-row-input" placeholder="¥0.00">
         </div>
-        <div class="rp-compose-row">
+        <div class="rp-compose-row rp-compose-row-blessing-wrap">
             <input type="text" id="rp-compose-blessing" class="rp-compose-row-input rp-compose-blessing-input" placeholder="开心一下" maxlength="40">
+            <button type="button" class="rp-compose-sticker-slot" id="rp-compose-sticker-slot" onclick="window.RedPacket.onStickerSlotClick()">
+                <i class="fas fa-face-smile" id="rp-compose-sticker-slot-icon"></i>
+                <img id="rp-compose-sticker-slot-img" style="display:none;">
+            </button>
         </div>
         <div class="rp-compose-preview">
             <span class="rp-compose-preview-sign">¥</span><span id="rp-compose-preview-amount">0.00</span>
@@ -853,6 +857,24 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
         <button class="rp-btn-primary rp-compose-send-btn" id="rp-compose-send-btn" onclick="window.RedPacket.submitCompose()">塞钱进红包</button>
         <div class="rp-compose-footnote">未领取的红包将于24小时后退回</div>
         <button class="rp-compose-cancel" onclick="hideModal(document.getElementById('redpacket-compose-modal'))"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+<div class="modal" id="rp-sticker-picker-modal">
+    <div class="modal-content rp-sticker-picker-content">
+        <div class="rp-history-header">
+            <span class="rp-history-title">选一个表情包</span>
+            <button class="rp-history-close" onclick="hideModal(document.getElementById('rp-sticker-picker-modal'))"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="rp-sticker-picker-grid" id="rp-sticker-picker-grid"></div>
+    </div>
+</div>
+<div class="modal" id="rp-sticker-delete-modal">
+    <div class="modal-content" style="max-width:300px;">
+        <div class="modal-title"><i class="fas fa-face-smile"></i><span>要删除这个表情包吗？</span></div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-secondary" onclick="hideModal(document.getElementById('rp-sticker-delete-modal'))">取消</button>
+            <button class="modal-btn modal-btn-primary" onclick="window.RedPacket.confirmStickerDelete()">删除</button>
+        </div>
     </div>
 </div>
 <div class="modal" id="redpacket-view-modal">

@@ -23,7 +23,7 @@
                 if (input) input.click();
             }
         },
-        { id: 'redpacket', emoji: '🧧', label: '红包', ready: false },
+        { id: 'redpacket', iconClass: 'fas fa-gift', label: '红包', ready: false },
         {
             id: 'videocall',
             iconClass: 'fas fa-video',
@@ -45,7 +45,7 @@
                 if (typeof toggleBatchMode === 'function') toggleBatchMode();
             }
         },
-        { id: 'xiaohongshu', emoji: '📕', label: '小红书', ready: false },
+        { id: 'xiaohongshu', iconClass: 'fas fa-book', label: '小红书', ready: false },
         { id: 'douyin', iconClass: 'fab fa-tiktok', label: '抖音', ready: false },
         { id: 'qa', iconClass: 'fas fa-comments', label: '快问快答', ready: false }
     ];

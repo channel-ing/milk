@@ -639,6 +639,7 @@
                 : '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '领取</div>';
             html =
                 '<div class="rp-card rp-card-sealed">' + _CARD_BG_SEALED +
+                    '<button class="rp-card-menu-btn" title="查看历史红包记录" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');"><i class="fas fa-ellipsis-h"></i></button>' +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
@@ -764,8 +765,12 @@
     }
 
     function _renderHistory() {
+        var myLabel = (settings.myName || '我') + '发出的';
+        var partnerLabel = (settings.partnerName || '梦角') + '发出的';
         document.querySelectorAll('.rp-history-tab').forEach(function (btn) {
-            btn.classList.toggle('active', btn.dataset.tab === _historyTab);
+            var isActive = btn.dataset.tab === _historyTab;
+            btn.classList.toggle('active', isActive);
+            btn.textContent = btn.dataset.tab === 'outbox' ? myLabel : partnerLabel;
         });
 
         var list = (_data[_historyTab] || []).slice();

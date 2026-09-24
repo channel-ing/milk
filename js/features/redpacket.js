@@ -124,19 +124,19 @@
     // 关闭按钮：之前完全漏掉了——之前只扫了 <rect>/<path fill>，没扫 <circle>，
     // 这次补上，圆圈+X都是描边（无填充），色值#FFC97C，三张卡各有一份坐标不同的原样拷贝
     var _CLOSE_BTN_SEALED =
-        '<svg class="rp-card-close-svg" viewBox="2930 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<svg class="rp-card-close-svg" viewBox="2919 8924 361 361" xmlns="http://www.w3.org/2000/svg">' +
         '<circle cx="3099.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
         '<path d="M3026 9030L3172.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
         '<path d="M3172.5 9030L3026 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
         '</svg>';
     var _CLOSE_BTN_OPENED =
-        '<svg class="rp-card-close-svg" viewBox="7850 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<svg class="rp-card-close-svg" viewBox="7839 8924 361 361" xmlns="http://www.w3.org/2000/svg">' +
         '<circle cx="8019.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
         '<path d="M7946 9030L8092.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
         '<path d="M8092.5 9030L7946 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
         '</svg>';
     var _CLOSE_BTN_RETURNED =
-        '<svg class="rp-card-close-svg" viewBox="12370 8935 339 339" xmlns="http://www.w3.org/2000/svg">' +
+        '<svg class="rp-card-close-svg" viewBox="12359 8924 361 361" xmlns="http://www.w3.org/2000/svg">' +
         '<circle cx="12539.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
         '<path d="M12466 9030L12612.5 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
         '<path d="M12612.5 9030L12466 9179.5" stroke="#FFC97C" stroke-width="22" stroke-linecap="round"/>' +
@@ -177,26 +177,9 @@
         return _data.outbox.find(function (r) { return r.id === id; }) || null;
     }
 
-    // ── 已读状态：跟普通消息走同一套逻辑（发送后1.5~4秒随机变已读），
-    // 照抄 core.js 里 _triggerDelayedReply 的已读那一小段，但不触发模拟文字回复——
-    // 红包该不该被接收，是自己另一套90%/10%概率判定的，不需要再叠加一次普通消息的回复逻辑 ──────────────────────
-    function _scheduleReadReceipt() {
-        if (typeof messages === 'undefined') return;
-        var readDelay = 1500 + Math.random() * 2500;
-        setTimeout(function () {
-            var changed = false;
-            messages.forEach(function (msg) {
-                if (msg.sender === 'user' && msg.status !== 'read') {
-                    msg.status = 'read';
-                    changed = true;
-                }
-            });
-            if (changed) {
-                if (typeof _updateReadReceiptsDOM === 'function') _updateReadReceiptsDOM();
-                if (typeof throttledSaveData === 'function') throttledSaveData();
-            }
-        }, readDelay);
-    }
+    // ── 已读+回复：直接复用普通消息的那套 window._triggerDelayedReply(true)，
+    // 不是我自己另写一套——已读之后要不要回复、"已读不回"概率怎么算，都跟普通消息走同一个函数，
+    // 不用在红包这边重复实现一遍 ──────────────────────
 
     // ── 发送（用户 → 梦角） ──────────────────────
     async function sendUserRedPacket(rawAmount, rawBlessing) {
@@ -232,7 +215,7 @@
                 favorited: false,
                 note: null
             });
-            _scheduleReadReceipt();
+            if (typeof window._triggerDelayedReply === 'function') window._triggerDelayedReply(true);
         }
         return true;
     }
@@ -299,7 +282,7 @@
         var html = '';
         if (record.status === 'pending') {
             html =
-                '<div class="rp-card rp-card-sealed">' + _CARD_BG_SEALED + +
+                '<div class="rp-card rp-card-sealed">' + _CARD_BG_SEALED +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
@@ -312,7 +295,7 @@
         } else if (record.status === 'received') {
             var timeStr = new Date(record.receiveTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             html =
-                '<div class="rp-card rp-card-opened">' + _CARD_BG_OPENED + +
+                '<div class="rp-card rp-card-opened">' + _CARD_BG_OPENED +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
@@ -324,7 +307,7 @@
                 '</div>';
         } else {
             html =
-                '<div class="rp-card rp-card-returned">' + _CARD_BG_RETURNED + +
+                '<div class="rp-card rp-card-returned">' + _CARD_BG_RETURNED +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +

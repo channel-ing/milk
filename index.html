@@ -295,6 +295,17 @@ html[data-theme="dark"] #cs-transition-overlay{background:radial-gradient(circle
     <button id="back-to-latest-btn" onclick="window._backToLatestMessages&&window._backToLatestMessages()">
         <i class="fas fa-arrow-down"></i><span id="back-to-latest-label"></span>
     </button>
+    <button id="rp-expiry-reminder-btn" style="display:none;" onclick="window.RedPacket.jumpToExpiryReminder()">
+        <span class="rp-icon-svg" style="width:14px;height:18px;display:inline-flex;">
+            <svg viewBox="1951 10584 635 819.516" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+                <rect x="1951" y="10584" width="635" height="819.516" rx="73" fill="#FF5151"/>
+                <path d="M1951 10928C1951 10928 2064.5 11013.9 2273 11013.5C2481.5 11013.1 2586 10928 2586 10928V11331C2586 11371.3 2553.32 11404 2513 11404H2024C1983.68 11404 1951 11371.3 1951 11331V10928Z" fill="#E14849"/>
+                <circle cx="2269" cy="11021" r="92" fill="#FFD145"/>
+                <path d="M2234 10970L2268.36 11000.2M2268.36 11000.2L2303 10970M2268.36 11000.2V11072M2223.5 11009.1H2314.63M2223 11042H2314.12" stroke="#D97F22" stroke-width="15" stroke-linecap="round"/>
+            </svg>
+        </span>
+        <span id="rp-expiry-reminder-label">1个红包待领取</span>
+    </button>
     <div class="empty-state" id="empty-state" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;width:100%;pointer-events:none;z-index:1;">
             <div style="position:relative;margin-bottom:20px;">
                 <i class="fas fa-heart" style="font-size:52px;opacity:0.55;color:var(--accent-color);"></i>

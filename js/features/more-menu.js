@@ -119,12 +119,17 @@
         panel.querySelectorAll('.more-menu-item').forEach(function (btnEl) {
             btnEl.addEventListener('click', function () {
                 const item = MORE_MENU_ITEMS.find(function (i) { return i.id === btnEl.dataset.id; });
-                closeMoreMenu();
-                if (!item) return;
+                if (!item) { closeMoreMenu(); return; }
                 if (item.ready && typeof item.action === 'function') {
+                    // "图片"是特殊情况：面板不能在这里就收起，要等用户真的选完图、
+                    // 触发发送之后才收（见下面 DOMContentLoaded 里挂在 #image-input 上的 change 监听）
+                    if (item.id !== 'image') closeMoreMenu();
                     item.action();
-                } else if (typeof showNotification === 'function') {
-                    showNotification('「' + item.label + '」功能开发中，敬请期待～', 'info', 2200);
+                } else {
+                    closeMoreMenu();
+                    if (typeof showNotification === 'function') {
+                        showNotification('「' + item.label + '」功能开发中，敬请期待～', 'info', 2200);
+                    }
                 }
             });
         });
@@ -184,8 +189,20 @@
             const panel = getPanel(), btn2 = getPlusBtn();
             if (!panel || !panel.classList.contains('active')) return;
             if (panel.contains(e.target) || (btn2 && btn2.contains(e.target))) return;
+            // "图片"项点击后会用 input.click() 模拟点开系统相册，这个模拟点击本身
+            // 也会冒泡到 document 被这里的"点外部"逻辑抓到，导致相册还没弹出面板就先收起了——
+            // #image-input 不算"外部"，直接放过
+            if (e.target.id === 'image-input') return;
             closeMoreMenu();
         });
+
+        // 图片：真正选完图（触发发送）之后再收起面板，不是点"图片"按钮那一下就收
+        const imageInput = document.getElementById('image-input');
+        if (imageInput) {
+            imageInput.addEventListener('change', function () {
+                if (imageInput.files && imageInput.files[0]) closeMoreMenu();
+            });
+        }
     });
 
     window.MoreMenu = {

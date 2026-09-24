@@ -1,7 +1,7 @@
 /* ============================================================
    红包功能样式 v2
    独立文件，不动 styles.css 原有内容。
-   这一版的形状/颜色/圆角/图标坐标，全部是从 Yuying 提供的 红包ui.svg
+   这一版的形状/颜色/圆角/图标坐标
    里原样量出来/抠出来的，不是估的。
    ============================================================ */
 
@@ -376,3 +376,177 @@
     font-size: 11px; color: #999;
     z-index: 2;
 }
+
+/* ── 卡片底部"查看历史红包记录"可点击链接（已领取/已退回卡片共用） ── */
+.rp-card-link-clickable {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.rp-card-link-clickable i { font-size: 9px; }
+
+/* ── 历史红包记录页（居中弹窗） ── */
+.rp-history-content {
+    padding: 22px 0 0 !important;
+    width: 88% !important;
+    max-width: 380px !important;
+    max-height: 82vh !important;
+}
+.rp-history-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0 22px 16px;
+}
+.rp-history-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.rp-history-close {
+    position: absolute;
+    right: 18px;
+    top: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary-bg);
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rp-history-tabs {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    padding: 0 22px 14px;
+}
+.rp-history-tab {
+    flex: 1;
+    padding: 9px 0;
+    border-radius: 10px;
+    border: none;
+    background: var(--primary-bg);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.rp-history-tab.active {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+.rp-history-stats {
+    flex-shrink: 0;
+    padding: 4px 22px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+}
+.rp-history-total {
+    font-size: 30px;
+    font-weight: 800;
+    color: #D9A441;
+    margin-bottom: 14px;
+}
+.rp-history-total-unit {
+    font-size: 16px;
+    font-weight: 700;
+}
+.rp-history-mini-cards {
+    display: flex;
+    gap: 10px;
+}
+.rp-history-mini-card {
+    flex: 1;
+    background: var(--primary-bg);
+    border-radius: 10px;
+    padding: 10px 4px;
+}
+.rp-history-mini-num {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+.rp-history-mini-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.rp-history-list {
+    overflow-y: auto;
+    padding: 6px 22px 22px;
+    min-height: 0;
+}
+.rp-history-empty {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    padding: 40px 0;
+}
+.rp-hist-day-group {
+    margin-top: 14px;
+}
+.rp-hist-day-label {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin-bottom: 8px;
+}
+.rp-hist-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.rp-hist-row:last-child { border-bottom: none; }
+.rp-hist-row-icon { flex-shrink: 0; }
+.rp-hist-row-icon .rp-icon-svg {
+    width: 22px;
+    height: 28.4px;
+}
+.rp-hist-row-mid {
+    flex: 1;
+    min-width: 0;
+}
+.rp-hist-row-blessing {
+    font-size: 13.5px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rp-hist-row-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin-top: 2px;
+}
+.rp-hist-row-right {
+    flex-shrink: 0;
+    text-align: right;
+}
+.rp-hist-row-amount {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #D9A441;
+}
+.rp-hist-row-status {
+    font-size: 10.5px;
+    margin-top: 3px;
+}
+.rp-hist-status-received { color: #4CAF50; }
+.rp-hist-status-returned { color: var(--text-secondary); opacity: 0.7; }
+.rp-hist-status-pending { color: #FFA445; }

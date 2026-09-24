@@ -1536,7 +1536,16 @@ window._jumpToMessage = function(id) {
     requestAnimationFrame(() => {
         const el = container.querySelector('[data-msg-id="' + id + '"]');
         if (el) {
-            el.scrollIntoView({ behavior: 'auto', block: 'center' });
+            // .chat-container 全局设了 scroll-behavior:smooth，scrollIntoView 的 behavior:'auto'
+            // 会被这个 CSS 接管、跟着走平滑滚动——跳转距离近（比如搜索/引用跳转，通常离得不远）
+            // 时不明显，但这次是从聊天末尾跳回一千多条之前，平滑动画跟不上，滚一半就没跟上了，
+            // 实测卡在半路（scrollTop 只挪了几百px，目标还在屏幕外几千px）。
+            // 改成直接算偏移量手动设 scrollTop，不走 scrollIntoView 那条会被 CSS 平滑滚动
+            // 接管的路径，保证不管跳多远都是瞬间到位。
+            const containerRect = container.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const offset = (elRect.top - containerRect.top) - (container.clientHeight / 2) + (elRect.height / 2);
+            container.scrollTop += offset;
             el.style.transition = 'background .3s ease';
             el.style.background = 'rgba(var(--accent-color-rgb),.14)';
             setTimeout(() => { el.style.background = ''; }, 1800);

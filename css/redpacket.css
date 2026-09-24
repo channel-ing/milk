@@ -185,9 +185,9 @@
     margin-right: 8px;
     border: none;
     border-radius: 8px;
-    background: rgba(var(--accent-color-rgb), 0.1);
-    color: var(--accent-color);
-    font-size: 18px;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 20px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -410,11 +410,16 @@
     letter-spacing: 2px;
 }
 
-/* 留言库的"编辑"/"批量添加"小弹窗：默认 .modal-buttons 没有底部间距，
-   按钮会直接贴着卡片下边缘，这里单独补上 */
+/* 留言库的"编辑"/"批量添加"小弹窗、表情包删除确认弹窗：默认 .modal-buttons 没有底部间距，
+   按钮会直接贴着卡片下边缘，这里统一补上 */
 #rp-bank-prompt-modal .modal-buttons,
-#rp-bank-batchadd-modal .modal-buttons {
+#rp-bank-batchadd-modal .modal-buttons,
+#rp-sticker-delete-modal .modal-buttons {
     margin-bottom: 20px;
+}
+#rp-sticker-delete-modal .modal-title {
+    font-size: 14px;
+    font-weight: 600;
 }
 .rp-card-waiting {
     position: absolute;
@@ -682,6 +687,7 @@
     width: 21.3%;
     height: 12.7%;
     object-fit: contain;
+    border-radius: 12px; /* 跟聊天图片消息的圆角对齐 */
     z-index: 2;
 }
 
@@ -693,12 +699,18 @@
 .rp-card-sealed.rp-card-has-sticker .rp-card-open-circle { top: 67.1%; }
 
 /* 拆开白卡/已退回灰卡+表情包：头部弧线往上收了(16.5%~22.8%，原来31.4%~36.6%)，
-   頭像/祝福语跟着往上提，表情包卡在祝福语和金额中间，金额挪到64% */
+   頭像/祝福语跟着往上提，表情包卡在祝福语和金额中间（拆开之后这张图放大一点，
+   left/width一起调是为了保持水平居中不偏），金额挪到64% */
 .rp-card-opened.rp-card-has-sticker .rp-card-header-row,
 .rp-card-returned.rp-card-has-sticker .rp-card-header-row { top: 28.3%; }
 .rp-card-opened.rp-card-has-sticker .rp-card-blessing-grey,
 .rp-card-returned.rp-card-has-sticker .rp-card-blessing-grey { top: 37%; }
 .rp-card-opened.rp-card-has-sticker .rp-card-sticker-img,
-.rp-card-returned.rp-card-has-sticker .rp-card-sticker-img { top: 45%; }
+.rp-card-returned.rp-card-has-sticker .rp-card-sticker-img {
+    top: 42.5%;
+    left: 37%;
+    width: 26%;
+    height: 15.5%;
+}
 .rp-card-opened.rp-card-has-sticker .rp-card-amount,
 .rp-card-returned.rp-card-has-sticker .rp-card-amount { top: 64%; }

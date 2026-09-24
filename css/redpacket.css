@@ -220,20 +220,11 @@
     max-height: 72vh !important;
 }
 .rp-sticker-picker-grid {
-    overflow-y: auto;
-    padding: 6px 22px 22px;
-}
-.rp-sticker-picker-group-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin: 14px 0 8px;
-}
-.rp-sticker-picker-group-label:first-child { margin-top: 0; }
-.rp-sticker-picker-group-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
+    overflow-y: auto;
+    padding: 6px 22px 22px;
 }
 .rp-sticker-picker-item {
     aspect-ratio: 1;
@@ -251,6 +242,7 @@
     display: block;
 }
 .rp-sticker-picker-empty {
+    grid-column: 1 / -1;
     text-align: center;
     font-size: 13px;
     color: var(--text-secondary);
@@ -553,16 +545,16 @@
 
 .rp-history-avatar {
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
     overflow: hidden;
     margin: 0 auto 12px;
     background: var(--primary-bg);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 22px;
     color: var(--text-secondary);
 }
 .rp-history-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }

@@ -185,12 +185,12 @@
     var _CARD_BG_OPENED =
         '<svg class="rp-card-bg" viewBox="6487 3724 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
         '<rect x="6487" y="3724" width="3065" height="4820" fill="#F15744"/>' +
-        '<path d="M8033.5 5486.5C7008.05 5486.5 6487 5237 6487 5237V8544H9552V5237C9552 5237 9058.95 5486.5 8033.5 5486.5Z" fill="white"/>' +
+        '<path d="M8033.5 5486.5C7008.05 5486.5 6487 5237 6487 5237V8544H9552V5237C9552 5237 9058.95 5486.5 8033.5 5486.5Z" fill="currentColor"/>' +
         '</svg>';
     var _CARD_BG_RETURNED =
         '<svg class="rp-card-bg" viewBox="11007 3724 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
         '<rect x="11007" y="3724" width="3065" height="4820" fill="#8F8F8F"/>' +
-        '<path d="M12553.5 5486.5C11528.1 5486.5 11007 5237 11007 5237V8544H14072V5237C14072 5237 13578.9 5486.5 12553.5 5486.5Z" fill="white"/>' +
+        '<path d="M12553.5 5486.5C11528.1 5486.5 11007 5237 11007 5237V8544H14072V5237C14072 5237 13578.9 5486.5 12553.5 5486.5Z" fill="currentColor"/>' +
         '</svg>';
 
     // 带表情包版本的背景弧线——不是同一套稿子改个内容，是Yuying另外给的专门稿子，
@@ -203,12 +203,12 @@
     var _CARD_BG_OPENED_STICKER =
         '<svg class="rp-card-bg" viewBox="0 0 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
         '<rect width="3065" height="4820" fill="#F15744"/>' +
-        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="white"/>' +
+        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="currentColor"/>' +
         '</svg>';
     var _CARD_BG_RETURNED_STICKER =
         '<svg class="rp-card-bg" viewBox="0 0 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
         '<rect width="3065" height="4820" fill="#8F8F8F"/>' +
-        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="white"/>' +
+        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="currentColor"/>' +
         '</svg>';
 
     var _CLOSE_BTN_SEALED =
@@ -688,14 +688,10 @@
         var stickerHTML = hasSticker ? _stickerImgHTML(record.sticker) : '';
 
         var html = '';
-        if (record.status === 'pending') {
-            var isClaimable = (direction === 'inbox'); // 用户是接收方，開按钮才可以点
-            var openCircleHTML = isClaimable
-                ? '<div class="rp-card-open-circle rp-card-open-circle-clickable" onclick="window.RedPacket.playOpenAnimation(\'' + record.id + '\', this)"><span>開</span></div>'
-                : '<div class="rp-card-open-circle"><span>開</span></div>';
-            var waitingHTML = isClaimable
-                ? '<div class="rp-card-waiting">点击"開"拆红包</div>'
-                : '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '领取</div>';
+        if (record.status === 'pending' && direction === 'inbox') {
+            // 接收方视角，还没拆开——保留悬念，開按钮可以点
+            var openCircleHTML =
+                '<div class="rp-card-open-circle rp-card-open-circle-clickable" onclick="window.RedPacket.playOpenAnimation(\'' + record.id + '\', this)"><span>開</span></div>';
             html =
                 '<div class="rp-card rp-card-sealed' + stickerClass + '">' + (hasSticker ? _CARD_BG_SEALED_STICKER : _CARD_BG_SEALED) +
                     '<button class="rp-card-menu-btn" title="查看历史红包记录" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');"><i class="fas fa-ellipsis-h"></i></button>' +
@@ -706,8 +702,24 @@
                     '<div class="rp-card-blessing">' + _esc(record.blessing) + '</div>' +
                     stickerHTML +
                     openCircleHTML +
-                    waitingHTML +
+                    '<div class="rp-card-waiting">点击"開"拆红包</div>' +
                     '<button class="rp-card-close" onclick="window.RedPacket.closeViewModal()">' + _CLOSE_BTN_SEALED + '</button>' +
+                '</div>';
+        } else if (record.status === 'pending') {
+            // 发送方查看自己发出、还没被领的红包——自己发的钱，没必要藏着不给自己看，
+            // 直接用"已拆开"那套揭晓金额的布局，只是底部换成"等待XX领取"，没有可点的開
+            html =
+                '<div class="rp-card rp-card-opened' + stickerClass + '">' + (hasSticker ? _CARD_BG_OPENED_STICKER : _CARD_BG_OPENED) +
+                    '<button class="rp-card-menu-btn" title="查看历史红包记录" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');"><i class="fas fa-ellipsis-h"></i></button>' +
+                    '<div class="rp-card-header-row">' +
+                        '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
+                        '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
+                    '</div>' +
+                    '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
+                    stickerHTML +
+                    '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
+                    '<div class="rp-card-link">等待 ' + _esc(settings.partnerName || '梦角') + ' 领取</div>' +
+                    '<button class="rp-card-close" onclick="window.RedPacket.closeViewModal()">' + _CLOSE_BTN_OPENED + '</button>' +
                 '</div>';
         } else if (record.status === 'received') {
             html =
@@ -804,51 +816,82 @@
     }
 
     // 表情选择器：直接复用"我的表情库"(myStickerLibrary)的内容源，不是另起一个上传入口
-    function _openStickerPicker() {
+    var _stickerPickerGroup = null; // 当前选中的分组id；null表示"未分组"那一桶
+
+    function _stickerItemHTML(s) {
+        var src = typeof s === 'string' ? s : s.src;
+        var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+        var imgTag = isCloud ? '<img data-lazy-cloud-ref="' + _esc(src) + '">' : '<img src="' + _esc(src) + '">';
+        return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '">' + imgTag + '</button>';
+    }
+
+    function _renderStickerPickerBody() {
+        var chipRow = document.getElementById('rp-sticker-picker-groups');
         var grid = document.getElementById('rp-sticker-picker-grid');
-        if (grid) {
-            var pool = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
-            if (!pool.length) {
-                grid.innerHTML = '<div class="rp-sticker-picker-empty">"我的表情库"里还没有表情，去聊天输入框那边先添加几个吧</div>';
-            } else {
-                function itemHTML(s) {
-                    var src = typeof s === 'string' ? s : s.src;
-                    var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
-                    var imgTag = isCloud ? '<img data-lazy-cloud-ref="' + _esc(src) + '">' : '<img src="' + _esc(src) + '">';
-                    return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '">' + imgTag + '</button>';
-                }
-                // 照搬"我的表情库"本来的分组结构渲染，不打散混在一起
-                // 这里必须显式读 window.myStickerGroups，不能用裸变量名——
-                // state.js 用 let 声明了同名的 myStickerGroups（一个从来没被填过的空数组），
-                // core.js 实际更新的是 window.myStickerGroups 这个属性，两者是两个不同的东西，
-                // 裸变量名读到的永远是 state.js 那个空数组，会被"遮蔽"成一直读到空分组
-                var groups = (window.myStickerGroups && Array.isArray(window.myStickerGroups)) ? window.myStickerGroups : [];
-                var html = '';
-                var usedIds = {};
-                groups.forEach(function (g) {
-                    var items = pool.filter(function (s) { return typeof s !== 'string' && s.groupId === g.id; });
-                    if (!items.length) return;
-                    items.forEach(function (s) { usedIds[s.id] = true; });
-                    html += '<div class="rp-sticker-picker-group-label">' + _esc(g.name) + '</div>' +
-                        '<div class="rp-sticker-picker-group-grid">' + items.map(itemHTML).join('') + '</div>';
-                });
-                var ungrouped = pool.filter(function (s) { return typeof s === 'string' || !usedIds[s.id]; });
-                if (ungrouped.length) {
-                    html += '<div class="rp-sticker-picker-group-label">未分组</div>' +
-                        '<div class="rp-sticker-picker-group-grid">' + ungrouped.map(itemHTML).join('') + '</div>';
-                }
-                grid.innerHTML = html;
-                _bindStickerLazyLoad(grid);
-                grid.querySelectorAll('.rp-sticker-picker-item').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        _composeSticker = btn.dataset.src;
-                        _syncStickerSlotUI();
-                        var pickerModal = document.getElementById('rp-sticker-picker-modal');
-                        if (pickerModal && typeof hideModal === 'function') hideModal(pickerModal);
-                    });
-                });
-            }
+        if (!chipRow || !grid) return;
+        var pool = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
+        if (!pool.length) {
+            chipRow.innerHTML = '';
+            grid.innerHTML = '<div class="rp-sticker-picker-empty">"我的表情库"里还没有表情，去聊天输入框那边先添加几个吧</div>';
+            return;
         }
+        // 这里必须显式读 window.myStickerGroups，不能用裸变量名——
+        // state.js 用 let 声明了同名的 myStickerGroups（一个从来没被填过的空数组），
+        // core.js 实际更新的是 window.myStickerGroups 这个属性，两者是两个不同的东西，
+        // 裸变量名读到的永远是 state.js 那个空数组，会被"遮蔽"成一直读到空分组
+        var groups = (window.myStickerGroups && Array.isArray(window.myStickerGroups)) ? window.myStickerGroups : [];
+        var validIds = groups.map(function (g) { return g.id; });
+        if (_stickerPickerGroup !== null && validIds.indexOf(_stickerPickerGroup) === -1) {
+            _stickerPickerGroup = groups.length ? groups[0].id : null;
+        }
+
+        // 分组chip行——直接复用"我的表情库"本来那套圆形头像式分组切换
+        // (.my-sticker-group-row / .my-sticker-group-chip 是全局样式，跟主聊天表情选择器长得一模一样)
+        if (!groups.length) {
+            chipRow.innerHTML = '';
+        } else {
+            chipRow.innerHTML = groups.map(function (g) {
+                var isActive = g.id === _stickerPickerGroup;
+                var cover = (typeof _myStickerCoverFor === 'function') ? _myStickerCoverFor(g.id) : null;
+                var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
+                var inner = cover
+                    ? (isCloud ? '<img data-cover-ref="' + _esc(cover) + '">' : '<img src="' + _esc(cover) + '">')
+                    : '<i class="fas fa-images"></i>';
+                return '<button type="button" class="my-sticker-group-chip' + (isActive ? ' active' : '') + '" data-gid="' + (g.id === null ? '' : g.id) + '" title="' + _esc(g.name) + '">' + inner + '</button>';
+            }).join('');
+            chipRow.querySelectorAll('img[data-cover-ref]').forEach(function (img) {
+                if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, img.getAttribute('data-cover-ref'));
+            });
+            chipRow.querySelectorAll('.my-sticker-group-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    _stickerPickerGroup = chip.dataset.gid || null;
+                    _renderStickerPickerBody();
+                });
+            });
+        }
+
+        var items = pool.filter(function (s) {
+            if (typeof s === 'string') return _stickerPickerGroup === null;
+            return (s.groupId || null) === _stickerPickerGroup;
+        });
+        if (!items.length) {
+            grid.innerHTML = '<div class="rp-sticker-picker-empty">这个分组还没有表情</div>';
+        } else {
+            grid.innerHTML = items.map(_stickerItemHTML).join('');
+            _bindStickerLazyLoad(grid);
+            grid.querySelectorAll('.rp-sticker-picker-item').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    _composeSticker = btn.dataset.src;
+                    _syncStickerSlotUI();
+                    var pickerModal = document.getElementById('rp-sticker-picker-modal');
+                    if (pickerModal && typeof hideModal === 'function') hideModal(pickerModal);
+                });
+            });
+        }
+    }
+
+    function _openStickerPicker() {
+        _renderStickerPickerBody();
         var modal = document.getElementById('rp-sticker-picker-modal');
         if (modal && typeof showModal === 'function') showModal(modal);
     }
@@ -966,6 +1009,9 @@
         var list = (_data[_historyTab] || []).slice();
         var isOutbox = _historyTab === 'outbox';
         var receiverLabel = isOutbox ? (settings.partnerName || '梦角') + '已领取' : (settings.myName || '我') + '已领取';
+
+        var avatarEl = document.getElementById('rp-history-avatar');
+        if (avatarEl) avatarEl.innerHTML = _getAvatarHtml(isOutbox ? 'partner' : 'user');
 
         // 已退回不计入总金额和已领取数量统计（文档明确要求）
         var totalAmount = 0, receivedCount = 0;

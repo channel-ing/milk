@@ -148,9 +148,9 @@
     margin-bottom: 12px;
 }
 .rp-compose-row-label {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--text-secondary);
-    padding: 13px 4px 13px 14px;
+    padding: 16px 4px 16px 14px;
     flex-shrink: 0;
 }
 .rp-compose-row-amount {
@@ -164,7 +164,7 @@
     outline: none;
     color: var(--text-primary);
     font-size: 15px;
-    padding: 13px 14px;
+    padding: 16px 14px;
     width: 100%;
     box-sizing: border-box;
     text-align: right;
@@ -182,14 +182,14 @@
 }
 .rp-compose-sticker-slot {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-    margin-right: 8px;
+    width: 32px;
+    height: 32px;
+    margin: 0 12px 0 4px;
     border: none;
     border-radius: 8px;
     background: none;
     color: var(--text-secondary);
-    font-size: 20px;
+    font-size: 17px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -706,7 +706,12 @@
    頭像/祝福语跟着往上提，開按钮往下挪到67.1%，表情包卡在祝福语和開按钮中间 */
 .rp-card-sealed.rp-card-has-sticker .rp-card-header-row { top: 19.1%; }
 .rp-card-sealed.rp-card-has-sticker .rp-card-blessing { top: 28%; }
-.rp-card-sealed.rp-card-has-sticker .rp-card-sticker-img { top: 39.6%; }
+.rp-card-sealed.rp-card-has-sticker .rp-card-sticker-img {
+    top: 38.5%;
+    left: 37%;
+    width: 26%;
+    height: 15.5%;
+}
 .rp-card-sealed.rp-card-has-sticker .rp-card-open-circle { top: 67.1%; }
 
 /* 拆开白卡/已退回灰卡+表情包：头部弧线往上收了(16.5%~22.8%，原来31.4%~36.6%)，

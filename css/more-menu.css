@@ -27,16 +27,12 @@
 }
 
 /* ── 下方展开面板（微信风格，撑开布局，不是浮层） ── */
+/* 不要任何展开/收起动效，切换要立刻到位，所以这里没有 transition */
 .more-menu-panel {
     display: none;
-    background: var(--secondary-bg);
-    border-top: 1px solid var(--border-color);
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .more-menu-panel.active {
-    max-height: 320px;
+    display: block;
 }
 
 .more-menu-grid {

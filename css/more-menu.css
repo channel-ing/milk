@@ -1,0 +1,90 @@
+/* ============================================================
+   更多菜单（输入区 “+” 弹出的网格菜单）
+   独立文件，不动 styles.css 原有内容。
+   ============================================================ */
+
+.input-area {
+    position: relative; /* 让弹层能以输入区为锚点定位 */
+}
+
+#more-menu-btn.active {
+    background: var(--accent-color) !important;
+    color: #fff !important;
+}
+
+.more-menu-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 8px;
+    width: min(288px, calc(100vw - 32px));
+    max-height: min(280px, calc(100svh - 200px));
+    overflow-y: auto;
+    background: var(--secondary-bg, #fff);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    padding: 16px 12px;
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 8px;
+    z-index: 500;
+}
+
+.more-menu-popover.active {
+    display: grid;
+    animation: moreMenuSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes moreMenuSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.more-menu-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
+    padding: 2px 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.more-menu-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: rgba(var(--accent-color-rgb), 0.1);
+    color: var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    transition: background 0.15s, transform 0.12s;
+}
+
+.more-menu-item:active .more-menu-icon {
+    background: rgba(var(--accent-color-rgb), 0.22);
+    transform: scale(0.93);
+}
+
+.more-menu-item.disabled .more-menu-icon {
+    opacity: 0.55;
+}
+
+.more-menu-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+    .more-menu-popover {
+        right: -4px;
+        padding: 14px 8px;
+        gap: 14px 4px;
+    }
+}

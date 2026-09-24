@@ -757,12 +757,20 @@
         if (!icon || !img) return;
         if (_composeSticker) {
             icon.style.display = 'none';
-            img.src = _composeSticker;
+            img.removeAttribute('src');
+            img.removeAttribute('data-lazy-cloud-ref');
+            if (typeof _composeSticker === 'string' && _composeSticker.indexOf('oss://') === 0) {
+                img.setAttribute('data-lazy-cloud-ref', _composeSticker);
+                if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, _composeSticker);
+            } else {
+                img.src = _composeSticker;
+            }
             img.style.display = 'block';
         } else {
             icon.style.display = '';
             img.style.display = 'none';
-            img.src = '';
+            img.removeAttribute('src');
+            img.removeAttribute('data-lazy-cloud-ref');
         }
     }
 
@@ -805,8 +813,11 @@
             } else {
                 grid.innerHTML = pool.map(function (s) {
                     var src = typeof s === 'string' ? s : s.src;
-                    return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '"><img src="' + _esc(src) + '"></button>';
+                    var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+                    var imgTag = isCloud ? '<img data-lazy-cloud-ref="' + _esc(src) + '">' : '<img src="' + _esc(src) + '">';
+                    return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '">' + imgTag + '</button>';
                 }).join('');
+                _bindStickerLazyLoad(grid);
                 grid.querySelectorAll('.rp-sticker-picker-item').forEach(function (btn) {
                     btn.addEventListener('click', function () {
                         _composeSticker = btn.dataset.src;

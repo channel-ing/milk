@@ -1,6 +1,6 @@
 /**
- * 红包功能 —— Step 1 + Step 2
- * 依据《红包功能设计文档.md》第1、2、3.1、6节 + 新确认的"双向独立消息"机制实现。
+ * 红包功能 —— Step 1 + Step 2 + Step 3
+ * 依据《红包功能设计文档.md》第1、2、3.1、4、8节 + 新确认的"双向独立消息"机制实现。
  *
  * 核心机制（跟微信一样，Yuying 明确确认过）：
  *   红包一旦被领取/过期，发送方那张卡片原地更新状态；接收方那边会【额外生成一条独立的新消息】，
@@ -10,7 +10,11 @@
  *   - 用户发红包给梦角（outbox）：金额校验、祝福语兜底、90%/10%领取判定、0.5~3h/24h 定时
  *   - 梦角发红包给用户（inbox）：金额生成算法（彩蛋池+三档概率）、留言库随机抽取、
  *     用户点"開"手动领取、24小时未点自动过期
- *   - 红包留言库管理界面（回复库→氛围感→"红包留言库"tab，架构照抄"问卷题库"那套）
+ *   - 红包留言库管理界面（回复库→氛围感→"红包祝福语"tab，架构照抄"问卷题库"那套）
+ *   - 梦角主动发红包的调度（8~12小时检查一次，15%→50%→95%阶梯概率，命中即触发并清零连续未命中计数；
+ *     陪伴模式/观影模式期间不检查，调度结构照抄 cinema.js 的梦角主动邀请那套：
+ *     setTimeout+持久化nextCheckAt，不是setInterval轮询）
+ *   - 到期提醒悬浮按钮（梦角发的红包超过20小时没领，聊天区右下角提醒，复用#back-to-latest-btn胶囊样式）
  *   - 聊天气泡三态 + 拆红包卡片（红卡/白卡/灰卡）+ 已读联动
  *
  * 存储 key 的取法照抄 survey.js / period.js 那一套（localforage.keys() 扫描 + 等 SESSION_ID 就绪）。
@@ -18,9 +22,10 @@
 (function () {
     'use strict';
 
-    var _data = { outbox: [], inbox: [], msgBank: [] };
+    var _data = { outbox: [], inbox: [], msgBank: [], scheduler: null };
     var _loaded = false;
     var _storageKey = null;
+    var _partnerCheckTimer = null;
 
     // ── Storage（照抄 survey.js 的取key方式） ──────────────────────
     async function _getKey() {
@@ -78,7 +83,7 @@
     async function _load() {
         var key = await _getKey();
         var saved = await localforage.getItem(key);
-        if (saved) _data = Object.assign({ outbox: [], inbox: [], msgBank: [] }, saved);
+        if (saved) _data = Object.assign({ outbox: [], inbox: [], msgBank: [], scheduler: null }, saved);
         _seedMsgBank();
         _loaded = true; // 不管读到的是真数据还是空的，这次读取本身没出错就算加载成功
     }
@@ -250,6 +255,108 @@
         // 不额外配音效/推送，也不触发已读+回复——这是系统自动结算，不是用户的真实操作
     }
 
+    // ================================================================
+    // 梦角主动发红包 —— 调度器（文档第4节）
+    // 结构照抄 cinema.js 的"梦角主动邀请"那套：nextCheckAt 持久化 + setTimeout，
+    // 不是 setInterval 轮询——间隔是小时级的，没必要每30秒空转检查一次。
+    // 8~12小时检查一次；连续未命中1-4次(missedCount 0~3)：15%；5-7次(4~6)：50%；
+    // 8次及以后(≥7)：固定95%。命中就发一个红包并清零计数。
+    // 陪伴模式/观影模式期间不检查——不消耗这次检查机会，15分钟后再看一眼。
+    // ================================================================
+    function _randHours8to12() { return 8 + Math.random() * 4; }
+
+    function _isGatedByOtherModes() {
+        try {
+            var companionEl = document.getElementById('companion-page');
+            var isCompanionActive = !!(companionEl && companionEl.classList.contains('active'));
+            var isCinemaWatching = !!window._cinemaWatching;
+            return isCompanionActive || isCinemaWatching;
+        } catch (e) { return false; }
+    }
+
+    function _scheduleNextPartnerCheck() {
+        if (_partnerCheckTimer) { clearTimeout(_partnerCheckTimer); _partnerCheckTimer = null; }
+        if (!_data.scheduler) {
+            // 第一次用，从现在起 8~12 小时后才第一次检查，不是装上就立刻查
+            _data.scheduler = { nextCheckAt: Date.now() + _randHours8to12() * 3600000, missedCount: 0 };
+            _save();
+        }
+        var delay = _data.scheduler.nextCheckAt - Date.now();
+        if (delay <= 0) { _runPartnerCheck(); return; }
+        _partnerCheckTimer = setTimeout(_runPartnerCheck, delay);
+    }
+
+    async function _runPartnerCheck() {
+        if (_isGatedByOtherModes()) {
+            _partnerCheckTimer = setTimeout(_runPartnerCheck, 15 * 60000);
+            return;
+        }
+        var missed = _data.scheduler.missedCount || 0;
+        var prob = missed < 4 ? 0.15 : (missed < 7 ? 0.5 : 0.95);
+        if (Math.random() < prob) {
+            await sendPartnerRedPacket();
+            _data.scheduler.missedCount = 0;
+        } else {
+            _data.scheduler.missedCount = missed + 1;
+        }
+        _data.scheduler.nextCheckAt = Date.now() + _randHours8to12() * 3600000;
+        _save();
+        _scheduleNextPartnerCheck();
+    }
+
+    // 控制台测试用：不用真等8~12小时，立刻跑一次调度检查（该门控还是会门控，该概率还是走概率）
+    function debugForcePartnerCheck() {
+        if (_partnerCheckTimer) { clearTimeout(_partnerCheckTimer); _partnerCheckTimer = null; }
+        _runPartnerCheck();
+    }
+    function debugSchedulerState() {
+        console.log('[红包调度器状态]', JSON.parse(JSON.stringify(_data.scheduler)));
+        return _data.scheduler;
+    }
+
+    // ================================================================
+    // 到期提醒悬浮按钮（文档第8节）：梦角发的红包超过20小时没领，
+    // 聊天界面右下角出现提醒，复用 #back-to-latest-btn 的胶囊样式，定位在它正上方。
+    // ================================================================
+    function _getExpiryReminderCandidates() {
+        var now = Date.now();
+        return (_data.inbox || []).filter(function (r) {
+            return r.status === 'pending' && !r.reminderDismissed && (now - r.sentTime) >= 20 * 3600000;
+        });
+    }
+
+    function _updateExpiryReminder() {
+        var btn = document.getElementById('rp-expiry-reminder-btn');
+        var label = document.getElementById('rp-expiry-reminder-label');
+        if (!btn || !label) return;
+        var list = _getExpiryReminderCandidates();
+        if (!list.length) { btn.style.display = 'none'; return; }
+        label.textContent = list.length === 1 ? '1个红包待领取' : (list.length + '个红包待领取');
+        btn.style.display = 'flex';
+    }
+
+    // 找到某个 inbox record 对应的【原始】那条消息（不是领取后生成的回执消息），用于跳转定位
+    function _findInboxMessageId(recordId) {
+        if (typeof messages === 'undefined') return null;
+        var msg = messages.find(function (m) {
+            return m.type === 'redpacket' && m.redpacketDirection === 'inbox' && m.redpacketId === recordId && m.sender !== 'user';
+        });
+        return msg ? msg.id : null;
+    }
+
+    function jumpToExpiryReminder() {
+        var list = _getExpiryReminderCandidates().sort(function (a, b) { return a.sentTime - b.sentTime; });
+        if (!list.length) return;
+        var earliest = list[0];
+        // 点击就立刻消失——不管用户跳过去之后到底有没有点"開"；真撞上多个待领取，
+        // 点一次全部消失（文档原话："不用为这个场景专门设计交互"）
+        list.forEach(function (r) { r.reminderDismissed = true; });
+        _save();
+        _updateExpiryReminder();
+        var msgId = _findInboxMessageId(earliest.id);
+        if (msgId && typeof window._jumpToMessage === 'function') window._jumpToMessage(msgId);
+    }
+
     // ── 定时检查（照抄 envelope.js 的 30秒轮询思路，自己独立跑一份，不需要改 app.js）：
     // outbox 和 inbox 两边的"到期未处理"都在这里统一扫 ──────────────────────
     function checkRedPacketStatus() {
@@ -277,6 +384,7 @@
             _save();
             if (typeof renderMessages === 'function') renderMessages(true);
         }
+        _updateExpiryReminder();
     }
 
     // direction 不传时两边都找一下，兼容老消息没存 redpacketDirection 字段的情况
@@ -363,6 +471,7 @@
                 window._sendPartnerNotification(settings.partnerName || '对方', '给你发了一个红包');
             }
         }
+        _updateExpiryReminder();
         return id;
     }
 
@@ -390,6 +499,7 @@
             if (typeof window._triggerDelayedReply === 'function') window._triggerDelayedReply(true);
         }
         if (typeof renderMessages === 'function') renderMessages(true);
+        _updateExpiryReminder();
         // 点開之后立刻把当前弹窗内容换成拆开的样子，不用用户重新点一次才看到结果
         _renderViewModal(record, 'partner', 'inbox');
     }
@@ -711,6 +821,8 @@
         await _load();
         checkRedPacketStatus();
         setInterval(checkRedPacketStatus, 30000);
+        _scheduleNextPartnerCheck();
+        _updateExpiryReminder();
 
         // 把"更多菜单"里的红包坑位从占位升级成真实功能，不用改 more-menu.js
         if (window.MoreMenu && typeof window.MoreMenu.registerItem === 'function') {
@@ -738,6 +850,9 @@
         claimById: claimPartnerRedPacket,
         generatePartnerAmount: generatePartnerAmount,
         debugAmountDistribution: debugAmountDistribution,
+        debugForcePartnerCheck: debugForcePartnerCheck,
+        debugSchedulerState: debugSchedulerState,
+        jumpToExpiryReminder: jumpToExpiryReminder,
         renderBubbleHTML: renderBubbleHTML,
         openByMessageId: openByMessageId,
         openComposeModal: openComposeModal,

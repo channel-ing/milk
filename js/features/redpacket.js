@@ -811,12 +811,29 @@
             if (!pool.length) {
                 grid.innerHTML = '<div class="rp-sticker-picker-empty">"我的表情库"里还没有表情，去聊天输入框那边先添加几个吧</div>';
             } else {
-                grid.innerHTML = pool.map(function (s) {
+                function itemHTML(s) {
                     var src = typeof s === 'string' ? s : s.src;
                     var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
                     var imgTag = isCloud ? '<img data-lazy-cloud-ref="' + _esc(src) + '">' : '<img src="' + _esc(src) + '">';
                     return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '">' + imgTag + '</button>';
-                }).join('');
+                }
+                // 照搬"我的表情库"本来的分组结构渲染，不打散混在一起
+                var groups = (typeof myStickerGroups !== 'undefined' && Array.isArray(myStickerGroups)) ? myStickerGroups : [];
+                var html = '';
+                var usedIds = {};
+                groups.forEach(function (g) {
+                    var items = pool.filter(function (s) { return typeof s !== 'string' && s.groupId === g.id; });
+                    if (!items.length) return;
+                    items.forEach(function (s) { usedIds[s.id] = true; });
+                    html += '<div class="rp-sticker-picker-group-label">' + _esc(g.name) + '</div>' +
+                        '<div class="rp-sticker-picker-group-grid">' + items.map(itemHTML).join('') + '</div>';
+                });
+                var ungrouped = pool.filter(function (s) { return typeof s === 'string' || !usedIds[s.id]; });
+                if (ungrouped.length) {
+                    html += '<div class="rp-sticker-picker-group-label">未分组</div>' +
+                        '<div class="rp-sticker-picker-group-grid">' + ungrouped.map(itemHTML).join('') + '</div>';
+                }
+                grid.innerHTML = html;
                 _bindStickerLazyLoad(grid);
                 grid.querySelectorAll('.rp-sticker-picker-item').forEach(function (btn) {
                     btn.addEventListener('click', function () {
@@ -912,7 +929,7 @@
     }
 
     function _historyEntryHTML(r, direction) {
-        var statusLabel = r.status === 'received' ? '已领取' : (r.status === 'returned' ? '已过期' : '未领取');
+        var statusLabel = r.status === 'received' ? '已领取' : (r.status === 'returned' ? '已过期' : '待领取');
         var statusClass = r.status === 'received' ? 'rp-hist-status-received' : (r.status === 'returned' ? 'rp-hist-status-returned' : 'rp-hist-status-pending');
         var timeStr = new Date(r.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         return (
@@ -931,12 +948,15 @@
     }
 
     function _renderHistory() {
-        var myLabel = (settings.myName || '我') + '发出的';
-        var partnerLabel = (settings.partnerName || '梦角') + '发出的';
+        // 接收方视角：outbox这份数据是"我发的"，但收钱的人是梦角，所以站在"谁收到"的角度看，
+        // 这个tab该叫"梦角收到的"；inbox反过来是"我收到的"——底下装的记录跟以前完全一样，
+        // 只是tab文案换了个角度说
+        var myReceivedLabel = (settings.myName || '我') + '收到的';
+        var partnerReceivedLabel = (settings.partnerName || '梦角') + '收到的';
         document.querySelectorAll('.rp-history-tab').forEach(function (btn) {
             var isActive = btn.dataset.tab === _historyTab;
             btn.classList.toggle('active', isActive);
-            btn.textContent = btn.dataset.tab === 'outbox' ? myLabel : partnerLabel;
+            btn.textContent = btn.dataset.tab === 'outbox' ? partnerReceivedLabel : myReceivedLabel;
         });
 
         var list = (_data[_historyTab] || []).slice();
@@ -954,7 +974,7 @@
             statsEl.innerHTML =
                 '<div class="rp-history-total">' + _formatAmountDisplay(totalAmount) + ' <span class="rp-history-total-unit">元</span></div>' +
                 '<div class="rp-history-mini-cards">' +
-                    '<div class="rp-history-mini-card"><div class="rp-history-mini-num">' + list.length + '</div><div class="rp-history-mini-label">共发出</div></div>' +
+                    '<div class="rp-history-mini-card"><div class="rp-history-mini-num">' + list.length + '</div><div class="rp-history-mini-label">共收到</div></div>' +
                     '<div class="rp-history-mini-card"><div class="rp-history-mini-num">' + receivedCount + '</div><div class="rp-history-mini-label">' + _esc(receiverLabel) + '</div></div>' +
                 '</div>';
         }

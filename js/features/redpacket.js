@@ -160,6 +160,31 @@
         }
     }
 
+    // ── 领取/过期那一刻，额外生成一条"接收方发出"的新消息（照微信的样子：
+    // 发送者原来那张卡片原地变状态；接收方这边则是一条全新的、独立的消息，
+    // 领了是已领取样式，过期了是已过期样式，机制完全一样，只是 record.status 不同，
+    // 气泡渲染直接复用 renderBubbleHTML，不用另外写 ──────────────────────
+    function _spawnReceiverMessage(record) {
+        if (typeof addMessage !== 'function') return;
+        var receiverName = settings.partnerName || '对方';
+        addMessage({
+            id: Date.now() + Math.random(),
+            sender: receiverName,
+            text: '',
+            timestamp: new Date(), // 用生成这一刻的真实时间，不用 resolveAt 那个理论时间点
+            status: 'received',
+            type: 'redpacket',
+            redpacketId: record.id,
+            favorited: false,
+            note: null
+        });
+        if (typeof playSound === 'function') playSound('message');
+        if (typeof window._sendPartnerNotification === 'function') {
+            var noticeText = record.status === 'received' ? '领取了你的红包' : '你的红包已过期，自动退回了';
+            window._sendPartnerNotification(receiverName, noticeText);
+        }
+    }
+
     // ── 定时检查（照抄 envelope.js 的 30秒轮询思路，自己独立跑一份，不需要改 app.js） ──────────────────────
     function checkRedPacketStatus() {
         if (!_loaded) return;
@@ -171,6 +196,7 @@
                 r.status = r.willReceive ? 'received' : 'returned';
                 if (r.status === 'received') r.receiveTime = r.resolveAt;
                 changed = true;
+                _spawnReceiverMessage(r);
             }
         });
         if (changed) {

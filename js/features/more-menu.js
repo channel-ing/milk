@@ -23,7 +23,15 @@
                 if (input) input.click();
             }
         },
-        { id: 'redpacket', iconClass: 'fas fa-gift', label: '红包', ready: false },
+        {
+            id: 'redpacket',
+            svgIcon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;">' +
+                '<path d="M925.888 76.8v400.96c-57.088 73.408-134.08 130.56-222.848 163.328C681.536 570.112 615.616 518.4 537.6 518.4c-79.936 0-147.264 54.336-166.912 128.064-95.36-31.616-178.048-91.072-238.4-168.704V76.8c0-42.24 34.56-76.8 76.8-76.8h640c42.24 0 76.8 34.56 76.8 76.8z" fill="currentColor"/>' +
+                '<path d="M925.888 554.56V947.2c0 42.24-34.56 76.8-76.8 76.8h-640c-42.24 0-76.8-34.56-76.8-76.8V554.56c59.712 76.8 141.248 135.808 235.328 167.68C382.208 802.88 452.8 864 537.6 864c87.104 0 159.168-64.448 171.072-148.288 86.464-33.024 161.344-89.344 217.216-161.152z" fill="currentColor"/>' +
+                '<path d="M659.2 691.2c0 14.976-2.688 29.312-7.68 42.56C634.24 779.904 589.76 812.8 537.6 812.8c-50.496 0-93.824-30.784-112.192-74.688-6.08-14.4-9.408-30.272-9.408-46.912 0-10.752 1.408-21.184 4.032-31.104C433.792 608 481.216 569.6 537.6 569.6c55.04 0 101.504 36.544 116.48 86.72 3.328 11.072 5.12 22.784 5.12 34.88z" fill="currentColor"/>' +
+                '</svg>',
+            label: '红包', ready: false
+        },
         {
             id: 'videocall',
             iconClass: 'fas fa-video',
@@ -96,9 +104,11 @@
         const panel = getPanel();
         if (!panel) return;
         const gridHTML = MORE_MENU_ITEMS.map(function (item) {
-            const iconHTML = item.emoji
-                ? '<span class="more-menu-emoji">' + item.emoji + '</span>'
-                : '<i class="' + item.iconClass + '"></i>';
+            const iconHTML = item.svgIcon
+                ? item.svgIcon
+                : (item.emoji
+                    ? '<span class="more-menu-emoji">' + item.emoji + '</span>'
+                    : '<i class="' + item.iconClass + '"></i>');
             return (
                 '<button class="more-menu-item' + (item.ready ? '' : ' disabled') + '" data-id="' + item.id + '" title="' + item.label + '">' +
                 '<span class="more-menu-icon">' + iconHTML + '</span>' +

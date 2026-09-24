@@ -529,6 +529,17 @@
         return id;
     }
 
+    // 開按钮点击入口：先放金元宝旋转动效，动效结束后再真正执行领取——
+    // 点击瞬间就调用 claimPartnerRedPacket 会导致弹窗内容立刻被替换成白卡，
+    // 动效还没转完就被打断了，所以这里要等一段时间（跟CSS动画时长对齐）再触发真正的领取逻辑
+    function playOpenAnimation(id, circleEl) {
+        if (!circleEl || circleEl.classList.contains('rp-coin-spinning')) return; // 防止动效播放中重复点击
+        circleEl.classList.add('rp-coin-spinning');
+        setTimeout(function () {
+            claimPartnerRedPacket(id);
+        }, 900);
+    }
+
     // 用户点"開"手动领取梦角发来的红包——这是真实的用户操作，跟普通消息一样触发已读+可能的回复
     function claimPartnerRedPacket(id) {
         var record = getById(id, 'inbox');
@@ -632,7 +643,7 @@
         if (record.status === 'pending') {
             var isClaimable = (direction === 'inbox'); // 用户是接收方，開按钮才可以点
             var openCircleHTML = isClaimable
-                ? '<div class="rp-card-open-circle rp-card-open-circle-clickable" onclick="window.RedPacket.claimById(\'' + record.id + '\')"><span>開</span></div>'
+                ? '<div class="rp-card-open-circle rp-card-open-circle-clickable" onclick="window.RedPacket.playOpenAnimation(\'' + record.id + '\', this)"><span>開</span></div>'
                 : '<div class="rp-card-open-circle"><span>開</span></div>';
             var waitingHTML = isClaimable
                 ? '<div class="rp-card-waiting">点击"開"拆红包</div>'
@@ -1006,6 +1017,7 @@
         sendUserRedPacket: sendUserRedPacket,
         sendPartnerRedPacket: sendPartnerRedPacket,
         claimById: claimPartnerRedPacket,
+        playOpenAnimation: playOpenAnimation,
         generatePartnerAmount: generatePartnerAmount,
         debugAmountDistribution: debugAmountDistribution,
         debugForcePartnerCheck: debugForcePartnerCheck,

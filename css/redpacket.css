@@ -217,12 +217,15 @@
     padding: 22px 0 0 !important;
     width: 88% !important;
     max-width: 380px !important;
-    max-height: 72vh !important;
+    height: 72vh !important; /* 固定死，不用max-height——不然分组里表情少的时候弹窗会跟着缩水，切分组时大小一直跳 */
 }
 .rp-sticker-picker-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
+    align-content: flex-start;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 6px 22px 22px;
 }
@@ -547,7 +550,7 @@
     flex-shrink: 0;
     width: 60px;
     height: 60px;
-    border-radius: 16px;
+    border-radius: 10px;
     overflow: hidden;
     margin: 0 auto 12px;
     background: var(--primary-bg);

@@ -649,8 +649,6 @@
                     '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_SEALED + '</button>' +
                 '</div>';
         } else if (record.status === 'received') {
-            var timeStr = new Date(record.receiveTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            var receiverLabel = direction === 'inbox' ? (settings.myName || '我') : (settings.partnerName || '梦角');
             html =
                 '<div class="rp-card rp-card-opened">' + _CARD_BG_OPENED +
                     '<div class="rp-card-header-row">' +
@@ -659,7 +657,7 @@
                     '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
                     '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
-                    '<div class="rp-card-link">' + _esc(receiverLabel) + ' 于 ' + timeStr + ' 领取</div>' +
+                    '<div class="rp-card-link rp-card-link-clickable" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');">查看历史红包记录 <i class="fas fa-chevron-right"></i></div>' +
                     '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_OPENED + '</button>' +
                 '</div>';
         } else {
@@ -671,7 +669,7 @@
                     '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
                     '<div class="rp-card-amount rp-card-amount-muted">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
-                    '<div class="rp-card-link">超过24小时未领取，已自动退回</div>' +
+                    '<div class="rp-card-link rp-card-link-clickable" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');">查看历史红包记录 <i class="fas fa-chevron-right"></i></div>' +
                     '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_RETURNED + '</button>' +
                 '</div>';
         }
@@ -710,6 +708,106 @@
             if (modal && typeof hideModal === 'function') hideModal(modal);
             if (typeof showNotification === 'function') showNotification('红包已发出～', 'success', 2000);
         }
+    }
+
+    // ================================================================
+    // 历史红包记录页（文档第7节）：居中弹窗，"我发出的"/"梦角发出的"两个tab，
+    // 顶部统计（总金额+共发出+对方已领取数，已退回不计入统计），
+    // 下方按日期分组的明细列表，结构参照电影院观影记录"顶部汇总+按天列表"那套。
+    // ================================================================
+    var _historyTab = 'outbox';
+
+    function openHistoryModal(tab) {
+        _historyTab = tab === 'inbox' ? 'inbox' : 'outbox';
+        _renderHistory();
+        var modal = document.getElementById('redpacket-history-modal');
+        if (modal && typeof showModal === 'function') showModal(modal);
+    }
+
+    function switchHistoryTab(tab) {
+        _historyTab = tab === 'inbox' ? 'inbox' : 'outbox';
+        _renderHistory();
+    }
+
+    function _historyDateKey(ts) {
+        var d = new Date(ts);
+        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    }
+    function _historyDateLabel(ts) {
+        var d = new Date(ts);
+        var today = new Date();
+        var yest = new Date(Date.now() - 86400000);
+        if (_historyDateKey(ts) === _historyDateKey(today.getTime())) return '今天';
+        if (_historyDateKey(ts) === _historyDateKey(yest.getTime())) return '昨天';
+        return d.getFullYear() === today.getFullYear()
+            ? (d.getMonth() + 1) + '月' + d.getDate() + '日'
+            : d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    }
+
+    function _historyEntryHTML(r) {
+        var statusLabel = r.status === 'received' ? '已领取' : (r.status === 'returned' ? '已过期' : '未领取');
+        var statusClass = r.status === 'received' ? 'rp-hist-status-received' : (r.status === 'returned' ? 'rp-hist-status-returned' : 'rp-hist-status-pending');
+        var timeStr = new Date(r.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return (
+            '<div class="rp-hist-row">' +
+                '<span class="rp-hist-row-icon">' + _ICON_SVG + '</span>' +
+                '<div class="rp-hist-row-mid">' +
+                    '<div class="rp-hist-row-blessing">' + _esc(r.blessing) + '</div>' +
+                    '<div class="rp-hist-row-time">' + timeStr + '</div>' +
+                '</div>' +
+                '<div class="rp-hist-row-right">' +
+                    '<div class="rp-hist-row-amount">' + _formatAmountShort(r.amount) + ' 元</div>' +
+                    '<div class="rp-hist-row-status ' + statusClass + '">' + statusLabel + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+    }
+
+    function _renderHistory() {
+        document.querySelectorAll('.rp-history-tab').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.tab === _historyTab);
+        });
+
+        var list = (_data[_historyTab] || []).slice();
+        var isOutbox = _historyTab === 'outbox';
+        var receiverLabel = isOutbox ? (settings.partnerName || '梦角') + '已领取' : (settings.myName || '我') + '已领取';
+
+        // 已退回不计入总金额和已领取数量统计（文档明确要求）
+        var totalAmount = 0, receivedCount = 0;
+        list.forEach(function (r) {
+            if (r.status === 'received') { totalAmount += r.amount; receivedCount++; }
+        });
+
+        var statsEl = document.getElementById('rp-history-stats');
+        if (statsEl) {
+            statsEl.innerHTML =
+                '<div class="rp-history-total">' + _formatAmountDisplay(totalAmount) + ' <span class="rp-history-total-unit">元</span></div>' +
+                '<div class="rp-history-mini-cards">' +
+                    '<div class="rp-history-mini-card"><div class="rp-history-mini-num">' + list.length + '</div><div class="rp-history-mini-label">共发出</div></div>' +
+                    '<div class="rp-history-mini-card"><div class="rp-history-mini-num">' + receivedCount + '</div><div class="rp-history-mini-label">' + _esc(receiverLabel) + '</div></div>' +
+                '</div>';
+        }
+
+        var listEl = document.getElementById('rp-history-list');
+        if (!listEl) return;
+        if (!list.length) {
+            listEl.innerHTML = '<div class="rp-history-empty">还没有红包记录</div>';
+            return;
+        }
+        var sorted = list.slice().sort(function (a, b) { return b.sentTime - a.sentTime; });
+        var groups = []; // [{label, items:[]}]，保持按时间从新到旧分组，同一天归一组
+        sorted.forEach(function (r) {
+            var label = _historyDateLabel(r.sentTime);
+            var g = groups.length && groups[groups.length - 1].label === label ? groups[groups.length - 1] : null;
+            if (!g) { g = { label: label, items: [] }; groups.push(g); }
+            g.items.push(r);
+        });
+        listEl.innerHTML = groups.map(function (g) {
+            return '<div class="rp-hist-day-group">' +
+                '<div class="rp-hist-day-label">' + _esc(g.label) + '</div>' +
+                g.items.map(_historyEntryHTML).join('') +
+            '</div>';
+        }).join('');
     }
 
     // ================================================================
@@ -910,6 +1008,8 @@
         debugTestReminder: debugTestReminder,
         debugSimulateScheduler: debugSimulateScheduler,
         jumpToExpiryReminder: jumpToExpiryReminder,
+        openHistoryModal: openHistoryModal,
+        switchHistoryTab: switchHistoryTab,
         renderBubbleHTML: renderBubbleHTML,
         openByMessageId: openByMessageId,
         openComposeModal: openComposeModal,

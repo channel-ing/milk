@@ -240,6 +240,7 @@
             type: 'redpacket',
             redpacketId: record.id,
             redpacketDirection: direction,
+            redpacketRole: 'receipt', // 这条是"领取/过期"生成的回执消息，不是最初那条
             favorited: false,
             note: null
         });
@@ -314,6 +315,48 @@
         return _data.scheduler;
     }
 
+    // ── 一键测试：不用自己拼代码，复制粘贴一行就行 ──────────────────────
+
+    // 1. 一键模拟"梦角发了红包，用户超过20小时没领"——自动发一个红包，
+    //    自动把发送时间往前拨到21小时前，自动刷新提醒按钮，右下角应该立刻能看到
+    async function debugTestReminder() {
+        if (!_loaded) await _load();
+        var id = await sendPartnerRedPacket();
+        var rec = getById(id, 'inbox');
+        if (rec) {
+            rec.sentTime = Date.now() - 21 * 3600000;
+            _save();
+        }
+        checkRedPacketStatus(); // 顺手会刷新提醒按钮
+        if (typeof showNotification === 'function') {
+            showNotification('已模拟一个超过20小时未领的红包，看看聊天区右下角', 'info', 3000);
+        }
+        console.log('[红包] 已模拟超时未领提醒，红包id=', id);
+    }
+
+    // 2. 一键验证"梦角主动发红包"的阶梯概率对不对——不是真的发1000个红包，
+    //    是照着调度器同一套逻辑（连续未命中计数+对应概率）在内存里空跑1000轮，
+    //    统计每个阶梯实际命中率跟文档写的15%/50%/95%差多少
+    function debugSimulateScheduler(rounds) {
+        rounds = rounds || 1000;
+        var missed = 0;
+        var stats = { t1: { hit: 0, total: 0 }, t2: { hit: 0, total: 0 }, t3: { hit: 0, total: 0 } };
+        for (var i = 0; i < rounds; i++) {
+            var key = missed < 4 ? 't1' : (missed < 7 ? 't2' : 't3');
+            var prob = missed < 4 ? 0.15 : (missed < 7 ? 0.5 : 0.95);
+            stats[key].total++;
+            if (Math.random() < prob) { stats[key].hit++; missed = 0; }
+            else { missed++; }
+        }
+        function fmt(s) { return s.total ? (s.hit / s.total * 100).toFixed(1) + '%' : '（这一档没跑到）'; }
+        console.log(
+            '[红包主动触发概率模拟] 共跑 ' + rounds + ' 轮\n' +
+            '第1-4次检查 (理论15%)：跑到 ' + stats.t1.total + ' 次，命中 ' + stats.t1.hit + ' 次，实际 ' + fmt(stats.t1) + '\n' +
+            '第5-7次检查 (理论50%)：跑到 ' + stats.t2.total + ' 次，命中 ' + stats.t2.hit + ' 次，实际 ' + fmt(stats.t2) + '\n' +
+            '第8次及以后 (理论95%)：跑到 ' + stats.t3.total + ' 次，命中 ' + stats.t3.hit + ' 次，实际 ' + fmt(stats.t3)
+        );
+    }
+
     // ================================================================
     // 到期提醒悬浮按钮（文档第8节）：梦角发的红包超过20小时没领，
     // 聊天界面右下角出现提醒，复用 #back-to-latest-btn 的胶囊样式，定位在它正上方。
@@ -335,12 +378,21 @@
         btn.style.display = 'flex';
     }
 
-    // 找到某个 inbox record 对应的【原始】那条消息（不是领取后生成的回执消息），用于跳转定位
+    // 找到某个 inbox record 对应的【原始】那条消息（不是领取后生成的回执消息），用于跳转定位。
+    // 之前这里靠 sender !== 'user' 猜"是不是原始消息"，但回执消息的 sender 如果不是字面的
+    // 'user'（比如用了真实用户名），这个判断就会失效，两条消息都会命中——现在改成直接认
+    // redpacketRole 这个明确标记，不用猜。旧消息没有这个字段时兜底退回旧逻辑，不然老数据直接找不到。
     function _findInboxMessageId(recordId) {
         if (typeof messages === 'undefined') return null;
         var msg = messages.find(function (m) {
-            return m.type === 'redpacket' && m.redpacketDirection === 'inbox' && m.redpacketId === recordId && m.sender !== 'user';
+            return m.type === 'redpacket' && m.redpacketDirection === 'inbox' && m.redpacketId === recordId && m.redpacketRole === 'original';
         });
+        if (!msg) {
+            // 兜底：老消息没有 redpacketRole 字段，退回旧的猜测逻辑
+            msg = messages.find(function (m) {
+                return m.type === 'redpacket' && m.redpacketDirection === 'inbox' && m.redpacketId === recordId && m.sender !== 'user';
+            });
+        }
         return msg ? msg.id : null;
     }
 
@@ -427,6 +479,7 @@
                 type: 'redpacket',
                 redpacketId: id,
                 redpacketDirection: 'outbox',
+                redpacketRole: 'original', // 这是红包最初发出的那条消息
                 favorited: false,
                 note: null
             });
@@ -463,6 +516,7 @@
                 type: 'redpacket',
                 redpacketId: id,
                 redpacketDirection: 'inbox',
+                redpacketRole: 'original', // 这是红包最初发出的那条消息
                 favorited: false,
                 note: null
             });
@@ -493,6 +547,7 @@
                 type: 'redpacket',
                 redpacketId: record.id,
                 redpacketDirection: 'inbox',
+                redpacketRole: 'receipt', // 这是用户点開领取之后生成的回执消息，不是最初那条
                 favorited: false,
                 note: null
             });
@@ -852,6 +907,8 @@
         debugAmountDistribution: debugAmountDistribution,
         debugForcePartnerCheck: debugForcePartnerCheck,
         debugSchedulerState: debugSchedulerState,
+        debugTestReminder: debugTestReminder,
+        debugSimulateScheduler: debugSimulateScheduler,
         jumpToExpiryReminder: jumpToExpiryReminder,
         renderBubbleHTML: renderBubbleHTML,
         openByMessageId: openByMessageId,

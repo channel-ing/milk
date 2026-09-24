@@ -75,12 +75,11 @@
     function validateAmount(raw) {
         var s = (raw == null ? '' : String(raw)).trim();
         if (!s) return { valid: false, error: '请输入金额' };
-        if (!/^\d+(\.\d{1,2})?$/.test(s)) return { valid: false, error: '金额格式不对，最多两位小数' };
+        if (!/^\d+(\.\d{1,2})?$/.test(s)) return { valid: false, error: '金额最多两位小数' };
         var n = parseFloat(s);
         if (isNaN(n) || n <= 0) return { valid: false, error: '金额要大于0' };
         if (n > 9999999.99) return { valid: false, error: '金额不能超过 9,999,999.99' };
         n = Math.round(n * 100) / 100;
-        if (n > 100 && n % 1 !== 0) return { valid: false, error: '超过100元的金额不能带小数' };
         return { valid: true, amount: n };
     }
 
@@ -92,6 +91,35 @@
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    // ── 红包小图标：直接从 Yuying 的 SVG 设计稿里原样扣出来的4个元素（信封身+封口弧+金币+¥符号），
+    // 坐标没有做任何改动，靠 viewBox 定位，保证跟设计稿像素级一致 ──────────────────────
+    var _ICON_SVG =
+        '<svg class="rp-icon-svg" viewBox="1951 10584 635 819.516" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="1951" y="10584" width="635" height="819.516" rx="73" fill="#FF5151"/>' +
+        '<path d="M1951 10928C1951 10928 2064.5 11013.9 2273 11013.5C2481.5 11013.1 2586 10928 2586 10928V11331C2586 11371.3 2553.32 11404 2513 11404H2024C1983.68 11404 1951 11371.3 1951 11331V10928Z" fill="#E14849"/>' +
+        '<circle cx="2269" cy="11021" r="92" fill="#FFD145"/>' +
+        '<path d="M2234 10970L2268.36 11000.2M2268.36 11000.2L2303 10970M2268.36 11000.2V11072M2223.5 11009.1H2314.63M2223 11042H2314.12" stroke="#D97F22" stroke-width="15" stroke-linecap="round"/>' +
+        '</svg>';
+
+    // ── 拆红包卡片的背景弧形：同样是从SVG稿里原样扣出来的路径（未拆开红卡 / 拆开白卡 / 已退回灰卡），
+    // 用 viewBox + preserveAspectRatio="none" 铺满容器，容器用 aspect-ratio 锁死比例，
+    // 保证响应式缩放时弧线形状跟设计稿完全一致，不是我自己拿CSS凑的曲线 ──────────────────────
+    var _CARD_BG_SEALED =
+        '<svg class="rp-card-bg" viewBox="1567 3724 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="1567" y="3724" width="3065" height="4820" fill="#CF1812"/>' +
+        '<path d="M3065.03 7373.94C2085.91 7373.94 1567 7027 1567 7027V8544H4632V7027C4632 7027 4044.15 7373.94 3065.03 7373.94Z" fill="#F15744"/>' +
+        '</svg>';
+    var _CARD_BG_OPENED =
+        '<svg class="rp-card-bg" viewBox="6487 3724 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="6487" y="3724" width="3065" height="4820" fill="#F15744"/>' +
+        '<path d="M8033.5 5486.5C7008.05 5486.5 6487 5237 6487 5237V8544H9552V5237C9552 5237 9058.95 5486.5 8033.5 5486.5Z" fill="white"/>' +
+        '</svg>';
+    var _CARD_BG_RETURNED =
+        '<svg class="rp-card-bg" viewBox="11007 3724 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="11007" y="3724" width="3065" height="4820" fill="#8F8F8F"/>' +
+        '<path d="M12553.5 5486.5C11528.1 5486.5 11007 5237 11007 5237V8544H14072V5237C14072 5237 13578.9 5486.5 12553.5 5486.5Z" fill="white"/>' +
+        '</svg>';
 
     // ── 领取/退回判定（文档 3.1：用户 → 梦角） ──────────────────────
     function _rollOutcome(record) {
@@ -187,17 +215,19 @@
         if (status === 'received' && record) {
             extraLine = '<div class="rp-bubble-extra">已领取 ' + _formatAmountDisplay(record.amount) + '元</div>';
         } else if (status === 'returned') {
-            extraLine = '<div class="rp-bubble-extra">已退回</div>';
+            extraLine = '<div class="rp-bubble-extra">已过期</div>';
         }
         return (
             '<div class="redpacket-bubble ' + statusClass + '" onclick="window.RedPacket.openByMessageId(\'' + msg.id + '\')">' +
                 '<div class="rp-bubble-top">' +
-                    '<span class="rp-bubble-icon"><i class="fas fa-gift"></i></span>' +
-                    '<span class="rp-bubble-blessing">' + _esc(blessing) + '</span>' +
+                    '<span class="rp-bubble-icon">' + _ICON_SVG + '</span>' +
+                    '<div class="rp-bubble-text">' +
+                        '<div class="rp-bubble-blessing">' + _esc(blessing) + '</div>' +
+                        extraLine +
+                    '</div>' +
                 '</div>' +
                 '<div class="rp-bubble-divider"></div>' +
                 '<div class="rp-bubble-bottom">' + _esc(senderName) + '发出的红包</div>' +
-                extraLine +
             '</div>'
         );
     }
@@ -225,42 +255,53 @@
 
         var html = '';
         if (record.status === 'pending') {
+            // 未拆开红卡：头像+称谓一行，祝福语大字，底部圆形"開"（照SVG稿1:1还原弧线，不是CSS画的）
             html =
-                '<div class="rp-card rp-card-sealed">' + closeBtn +
+                '<div class="rp-card rp-card-sealed">' + closeBtn + _CARD_BG_SEALED +
                     '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                     '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
                     '<div class="rp-card-blessing">' + _esc(record.blessing) + '</div>' +
-                    '<div class="rp-card-waiting"><i class="fas fa-hourglass-half"></i> 等待' + _esc(settings.partnerName || '梦角') + '查收…</div>' +
+                    '<div class="rp-card-open-circle"><span>開</span></div>' +
+                    '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '查收…</div>' +
                 '</div>';
         } else if (record.status === 'received') {
             var timeStr = new Date(record.receiveTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             html =
-                '<div class="rp-card rp-card-opened">' + closeBtn +
+                '<div class="rp-card rp-card-opened">' + closeBtn + _CARD_BG_OPENED +
                     '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                     '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
-                    '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' 元</div>' +
-                    '<div class="rp-card-time-note">' + _esc(settings.partnerName || '梦角') + ' 于 ' + timeStr + ' 领取</div>' +
+                    '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
+                    '<div class="rp-card-link">' + _esc(settings.partnerName || '梦角') + ' 于 ' + timeStr + ' 领取</div>' +
                 '</div>';
         } else {
             html =
-                '<div class="rp-card rp-card-returned">' + closeBtn +
+                '<div class="rp-card rp-card-returned">' + closeBtn + _CARD_BG_RETURNED +
                     '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                     '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
-                    '<div class="rp-card-amount rp-card-amount-muted">' + _formatAmountDisplay(record.amount) + ' 元</div>' +
-                    '<div class="rp-card-returned-note"><i class="fas fa-rotate-left"></i> 超过24小时未领取，已自动退回</div>' +
+                    '<div class="rp-card-amount rp-card-amount-muted">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
+                    '<div class="rp-card-link">超过24小时未领取，已自动退回</div>' +
                 '</div>';
         }
         wrap.innerHTML = html;
     }
 
     // ── 发红包弹窗（编写金额+祝福语） ──────────────────────
+    function _syncComposePreview() {
+        var amountInput = document.getElementById('rp-compose-amount');
+        var preview = document.getElementById('rp-compose-preview-amount');
+        if (!amountInput || !preview) return;
+        var n = parseFloat(amountInput.value);
+        preview.textContent = (isNaN(n) ? 0 : n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     function openComposeModal() {
         var amountInput = document.getElementById('rp-compose-amount');
         var blessingInput = document.getElementById('rp-compose-blessing');
         if (amountInput) amountInput.value = '';
         if (blessingInput) blessingInput.value = '';
+        _syncComposePreview();
         var modal = document.getElementById('redpacket-compose-modal');
         if (modal && typeof showModal === 'function') showModal(modal, amountInput);
     }
@@ -291,6 +332,11 @@
         if (window.MoreMenu && typeof window.MoreMenu.registerItem === 'function') {
             window.MoreMenu.registerItem('redpacket', { ready: true, action: openComposeModal });
         }
+
+        var headerIcon = document.getElementById('rp-compose-header-icon');
+        if (headerIcon) headerIcon.innerHTML = _ICON_SVG;
+        var amountInput = document.getElementById('rp-compose-amount');
+        if (amountInput) amountInput.addEventListener('input', _syncComposePreview);
     }
 
     document.addEventListener('DOMContentLoaded', function () {

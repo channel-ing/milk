@@ -217,7 +217,7 @@
     padding: 22px 0 0 !important;
     width: 88% !important;
     max-width: 380px !important;
-    height: 72vh !important; /* 固定死，不用max-height——不然分组里表情少的时候弹窗会跟着缩水，切分组时大小一直跳 */
+    height: 36vh !important; /* 缩短一半（原来72vh） */
 }
 .rp-sticker-picker-grid {
     display: grid;

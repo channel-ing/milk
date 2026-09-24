@@ -734,17 +734,20 @@
    坐标原样抠自那两份新SVG（未拆红包.svg / 带表情包.svg）。
    ============================================================ */
 .rp-card-sticker-img {
+    /* 改成跟主聊天 .message-image 一个逻辑：只卡宽度，高度不设死，
+       跟着图片本身的比例自然撑开，圆角直接打在图片上——不裁切、不用背景凑一个方框。
+       left/width 沿用卡片美术图设计好的插槽宽度；top 挪到插槽的垂直中心点，
+       配合 translateY(-50%) 让图不管高矮都以设计好的中心为基准，不会因为
+       高度不固定了就贴着某一边跑偏 */
     position: absolute;
     left: 39.3%;
     width: 21.3%;
-    height: 12.7%;
-    /* 改回contain，非正方形的表情包不会再被裁掉边角。
-       之前用cover是为了让圆角贴边好看，但代价是会裁切图片内容——
-       这次按要求优先保证表情包完整显示，用contain+底色兜住四周留白，
-       让留白看起来像个相框而不是"少了一角" */
-    object-fit: contain;
-    background: rgba(0,0,0,0.06);
+    height: auto;
+    max-height: none;
+    object-fit: unset;
+    background: none;
     border-radius: 12px; /* 跟聊天图片消息的圆角对齐 */
+    transform: translateY(-50%);
     z-index: 2;
 }
 
@@ -753,10 +756,11 @@
 .rp-card-sealed.rp-card-has-sticker .rp-card-header-row { top: 19.1%; }
 .rp-card-sealed.rp-card-has-sticker .rp-card-blessing { top: 28%; }
 .rp-card-sealed.rp-card-has-sticker .rp-card-sticker-img {
-    top: 38.5%;
+    /* top 从"框的顶边"改成"插槽的垂直中心"(原38.5% + 原高15.5%/2 = 46.25%)，
+       配合上面 translateY(-50%) 生效；height 不再固定，交给图片自己的比例 */
+    top: 46.25%;
     left: 37%;
     width: 26%;
-    height: 15.5%;
 }
 .rp-card-sealed.rp-card-has-sticker .rp-card-open-circle { top: 67.1%; }
 
@@ -769,10 +773,10 @@
 .rp-card-returned.rp-card-has-sticker .rp-card-blessing-grey { top: 37%; }
 .rp-card-opened.rp-card-has-sticker .rp-card-sticker-img,
 .rp-card-returned.rp-card-has-sticker .rp-card-sticker-img {
-    top: 42.5%;
+    /* 同上，改成插槽垂直中心(原42.5% + 原高15.5%/2 = 50.25%) */
+    top: 50.25%;
     left: 37%;
     width: 26%;
-    height: 15.5%;
 }
 .rp-card-opened.rp-card-has-sticker .rp-card-amount,
 .rp-card-returned.rp-card-has-sticker .rp-card-amount { top: 64%; }

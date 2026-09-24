@@ -5,6 +5,27 @@
    里原样量出来/抠出来的，不是估的。
    ============================================================ */
 
+/* ── 到期提醒悬浮按钮（文档第8节）：跟 #back-to-latest-btn 同款胶囊样式，
+   定位在它正上方，两者各自独立显示/隐藏，互不影响 ── */
+#rp-expiry-reminder-btn {
+    position: absolute;
+    right: 14px;
+    bottom: 128px; /* back-to-latest-btn 是 84px，胶囊自身高度+间距约 44px，叠在它正上方 */
+    z-index: 20;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: none;
+    background: var(--accent-color);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 /* ── 聊天气泡 ── */
 .message-redpacket-bubble-wrap {
     background: none !important;

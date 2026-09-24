@@ -738,7 +738,11 @@
     left: 39.3%;
     width: 21.3%;
     height: 12.7%;
-    object-fit: cover; /* 之前用contain，图片留白对不齐圆角框边界，看起来像缺了一角；改cover铺满裁切，圆角就干净了 */
+    /* 改回contain，非正方形的表情包不会再被裁掉边角。
+       之前用cover是为了让圆角贴边好看，但代价是会裁切图片内容——
+       这次按要求优先保证表情包完整显示，用contain+底色兜住四周留白，
+       让留白看起来像个相框而不是"少了一角" */
+    object-fit: contain;
     background: rgba(0,0,0,0.06);
     border-radius: 12px; /* 跟聊天图片消息的圆角对齐 */
     z-index: 2;

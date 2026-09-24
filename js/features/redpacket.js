@@ -193,6 +193,24 @@
         '<path d="M12553.5 5486.5C11528.1 5486.5 11007 5237 11007 5237V8544H14072V5237C14072 5237 13578.9 5486.5 12553.5 5486.5Z" fill="white"/>' +
         '</svg>';
 
+    // 带表情包版本的背景弧线——不是同一套稿子改个内容，是Yuying另外给的专门稿子，
+    // 头部弧线的位置整个不一样（往上收了，给表情包腾地方），坐标原样抠自那两份新SVG
+    var _CARD_BG_SEALED_STICKER =
+        '<svg class="rp-card-bg" viewBox="0 0 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect width="3065" height="4820" fill="#CF1812"/>' +
+        '<path d="M1498.03 3826.57C518.909 3826.57 0 3532 0 3532V4820H3065V3532C3065 3532 2477.15 3826.57 1498.03 3826.57Z" fill="#F15744"/>' +
+        '</svg>';
+    var _CARD_BG_OPENED_STICKER =
+        '<svg class="rp-card-bg" viewBox="0 0 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect width="3065" height="4820" fill="#F15744"/>' +
+        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="white"/>' +
+        '</svg>';
+    var _CARD_BG_RETURNED_STICKER =
+        '<svg class="rp-card-bg" viewBox="0 0 3065 4820" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect width="3065" height="4820" fill="#8F8F8F"/>' +
+        '<path d="M1546.5 1100.52C521.05 1100.52 0 797 0 797V4820H3065V797C3065 797 2571.95 1100.52 1546.5 1100.52Z" fill="white"/>' +
+        '</svg>';
+
     var _CLOSE_BTN_SEALED =
         '<svg class="rp-card-close-svg" viewBox="2919 8924 361 361" xmlns="http://www.w3.org/2000/svg">' +
         '<circle cx="3099.5" cy="9104.5" r="169.5" stroke="#FFC97C" stroke-width="22" fill="none"/>' +
@@ -448,7 +466,7 @@
     }
 
     // ── 发送（用户 → 梦角） ──────────────────────
-    async function sendUserRedPacket(rawAmount, rawBlessing) {
+    async function sendUserRedPacket(rawAmount, rawBlessing, sticker) {
         var check = validateAmount(rawAmount);
         if (!check.valid) {
             if (typeof showNotification === 'function') showNotification(check.error, 'error');
@@ -462,6 +480,7 @@
             id: id,
             amount: check.amount,
             blessing: blessing,
+            sticker: sticker || null,
             sentTime: Date.now(),
             status: 'pending'
         };
@@ -488,16 +507,27 @@
         return true;
     }
 
+    // 80%概率带一个表情包，从"对方表情库"(stickerLibrary，纯字符串数组)里随机抽；
+    // 库是空的就不带，不会因为抽不到东西而出错或者硬凑
+    function _drawPartnerSticker() {
+        if (Math.random() >= 0.8) return null;
+        var pool = (typeof stickerLibrary !== 'undefined' && Array.isArray(stickerLibrary)) ? stickerLibrary : [];
+        if (!pool.length) return null;
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
     // ── 发送（梦角 → 用户）：Step 3 才会接自动调度器，这一步先暴露成可以手动/控制台调用 ──────────────────
     async function sendPartnerRedPacket() {
         if (!_loaded) await _load();
         var amount = generatePartnerAmount();
         var blessing = _drawPartnerBlessing();
+        var sticker = _drawPartnerSticker();
         var id = 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         var record = {
             id: id,
             amount: amount,
             blessing: blessing,
+            sticker: sticker,
             sentTime: Date.now(),
             status: 'pending',
             resolveAt: Date.now() + 24 * 3600000 // 24小时未点開自动过期
@@ -625,9 +655,24 @@
             return;
         }
         var originalSenderIsUser = (direction === 'outbox');
+        _viewModalFromHistory = false;
         _renderViewModal(record, originalSenderIsUser ? 'user' : 'partner', direction);
         var modal = document.getElementById('redpacket-view-modal');
         if (modal && typeof showModal === 'function') showModal(modal);
+    }
+
+    function _stickerImgHTML(src) {
+        if (!src) return '';
+        var isCloud = typeof src === 'string' && src.indexOf('oss://') === 0;
+        return isCloud
+            ? '<img class="rp-card-sticker-img" data-lazy-cloud-ref="' + _esc(src) + '">'
+            : '<img class="rp-card-sticker-img" src="' + _esc(src) + '">';
+    }
+    function _bindStickerLazyLoad(wrap) {
+        if (!window.CloudMedia) return;
+        wrap.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
+            window.CloudMedia.bindLazyImage(imgEl, imgEl.getAttribute('data-lazy-cloud-ref'));
+        });
     }
 
     // sender: 'user' | 'partner'——始终是【这个红包最初的发送人】，不是当前这条气泡消息的 msg.sender
@@ -638,6 +683,9 @@
         var avatarHtml = _getAvatarHtml(sender);
         var senderName = sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '梦角');
         var senderLabel = senderName + '发出的红包';
+        var hasSticker = !!record.sticker;
+        var stickerClass = hasSticker ? ' rp-card-has-sticker' : '';
+        var stickerHTML = hasSticker ? _stickerImgHTML(record.sticker) : '';
 
         var html = '';
         if (record.status === 'pending') {
@@ -649,46 +697,52 @@
                 ? '<div class="rp-card-waiting">点击"開"拆红包</div>'
                 : '<div class="rp-card-waiting">等待' + _esc(settings.partnerName || '梦角') + '领取</div>';
             html =
-                '<div class="rp-card rp-card-sealed">' + _CARD_BG_SEALED +
+                '<div class="rp-card rp-card-sealed' + stickerClass + '">' + (hasSticker ? _CARD_BG_SEALED_STICKER : _CARD_BG_SEALED) +
                     '<button class="rp-card-menu-btn" title="查看历史红包记录" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');"><i class="fas fa-ellipsis-h"></i></button>' +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender">' + _esc(senderLabel) + '</div>' +
                     '</div>' +
                     '<div class="rp-card-blessing">' + _esc(record.blessing) + '</div>' +
+                    stickerHTML +
                     openCircleHTML +
                     waitingHTML +
-                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_SEALED + '</button>' +
+                    '<button class="rp-card-close" onclick="window.RedPacket.closeViewModal()">' + _CLOSE_BTN_SEALED + '</button>' +
                 '</div>';
         } else if (record.status === 'received') {
             html =
-                '<div class="rp-card rp-card-opened">' + _CARD_BG_OPENED +
+                '<div class="rp-card rp-card-opened' + stickerClass + '">' + (hasSticker ? _CARD_BG_OPENED_STICKER : _CARD_BG_OPENED) +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
                     '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
+                    stickerHTML +
                     '<div class="rp-card-amount">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
                     '<div class="rp-card-link rp-card-link-clickable" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');">查看历史红包记录 <i class="fas fa-chevron-right"></i></div>' +
-                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_OPENED + '</button>' +
+                    '<button class="rp-card-close" onclick="window.RedPacket.closeViewModal()">' + _CLOSE_BTN_OPENED + '</button>' +
                 '</div>';
         } else {
             html =
-                '<div class="rp-card rp-card-returned">' + _CARD_BG_RETURNED +
+                '<div class="rp-card rp-card-returned' + stickerClass + '">' + (hasSticker ? _CARD_BG_RETURNED_STICKER : _CARD_BG_RETURNED) +
                     '<div class="rp-card-header-row">' +
                         '<div class="rp-card-avatar">' + avatarHtml + '</div>' +
                         '<div class="rp-card-sender-dark">' + _esc(senderLabel) + '</div>' +
                     '</div>' +
                     '<div class="rp-card-blessing-grey">' + _esc(record.blessing) + '</div>' +
+                    stickerHTML +
                     '<div class="rp-card-amount rp-card-amount-muted">' + _formatAmountDisplay(record.amount) + ' <span class="rp-card-amount-unit">元</span></div>' +
                     '<div class="rp-card-link rp-card-link-clickable" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'));window.RedPacket.openHistoryModal(\'' + direction + '\');">查看历史红包记录 <i class="fas fa-chevron-right"></i></div>' +
-                    '<button class="rp-card-close" onclick="hideModal(document.getElementById(\'redpacket-view-modal\'))">' + _CLOSE_BTN_RETURNED + '</button>' +
+                    '<button class="rp-card-close" onclick="window.RedPacket.closeViewModal()">' + _CLOSE_BTN_RETURNED + '</button>' +
                 '</div>';
         }
         wrap.innerHTML = html;
+        if (hasSticker) _bindStickerLazyLoad(wrap);
     }
 
-    // ── 发红包弹窗（编写金额+祝福语） ──────────────────────
+    // ── 发红包弹窗（编写金额+祝福语+表情包） ──────────────────────
+    var _composeSticker = null; // 当前表单里选中的表情包src，没选就是null
+
     function _syncComposePreview() {
         var amountInput = document.getElementById('rp-compose-amount');
         var preview = document.getElementById('rp-compose-preview-amount');
@@ -697,14 +751,74 @@
         preview.textContent = (isNaN(n) ? 0 : n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function _syncStickerSlotUI() {
+        var icon = document.getElementById('rp-compose-sticker-slot-icon');
+        var img = document.getElementById('rp-compose-sticker-slot-img');
+        if (!icon || !img) return;
+        if (_composeSticker) {
+            icon.style.display = 'none';
+            img.src = _composeSticker;
+            img.style.display = 'block';
+        } else {
+            icon.style.display = '';
+            img.style.display = 'none';
+            img.src = '';
+        }
+    }
+
     function openComposeModal() {
         var amountInput = document.getElementById('rp-compose-amount');
         var blessingInput = document.getElementById('rp-compose-blessing');
         if (amountInput) amountInput.value = '';
         if (blessingInput) blessingInput.value = '';
+        _composeSticker = null;
+        _syncStickerSlotUI();
         _syncComposePreview();
         var modal = document.getElementById('redpacket-compose-modal');
         if (modal && typeof showModal === 'function') showModal(modal, amountInput);
+    }
+
+    // 表情槽位点击：已经选了 → 弹删除确认；还没选 → 打开选择器
+    function onStickerSlotClick() {
+        if (_composeSticker) {
+            var delModal = document.getElementById('rp-sticker-delete-modal');
+            if (delModal && typeof showModal === 'function') showModal(delModal);
+        } else {
+            _openStickerPicker();
+        }
+    }
+
+    function confirmStickerDelete() {
+        _composeSticker = null;
+        _syncStickerSlotUI();
+        var delModal = document.getElementById('rp-sticker-delete-modal');
+        if (delModal && typeof hideModal === 'function') hideModal(delModal);
+    }
+
+    // 表情选择器：直接复用"我的表情库"(myStickerLibrary)的内容源，不是另起一个上传入口
+    function _openStickerPicker() {
+        var grid = document.getElementById('rp-sticker-picker-grid');
+        if (grid) {
+            var pool = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
+            if (!pool.length) {
+                grid.innerHTML = '<div class="rp-sticker-picker-empty">"我的表情库"里还没有表情，去聊天输入框那边先添加几个吧</div>';
+            } else {
+                grid.innerHTML = pool.map(function (s) {
+                    var src = typeof s === 'string' ? s : s.src;
+                    return '<button type="button" class="rp-sticker-picker-item" data-src="' + _esc(src) + '"><img src="' + _esc(src) + '"></button>';
+                }).join('');
+                grid.querySelectorAll('.rp-sticker-picker-item').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        _composeSticker = btn.dataset.src;
+                        _syncStickerSlotUI();
+                        var pickerModal = document.getElementById('rp-sticker-picker-modal');
+                        if (pickerModal && typeof hideModal === 'function') hideModal(pickerModal);
+                    });
+                });
+            }
+        }
+        var modal = document.getElementById('rp-sticker-picker-modal');
+        if (modal && typeof showModal === 'function') showModal(modal);
     }
 
     async function submitCompose() {
@@ -713,7 +827,7 @@
         var btn = document.getElementById('rp-compose-send-btn');
         if (!amountInput) return;
         if (btn) btn.disabled = true;
-        var ok = await sendUserRedPacket(amountInput.value, blessingInput ? blessingInput.value : '');
+        var ok = await sendUserRedPacket(amountInput.value, blessingInput ? blessingInput.value : '', _composeSticker);
         if (btn) btn.disabled = false;
         if (ok) {
             var modal = document.getElementById('redpacket-compose-modal');
@@ -728,6 +842,36 @@
     // 下方按日期分组的明细列表，结构参照电影院观影记录"顶部汇总+按天列表"那套。
     // ================================================================
     var _historyTab = 'outbox';
+
+    // 拆红包卡片弹窗是从历史记录点进来的，关掉之后要回到历史列表，不是直接消失——
+    // 用这个标志记一下，closeViewModal 关的时候会检查它
+    var _viewModalFromHistory = false;
+
+    function openHistoryDetail(recordId, direction) {
+        var record = getById(recordId, direction);
+        if (!record) {
+            if (typeof showNotification === 'function') showNotification('这条记录找不到了', 'error');
+            return;
+        }
+        var originalSenderIsUser = (direction === 'outbox');
+        _viewModalFromHistory = true;
+        _renderViewModal(record, originalSenderIsUser ? 'user' : 'partner', direction);
+        var historyModal = document.getElementById('redpacket-history-modal');
+        var viewModal = document.getElementById('redpacket-view-modal');
+        if (historyModal && typeof hideModal === 'function') hideModal(historyModal);
+        if (viewModal && typeof showModal === 'function') showModal(viewModal);
+    }
+
+    // 所有"×"关闭按钮都走这个，不再直接调 hideModal——如果这张卡片是从历史记录点进来的，
+    // 关掉之后要自动重新弹出历史列表，不是就此什么都不剩
+    function closeViewModal() {
+        var viewModal = document.getElementById('redpacket-view-modal');
+        if (viewModal && typeof hideModal === 'function') hideModal(viewModal);
+        if (_viewModalFromHistory) {
+            _viewModalFromHistory = false;
+            openHistoryModal(_historyTab);
+        }
+    }
 
     function openHistoryModal(tab) {
         _historyTab = tab === 'inbox' ? 'inbox' : 'outbox';
@@ -756,12 +900,12 @@
             : d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
     }
 
-    function _historyEntryHTML(r) {
+    function _historyEntryHTML(r, direction) {
         var statusLabel = r.status === 'received' ? '已领取' : (r.status === 'returned' ? '已过期' : '未领取');
         var statusClass = r.status === 'received' ? 'rp-hist-status-received' : (r.status === 'returned' ? 'rp-hist-status-returned' : 'rp-hist-status-pending');
         var timeStr = new Date(r.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         return (
-            '<div class="rp-hist-row">' +
+            '<div class="rp-hist-row" data-id="' + r.id + '" data-direction="' + direction + '" onclick="window.RedPacket.openHistoryDetail(\'' + r.id + '\', \'' + direction + '\')">' +
                 '<span class="rp-hist-row-icon">' + _ICON_SVG + '</span>' +
                 '<div class="rp-hist-row-mid">' +
                     '<div class="rp-hist-row-blessing">' + _esc(r.blessing) + '</div>' +
@@ -821,7 +965,7 @@
         listEl.innerHTML = groups.map(function (g) {
             return '<div class="rp-hist-day-group">' +
                 '<div class="rp-hist-day-label">' + _esc(g.label) + '</div>' +
-                g.items.map(_historyEntryHTML).join('') +
+                g.items.map(function (r) { return _historyEntryHTML(r, _historyTab); }).join('') +
             '</div>';
         }).join('');
     }
@@ -1026,7 +1170,11 @@
         debugSimulateScheduler: debugSimulateScheduler,
         jumpToExpiryReminder: jumpToExpiryReminder,
         openHistoryModal: openHistoryModal,
+        openHistoryDetail: openHistoryDetail,
+        closeViewModal: closeViewModal,
         switchHistoryTab: switchHistoryTab,
+        onStickerSlotClick: onStickerSlotClick,
+        confirmStickerDelete: confirmStickerDelete,
         renderBubbleHTML: renderBubbleHTML,
         openByMessageId: openByMessageId,
         openComposeModal: openComposeModal,

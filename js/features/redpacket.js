@@ -291,8 +291,24 @@
     // 每日上限：最多3个，自然日0点重置（不是滚动24小时），节日/纪念日红包也占这个额度。
     // ================================================================
 
+    // 调试用：控制台可以临时"假装今天是哪天"，方便不等到真实节日/纪念日那天也能测判定逻辑对不对。
+    // 只影响 redpacket.js 这一个文件里对"今天"的判断，不会影响项目里其它任何地方（日签、经期等
+    // 照样用真实系统时间）。正式环境里 _rpDebugFakeToday 永远是 null，不会被误触发。
+    var _rpDebugFakeToday = null; // null=用真实时间；否则是 Date 对象
+    function _rpNow() { return _rpDebugFakeToday || new Date(); }
+    function debugSetFakeToday(dateStr) {
+        var d = new Date(dateStr + 'T12:00:00'); // 用中午，避免时区换算把日期拨到前一天/后一天
+        if (isNaN(d.getTime())) { console.warn('[红包] 日期格式不对，要传 \'YYYY-MM-DD\''); return; }
+        _rpDebugFakeToday = d;
+        console.log('[红包] 已假装今天是 ' + dateStr + '，测完记得调用 window.RedPacket.debugClearFakeToday() 恢复真实时间');
+    }
+    function debugClearFakeToday() {
+        _rpDebugFakeToday = null;
+        console.log('[红包] 已恢复真实时间');
+    }
+
     function _rpTodayStr() {
-        var d = new Date();
+        var d = _rpNow();
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
     // b比a晚多少天，a/b都是'YYYY-MM-DD'（按当地日历日算，不受时分秒影响）
@@ -316,7 +332,7 @@
     function _rpCheckFestival() {
         try {
             if (typeof festivals === 'undefined' || !Array.isArray(festivals)) return null;
-            var now = new Date(), m = now.getMonth() + 1, d = now.getDate();
+            var now = _rpNow(), m = now.getMonth() + 1, d = now.getDate();
             var isListed = _RP_FESTIVAL_MD.some(function (md) { return md[0] === m && md[1] === d; });
             if (!isListed) return null;
             var f = festivals.find(function (x) { return x.m === m && x.d === d; });
@@ -329,7 +345,7 @@
     // 跟 anniversaries 数组里其它条目一起判定，命中第一个就返回（理论上不太会同一天撞好几个）
     function _rpCheckAnniversary() {
         try {
-            var now = new Date();
+            var now = _rpNow();
             var list = [];
             if (typeof _annGetMeetData === 'function') {
                 var meet = _annGetMeetData();
@@ -358,7 +374,7 @@
         } catch (e) { return null; }
     }
 
-    // 经期第一天关怀红包——文案控制在10个字以内，先写个草稿，你自己再改
+    // 经期第一天关怀红包——Yuying 自己改过的文案
     var _RP_PERIOD_LINES = [
         '经期第一天好好休息，不要太累了',
         '痛痛飞走～',
@@ -375,9 +391,11 @@
         } catch (e) { return null; }
     }
 
-    // 节日优先，其次纪念日，最后是经期第一天（用户实际记录的，不是预测的）——三者不叠加，哪个先判定到就用哪个
-    async function _rpCheckSpecialDay() {
-        return _rpCheckFestival() || _rpCheckAnniversary() || await _rpCheckPeriod();
+    // 节日/纪念日同一天撞上时，只给纪念日（Yuying 明确说的：撞上了纪念日优先，节日让路）；
+    // 经期第一天不参与这个"谁优先"的排序——它是否要显示，交给下面 evaluatePartnerTrigger
+    // 里专门的"撞车判定"处理，撞车与否走的是两条不同的路径，不是简单的优先级链
+    function _rpCheckPrimarySpecial() {
+        return _rpCheckAnniversary() || _rpCheckFestival();
     }
 
     function _isGatedByOtherModes() {
@@ -390,13 +408,16 @@
     }
 
     // 每日额度状态跨天自动重置——不用定时器主动清零，每次判定时"顺手"检查一下
-    // dailyDate 是不是还是今天，不是就说明跨天了，重置 dailyCount
+    // dailyDate 是不是还是今天，不是就说明跨天了，重置 dailyCount。
+    // periodBonusUsedDate 不用在这里额外清零——它的用法一直是"跟今天日期比对"，
+    // 逻辑上自然就是"过了今天就不算用过"，不用像 dailyCount 那样手动清零（specialUsedDate 也是同理）
     function _rpEnsureSchedulerShape() {
         if (!_data.scheduler || typeof _data.scheduler !== 'object' || 'missedCount' in _data.scheduler) {
             // 兼容旧结构（8~12小时调度器时代留下的 {nextCheckAt, missedCount}）：直接换成新结构，
             // 不试图从旧字段里"翻译"出连续天数，安全起见当成"从没发过"处理（走最低档兜底概率）
-            _data.scheduler = { lastSentDate: null, dailyDate: null, dailyCount: 0, specialUsedDate: null };
+            _data.scheduler = { lastSentDate: null, dailyDate: null, dailyCount: 0, specialUsedDate: null, periodBonusUsedDate: null };
         }
+        if (!('periodBonusUsedDate' in _data.scheduler)) _data.scheduler.periodBonusUsedDate = null; // 老数据补个字段，不然是 undefined，跟 today 字符串比较也不会误判，但补上更干净
         var today = _rpTodayStr();
         if (_data.scheduler.dailyDate !== today) {
             _data.scheduler.dailyDate = today;
@@ -419,7 +440,20 @@
 
     // 主判定入口——Step 2 会把这个函数接到 core.js 里跟拍一拍同一个判定点上。
     // 现在先单独导出，方便控制台直接调用验证。
-    // 返回 null = 这次没触发；返回 {special} = 触发了，special 非空时是节日/纪念日命中的文案信息
+    // 每次调用只掷一次骰子（对应梦角的一条回复），命中就发一个红包，不管命中与否这次判定就算完了：
+    //
+    //   路径A（当天专属额度，只要还没用过就一直在这条路上试，直到命中或者过了今天）：
+    //     今天有纪念日/节日 → 80%命中，文案用纪念日/节日的
+    //
+    //   路径B（只有"今天纪念日/节日 且 经期第一天 两件事同时撞上"才会启用，撞车专属的"追加一个"机制，
+    //     独立于路径A的额度，路径A命中过一次之后才会轮到这条路）：
+    //     还没发过经期关怀红包 → 50%命中，文案用经期关怀的
+    //
+    //   路径C（前两条都不适用时的兜底，也是没有任何特殊日子时的默认路径）：
+    //     经期第一天（没有撞车的情况，单独出现）→ 80%命中，文案用经期关怀的；
+    //     都不是 → 按"连续多少天没发"的兜底阶梯概率，文案走普通留言库
+    //
+    // 返回 null = 这次没触发；返回 {special} = 触发了，special 非空时是特殊文案的信息
     async function evaluatePartnerTrigger() {
         if (!_loaded) await _load();
         if (_isGatedByOtherModes()) return null; // 陪伴模式/观影模式期间不判定
@@ -427,16 +461,41 @@
         var today = _rpTodayStr();
         if (_data.scheduler.dailyCount >= 3) return null; // 今天3个名额已经用完
 
-        var special = null;
-        if (_data.scheduler.specialUsedDate !== today) {
-            special = await _rpCheckSpecialDay();
+        var primary = _rpCheckPrimarySpecial();               // 节日/纪念日（互斥，纪念日优先）
+        var periodSpecial = await _rpCheckPeriod();            // 经期第一天（今天真的记录了才会非空）
+        var isCollision = !!(primary && periodSpecial);
+
+        var special = null, prob;
+
+        if (_data.scheduler.specialUsedDate !== today && primary) {
+            // 路径A：今天的纪念日/节日额度还没用——不管今天是否也撞上经期，
+            // 第一个红包永远先尝试用纪念日/节日
+            special = primary;
+            prob = 0.8;
+        } else if (isCollision && _data.scheduler.periodBonusUsedDate !== today) {
+            // 路径B：只有撞车了才会走到这——纪念日/节日的额度已经用掉了（上面那个分支不成立），
+            // 且经期关怀的"追加名额"还没用过，50%概率追加一个
+            special = periodSpecial;
+            prob = 0.5;
+        } else if (_data.scheduler.specialUsedDate !== today && periodSpecial) {
+            // 路径C：没撞车，今天单纯是经期第一天（没有纪念日/节日）——按原来的逻辑，80%命中
+            special = periodSpecial;
+            prob = 0.8;
+        } else {
+            prob = _rpFallbackProb();
         }
-        var prob = special ? 0.8 : _rpFallbackProb();
+
         if (Math.random() >= prob) return null; // 没中
 
         _data.scheduler.dailyCount += 1;
         _data.scheduler.lastSentDate = today;
-        if (special) _data.scheduler.specialUsedDate = today;
+        if (special === primary && primary) _data.scheduler.specialUsedDate = today;
+        if (special === periodSpecial && periodSpecial) {
+            // 经期关怀无论是走路径B(撞车追加)还是路径C(单独出现)命中的，都标记"今天用过了"，
+            // 防止路径C那种"没撞车"的情况下，同一天因为经期记录一直在、又被反复命中好几次
+            _data.scheduler.periodBonusUsedDate = today;
+            if (!isCollision) _data.scheduler.specialUsedDate = today; // 路径C视同占用了"当天专属额度"，逻辑上跟原来的节日/纪念日一样，一天只顶一次
+        }
         _save();
 
         await sendPartnerRedPacket(special ? special.text : null);
@@ -470,28 +529,36 @@
         return result;
     }
 
-    // 3. 看当前调度状态：连续几天没发、今天已经发了几个、今天特殊额度用没用过
+    // 3. 看当前调度状态：连续几天没发、今天已经发了几个、今天专属额度/经期追加名额用没用过
     async function debugSchedulerState() {
         _rpEnsureSchedulerShape();
         var days = _rpDaysSinceLastSent();
+        var primary = _rpCheckPrimarySpecial();
+        var periodSpecial = await _rpCheckPeriod();
         var info = {
             连续没发天数: days === Infinity ? '从没发过' : days,
             当前兜底概率: (_rpFallbackProb() * 100) + '%',
             今天已发数量: _data.scheduler.dailyCount + ' / 3',
-            今天特殊额度: _data.scheduler.specialUsedDate === _rpTodayStr() ? '已用过' : '还没用',
-            今天是不是特殊日子: await _rpCheckSpecialDay()
+            今天专属额度: _data.scheduler.specialUsedDate === _rpTodayStr() ? '已用过' : '还没用',
+            今天经期追加名额: _data.scheduler.periodBonusUsedDate === _rpTodayStr() ? '已用过' : '还没用',
+            今天节日或纪念日: primary,
+            今天经期第一天: periodSpecial,
+            今天是否撞车: !!(primary && periodSpecial)
         };
         console.log('[红包调度器状态]', info);
         return info;
     }
 
-    // 4. 看"今天算不算特殊日子"判定得对不对，不发红包，纯看判定结果和文案
-    //    （节日/纪念日/经期第一天三个都会查，命中优先级：节日 > 纪念日 > 经期）
+    // 4. 看"今天算不算特殊日子"判定得对不对，不发红包，纯看判定结果——不模拟额度/概率，
+    //    单纯告诉你今天有没有命中节日/纪念日、有没有命中经期第一天，以及算不算撞车
     async function debugCheckSpecialDay() {
-        var r = await _rpCheckSpecialDay();
-        console.log('[红包] 今天特殊日子判定：', r || '今天不是节日/纪念日里程碑・倒数日/经期第一天');
+        var primary = _rpCheckPrimarySpecial();
+        var periodSpecial = await _rpCheckPeriod();
+        var r = { 节日或纪念日: primary, 经期第一天: periodSpecial, 撞车: !!(primary && periodSpecial) };
+        console.log('[红包] 今天特殊日子判定：', r);
         return r;
     }
+
 
     // 5. 批量空跑验证概率分布对不对——不真的发红包，只是照着 evaluatePartnerTrigger
     //    同一套概率公式在内存里模拟 N 天，统计"连续没发天数"落在每个档位时的实际命中率，
@@ -1427,6 +1494,8 @@
         debugForcePartnerCheck: debugForcePartnerCheck,
         debugSchedulerState: debugSchedulerState,
         debugCheckSpecialDay: debugCheckSpecialDay,
+        debugSetFakeToday: debugSetFakeToday,
+        debugClearFakeToday: debugClearFakeToday,
         debugTestReminder: debugTestReminder,
         debugSimulateFallback: debugSimulateFallback,
         evaluatePartnerTrigger: evaluatePartnerTrigger,

@@ -2171,6 +2171,16 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                 return;
             }
 
+            // ── 梦角主动发红包：跟上面拍一拍是完全独立的两套判定，互不影响——
+            // 不 return，不影响这次正常回复照常生成；异步调用，不 await，不拖慢/阻塞回复流程，
+            // 红包该不该发、发不发得出去，evaluatePartnerTrigger 内部自己算完自己存，
+            // 这里只是在梦角每次要生成回复之前，顺手多"戳"它判定一次
+            if (window.RedPacket && typeof window.RedPacket.evaluatePartnerTrigger === 'function') {
+                window.RedPacket.evaluatePartnerTrigger().catch(function (e) {
+                    console.warn('[红包] 判定过程出错，这次先跳过', e);
+                });
+            }
+
             const replyCount = Math.random() < 0.75 ? 1: (Math.random() < 0.95 ? 2: 3);
             if (!customReplies || customReplies.length === 0) {
                 showNotification('回复库为空，请先到「自定义回复」中添加内容', 'info', 3500);

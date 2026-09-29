@@ -41,7 +41,7 @@
 
 .more-menu-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 22px 8px;
     padding: 20px 18px calc(16px + env(safe-area-inset-bottom, 0px));
     animation: moreMenuFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);

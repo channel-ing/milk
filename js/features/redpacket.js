@@ -107,37 +107,76 @@
         return { valid: true, amount: n };
     }
 
-    // ── 梦角发红包的金额生成算法（文档1.2）：50%彩蛋池，50%走三档区间(40%/40%/20%) ──────────────────────
-    var _EGG_POOL = [520, 1314, 13.14, 52000, 520000, 9999999.99];
-    function generatePartnerAmount() {
-        if (Math.random() < 0.5) {
-            return _EGG_POOL[Math.floor(Math.random() * _EGG_POOL.length)];
+    // ── 梦角发红包的金额生成算法 ──────────────────────
+    // 彩蛋池的触发概率分两档：节日/纪念日/经期关怀这些"特殊场合"是80%，
+    // 普通红包(兜底概率触发的)维持原来的50%不变
+    // 彩蛋池内部6个数字也不是均等概率了，权重：520和1314各30%，52000和520000各15%，
+    // 13.14是9%，9999999.99只给1%（这个数字太夸张，出现太频繁会显得不真实）
+    var _EGG_POOL_WEIGHTED = [
+        { amount: 520, weight: 0.30 },
+        { amount: 1314, weight: 0.30 },
+        { amount: 52000, weight: 0.15 },
+        { amount: 520000, weight: 0.15 },
+        { amount: 13.14, weight: 0.09 },
+        { amount: 9999999.99, weight: 0.01 }
+    ];
+    var _EGG_POOL = _EGG_POOL_WEIGHTED.map(function (x) { return x.amount; }); // 给下面 debugAmountDistribution 判断"是不是彩蛋"用
+    function _drawEggAmount() {
+        var r = Math.random(), cum = 0;
+        for (var i = 0; i < _EGG_POOL_WEIGHTED.length; i++) {
+            cum += _EGG_POOL_WEIGHTED[i].weight;
+            if (r < cum) return _EGG_POOL_WEIGHTED[i].amount;
         }
+        return _EGG_POOL_WEIGHTED[_EGG_POOL_WEIGHTED.length - 1].amount; // 浮点误差兜底，理论上走不到这里
+    }
+
+    // 非彩蛋的"三档区间"改成四档：50% 1~1000，35% 1000~1万，10% 1万~10万，5% 10万~100万——
+    // 比之前更集中在小额，只有少数情况才会给到大额
+    function _drawTierAmount() {
         var r = Math.random(), min, max;
-        if (r < 0.4) { min = 1; max = 10000; }
-        else if (r < 0.8) { min = 10000; max = 100000; }
+        if (r < 0.5) { min = 1; max = 1000; }
+        else if (r < 0.85) { min = 1000; max = 10000; }
+        else if (r < 0.95) { min = 10000; max = 100000; }
         else { min = 100000; max = 1000000; }
         var amount = Math.floor(min + Math.random() * (max - min));
         return Math.max(1, amount);
     }
 
+    // isSpecial：这次是不是节日/纪念日/经期关怀这类"特殊场合"的红包——是的话彩蛋池概率吃80%，
+    // 不是（普通兜底触发）就还是50%
+    function generatePartnerAmount(isSpecial) {
+        var eggProb = isSpecial ? 0.8 : 0.5;
+        if (Math.random() < eggProb) return _drawEggAmount();
+        return _drawTierAmount();
+    }
+
     // 控制台批量验证概率分布用（照项目里其它随机系统的验证惯例，跑几百次看分布对不对）
-    function debugAmountDistribution(n) {
+    // isSpecial 参数跟正式代码一样传，不传就是模拟普通红包(50%彩蛋)
+    function debugAmountDistribution(n, isSpecial) {
         n = n || 500;
-        var egg = 0, t1 = 0, t2 = 0, t3 = 0;
+        var egg = 0, eggBreakdown = {}, t1 = 0, t2 = 0, t3 = 0, t4 = 0;
         for (var i = 0; i < n; i++) {
-            var a = generatePartnerAmount();
-            if (_EGG_POOL.indexOf(a) !== -1) egg++;
-            else if (a < 10000) t1++;
-            else if (a < 100000) t2++;
-            else t3++;
+            var a = generatePartnerAmount(isSpecial);
+            if (_EGG_POOL.indexOf(a) !== -1) {
+                egg++;
+                eggBreakdown[a] = (eggBreakdown[a] || 0) + 1;
+            }
+            else if (a < 1000) t1++;
+            else if (a < 10000) t2++;
+            else if (a < 100000) t3++;
+            else t4++;
         }
         console.log(
-            '[红包金额分布] 样本数=' + n +
-            ' | 彩蛋=' + egg + ' (' + (egg / n * 100).toFixed(1) + '%)' +
-            ' | 档位一 1~1万=' + t1 + ' (' + (t1 / n * 100).toFixed(1) + '%)' +
-            ' | 档位二 1万~10万=' + t2 + ' (' + (t2 / n * 100).toFixed(1) + '%)' +
-            ' | 档位三 10万~100万=' + t3 + ' (' + (t3 / n * 100).toFixed(1) + '%)'
+            '[红包金额分布] 样本数=' + n + '（isSpecial=' + !!isSpecial + '，彩蛋概率理论值=' + (isSpecial ? '80%' : '50%') + '）\n' +
+            '彩蛋池整体=' + egg + ' (' + (egg / n * 100).toFixed(1) + '%)\n' +
+            '  ├ 彩蛋内部明细：' + Object.keys(eggBreakdown).map(function (k) {
+                return k + '=' + eggBreakdown[k] + '(' + (eggBreakdown[k] / (egg || 1) * 100).toFixed(1) + '%，理论' +
+                    (_EGG_POOL_WEIGHTED.find(function (x) { return String(x.amount) === k; }).weight * 100) + '%)';
+            }).join('，') + '\n' +
+            '档位一 1~1000=' + t1 + ' (' + (t1 / n * 100).toFixed(1) + '%，理论50%)\n' +
+            '档位二 1000~1万=' + t2 + ' (' + (t2 / n * 100).toFixed(1) + '%，理论35%)\n' +
+            '档位三 1万~10万=' + t3 + ' (' + (t3 / n * 100).toFixed(1) + '%，理论10%)\n' +
+            '档位四 10万~100万=' + t4 + ' (' + (t4 / n * 100).toFixed(1) + '%，理论5%)'
         );
     }
 
@@ -381,10 +420,10 @@
 
     // 经期第一天关怀红包——Yuying 自己改过的文案
     var _RP_PERIOD_LINES = [
-        '经期第一天好好休息',
+        '经期第一天好好休息，不要太累了',
         '痛痛飞走～',
-        '揉揉肚肚～',
-        '经期不吃冰的哦'
+        '我在陪着你，痛了也不要忍着呀',
+        '经期第一天，不要吃冰的哦'
     ];
     async function _rpCheckPeriod() {
         try {
@@ -508,7 +547,7 @@
         }
         _save();
 
-        await sendPartnerRedPacket(special ? special.text : null);
+        await sendPartnerRedPacket(special ? special.text : null, !!special);
         return { special: special };
     }
 
@@ -740,9 +779,12 @@
     }
 
     // ── 发送（梦角 → 用户）：Step 3 才会接自动调度器，这一步先暴露成可以手动/控制台调用 ──────────────────
-    async function sendPartnerRedPacket(blessingOverride) {
+    // isSpecial：是不是节日/纪念日/经期关怀这类"特殊场合"（决定彩蛋池概率吃80%还是普通的50%），
+    // 不传就当普通红包处理——跟 blessingOverride 是不是非空刚好一致（evaluatePartnerTrigger
+    // 调用时会把两个一起传：命中特殊路径时 blessingOverride 有值，isSpecial 也是 true）
+    async function sendPartnerRedPacket(blessingOverride, isSpecial) {
         if (!_loaded) await _load();
-        var amount = generatePartnerAmount();
+        var amount = generatePartnerAmount(isSpecial);
         var blessing = blessingOverride || _drawPartnerBlessing();
         var sticker = _drawPartnerSticker();
         var id = 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);

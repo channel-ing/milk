@@ -25,7 +25,6 @@
     var _data = { outbox: [], inbox: [], msgBank: [], scheduler: null };
     var _loaded = false;
     var _storageKey = null;
-    var _partnerCheckTimer = null;
 
     // ── Storage（照抄 survey.js 的取key方式） ──────────────────────
     async function _getKey() {
@@ -275,14 +274,94 @@
     }
 
     // ================================================================
-    // 梦角主动发红包 —— 调度器（文档第4节）
-    // 结构照抄 cinema.js 的"梦角主动邀请"那套：nextCheckAt 持久化 + setTimeout，
-    // 不是 setInterval 轮询——间隔是小时级的，没必要每30秒空转检查一次。
-    // 8~12小时检查一次；连续未命中1-4次(missedCount 0~3)：15%；5-7次(4~6)：50%；
-    // 8次及以后(≥7)：固定95%。命中就发一个红包并清零计数。
-    // 陪伴模式/观影模式期间不检查——不消耗这次检查机会，15分钟后再看一眼。
+    // 梦角主动发红包 —— 判定逻辑（Step 1：只写判定，不接入 core.js 的回复生成点）
+    //
+    // 跟"拍一拍"共用同一个触发时机：梦角每生成一条回复，判定一次
+    // （Step 2 才会真的把 evaluatePartnerTrigger() 接到 core.js 里那个跟拍一拍
+    //  同一处的判定点上，现在先在这里把判定逻辑写完、用控制台指令单独验证）。
+    //
+    // 判定优先级（每次只走一条，不叠加）：
+    //   1. 今天是节日，或今天是某个纪念日的里程碑(52天/100的倍数)/倒数日当天，
+    //      且"今天的特殊额度"还没用过 → 80%，命中就用节日/纪念日专属文案，
+    //      并把"今天特殊额度"标记为已用（当天再命中，就走下面第2条的普通概率+普通文案）
+    //   2. 否则按"连续多少天一个红包都没发出"走兜底阶梯：
+    //      <3天：3%（照抄拍一拍的基础概率）；3~5天：20%；6~9天：40%；≥10天：90%
+    //   命中就发一个红包，把"连续没发天数"清零（今天记为最近一次发出的日期）。
+    //
+    // 每日上限：最多3个，自然日0点重置（不是滚动24小时），节日/纪念日红包也占这个额度。
     // ================================================================
-    function _randHours8to12() { return 8 + Math.random() * 4; }
+
+    function _rpTodayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    // b比a晚多少天，a/b都是'YYYY-MM-DD'（按当地日历日算，不受时分秒影响）
+    function _rpDaysBetweenDateStr(a, b) {
+        var da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
+        return Math.round((db - da) / 86400000);
+    }
+
+    // 从项目里已有的 festivals 数组（js/features.js，日签/动态问候语用的那份45条节气+节日全集）
+    // 里挑出来的12个"有仪式感、适合发红包"的正经节日——Yuying 明确确认过这份名单，
+    // 二十四节气（惊蛰/白露那类）、妇女节/儿童节/植树节这类不算在内
+    var _RP_FESTIVAL_MD = [
+        [1, 1] /* 元旦 */, [2, 14] /* 情人节 */, [2, 16] /* 除夕 */, [2, 17] /* 春节 */,
+        [3, 3] /* 元宵节 */, [5, 20] /* 520 */, [6, 19] /* 端午节 */, [8, 19] /* 七夕节 */,
+        [9, 25] /* 中秋节 */, [10, 1] /* 国庆节 */, [12, 25] /* 圣诞节 */, [12, 31] /* 跨年夜 */
+    ];
+    var _RP_BLESSING_WORDS = ['快乐', '幸福', '甜蜜', '圆满', '顺遂'];
+    function _rpRandomWord() { return _RP_BLESSING_WORDS[Math.floor(Math.random() * _RP_BLESSING_WORDS.length)]; }
+
+    // 今天算不算节日；命中就返回 {kind:'festival', text, name}，用 festivals 数组自带的 note 当文案，不新造
+    function _rpCheckFestival() {
+        try {
+            if (typeof festivals === 'undefined' || !Array.isArray(festivals)) return null;
+            var now = new Date(), m = now.getMonth() + 1, d = now.getDate();
+            var isListed = _RP_FESTIVAL_MD.some(function (md) { return md[0] === m && md[1] === d; });
+            if (!isListed) return null;
+            var f = festivals.find(function (x) { return x.m === m && x.d === d; });
+            if (!f) return null;
+            return { kind: 'festival', text: f.note, name: f.name };
+        } catch (e) { return null; }
+    }
+
+    // 今天算不算纪念日里程碑/倒数日；相遇纪念日（_annGetMeetData，特殊虚拟条目）永远是"已经"型，
+    // 跟 anniversaries 数组里其它条目一起判定，命中第一个就返回（理论上不太会同一天撞好几个）
+    function _rpCheckAnniversary() {
+        try {
+            var now = new Date();
+            var list = [];
+            if (typeof _annGetMeetData === 'function') {
+                var meet = _annGetMeetData();
+                if (meet && meet.target) list.push({ name: meet.name, target: meet.target, isCD: false });
+            }
+            (typeof anniversaries !== 'undefined' ? anniversaries : []).forEach(function (a) {
+                var t = new Date(a.date);
+                if (isNaN(t.getTime())) return;
+                list.push({ name: a.name, target: t, isCD: a.type === 'countdown' });
+            });
+            for (var i = 0; i < list.length; i++) {
+                var it = list[i];
+                if (it.isCD) {
+                    var dLeft = Math.ceil((it.target - now) / 86400000);
+                    if (dLeft === 0) {
+                        return { kind: 'countdown', text: it.name + _rpRandomWord(), name: it.name };
+                    }
+                } else {
+                    var dPass = Math.floor((now - it.target) / 86400000);
+                    if (dPass > 0 && (dPass === 52 || dPass % 100 === 0)) {
+                        return { kind: 'milestone', text: it.name + dPass + '天' + _rpRandomWord(), name: it.name, days: dPass };
+                    }
+                }
+            }
+            return null;
+        } catch (e) { return null; }
+    }
+
+    // 节日优先，其次纪念日；都没命中返回 null
+    function _rpCheckSpecialDay() {
+        return _rpCheckFestival() || _rpCheckAnniversary();
+    }
 
     function _isGatedByOtherModes() {
         try {
@@ -293,44 +372,58 @@
         } catch (e) { return false; }
     }
 
-    function _scheduleNextPartnerCheck() {
-        if (_partnerCheckTimer) { clearTimeout(_partnerCheckTimer); _partnerCheckTimer = null; }
-        if (!_data.scheduler) {
-            // 第一次用，从现在起 8~12 小时后才第一次检查，不是装上就立刻查
-            _data.scheduler = { nextCheckAt: Date.now() + _randHours8to12() * 3600000, missedCount: 0 };
-            _save();
+    // 每日额度状态跨天自动重置——不用定时器主动清零，每次判定时"顺手"检查一下
+    // dailyDate 是不是还是今天，不是就说明跨天了，重置 dailyCount
+    function _rpEnsureSchedulerShape() {
+        if (!_data.scheduler || typeof _data.scheduler !== 'object' || 'missedCount' in _data.scheduler) {
+            // 兼容旧结构（8~12小时调度器时代留下的 {nextCheckAt, missedCount}）：直接换成新结构，
+            // 不试图从旧字段里"翻译"出连续天数，安全起见当成"从没发过"处理（走最低档兜底概率）
+            _data.scheduler = { lastSentDate: null, dailyDate: null, dailyCount: 0, specialUsedDate: null };
         }
-        var delay = _data.scheduler.nextCheckAt - Date.now();
-        if (delay <= 0) { _runPartnerCheck(); return; }
-        _partnerCheckTimer = setTimeout(_runPartnerCheck, delay);
+        var today = _rpTodayStr();
+        if (_data.scheduler.dailyDate !== today) {
+            _data.scheduler.dailyDate = today;
+            _data.scheduler.dailyCount = 0;
+        }
     }
 
-    async function _runPartnerCheck() {
-        if (_isGatedByOtherModes()) {
-            _partnerCheckTimer = setTimeout(_runPartnerCheck, 15 * 60000);
-            return;
+    function _rpDaysSinceLastSent() {
+        if (!_data.scheduler.lastSentDate) return Infinity; // 从没发过 = 无穷久没发，直接吃最高档兜底
+        return _rpDaysBetweenDateStr(_data.scheduler.lastSentDate, _rpTodayStr());
+    }
+
+    function _rpFallbackProb() {
+        var days = _rpDaysSinceLastSent();
+        if (days < 3) return 0.03;
+        if (days <= 5) return 0.2;
+        if (days <= 9) return 0.4;
+        return 0.9;
+    }
+
+    // 主判定入口——Step 2 会把这个函数接到 core.js 里跟拍一拍同一个判定点上。
+    // 现在先单独导出，方便控制台直接调用验证。
+    // 返回 null = 这次没触发；返回 {special} = 触发了，special 非空时是节日/纪念日命中的文案信息
+    async function evaluatePartnerTrigger() {
+        if (!_loaded) await _load();
+        if (_isGatedByOtherModes()) return null; // 陪伴模式/观影模式期间不判定
+        _rpEnsureSchedulerShape();
+        var today = _rpTodayStr();
+        if (_data.scheduler.dailyCount >= 3) return null; // 今天3个名额已经用完
+
+        var special = null;
+        if (_data.scheduler.specialUsedDate !== today) {
+            special = _rpCheckSpecialDay();
         }
-        var missed = _data.scheduler.missedCount || 0;
-        var prob = missed < 4 ? 0.15 : (missed < 7 ? 0.5 : 0.95);
-        if (Math.random() < prob) {
-            await sendPartnerRedPacket();
-            _data.scheduler.missedCount = 0;
-        } else {
-            _data.scheduler.missedCount = missed + 1;
-        }
-        _data.scheduler.nextCheckAt = Date.now() + _randHours8to12() * 3600000;
+        var prob = special ? 0.8 : _rpFallbackProb();
+        if (Math.random() >= prob) return null; // 没中
+
+        _data.scheduler.dailyCount += 1;
+        _data.scheduler.lastSentDate = today;
+        if (special) _data.scheduler.specialUsedDate = today;
         _save();
-        _scheduleNextPartnerCheck();
-    }
 
-    // 控制台测试用：不用真等8~12小时，立刻跑一次调度检查（该门控还是会门控，该概率还是走概率）
-    function debugForcePartnerCheck() {
-        if (_partnerCheckTimer) { clearTimeout(_partnerCheckTimer); _partnerCheckTimer = null; }
-        _runPartnerCheck();
-    }
-    function debugSchedulerState() {
-        console.log('[红包调度器状态]', JSON.parse(JSON.stringify(_data.scheduler)));
-        return _data.scheduler;
+        await sendPartnerRedPacket(special ? special.text : null);
+        return { special: special };
     }
 
     // ── 一键测试：不用自己拼代码，复制粘贴一行就行 ──────────────────────
@@ -352,26 +445,57 @@
         console.log('[红包] 已模拟超时未领提醒，红包id=', id);
     }
 
-    // 2. 一键验证"梦角主动发红包"的阶梯概率对不对——不是真的发1000个红包，
-    //    是照着调度器同一套逻辑（连续未命中计数+对应概率）在内存里空跑1000轮，
-    //    统计每个阶梯实际命中率跟文档写的15%/50%/95%差多少
-    function debugSimulateScheduler(rounds) {
-        rounds = rounds || 1000;
-        var missed = 0;
-        var stats = { t1: { hit: 0, total: 0 }, t2: { hit: 0, total: 0 }, t3: { hit: 0, total: 0 } };
+    // 2. 立刻跑一次判定，不用真的等梦角回复触发——该门控（陪伴/观影模式）还是会门控，
+    //    该概率还是走概率，跟正式接入后的行为完全一样
+    async function debugForcePartnerCheck() {
+        var result = await evaluatePartnerTrigger();
+        console.log('[红包] 手动触发一次判定，结果：', result ? '中了，已发红包' : '没中（或今天名额已用完/正在陪伴・观影模式）', result);
+        return result;
+    }
+
+    // 3. 看当前调度状态：连续几天没发、今天已经发了几个、今天特殊额度用没用过
+    function debugSchedulerState() {
+        _rpEnsureSchedulerShape();
+        var days = _rpDaysSinceLastSent();
+        var info = {
+            连续没发天数: days === Infinity ? '从没发过' : days,
+            当前兜底概率: (_rpFallbackProb() * 100) + '%',
+            今天已发数量: _data.scheduler.dailyCount + ' / 3',
+            今天特殊额度: _data.scheduler.specialUsedDate === _rpTodayStr() ? '已用过' : '还没用',
+            今天是不是特殊日子: _rpCheckSpecialDay()
+        };
+        console.log('[红包调度器状态]', info);
+        return info;
+    }
+
+    // 4. 看"今天算不算特殊日子"判定得对不对，不发红包，纯看判定结果和文案
+    function debugCheckSpecialDay() {
+        var r = _rpCheckSpecialDay();
+        console.log('[红包] 今天特殊日子判定：', r || '今天不是节日也不是纪念日里程碑/倒数日');
+        return r;
+    }
+
+    // 5. 批量空跑验证概率分布对不对——不真的发红包，只是照着 evaluatePartnerTrigger
+    //    同一套概率公式在内存里模拟 N 天，统计"连续没发天数"落在每个档位时的实际命中率，
+    //    跟设计的 3%/20%/40%/90% 差多少（不含节日/纪念日的80%那条路径，那条是日历决定的，没法随机模拟）
+    function debugSimulateFallback(rounds) {
+        rounds = rounds || 2000;
+        var daysSince = 999; // 模拟从"很久没发"开始
+        var stats = { t1: { hit: 0, total: 0 }, t2: { hit: 0, total: 0 }, t3: { hit: 0, total: 0 }, t4: { hit: 0, total: 0 } };
         for (var i = 0; i < rounds; i++) {
-            var key = missed < 4 ? 't1' : (missed < 7 ? 't2' : 't3');
-            var prob = missed < 4 ? 0.15 : (missed < 7 ? 0.5 : 0.95);
+            var key = daysSince < 3 ? 't1' : (daysSince <= 5 ? 't2' : (daysSince <= 9 ? 't3' : 't4'));
+            var prob = daysSince < 3 ? 0.03 : (daysSince <= 5 ? 0.2 : (daysSince <= 9 ? 0.4 : 0.9));
             stats[key].total++;
-            if (Math.random() < prob) { stats[key].hit++; missed = 0; }
-            else { missed++; }
+            if (Math.random() < prob) { stats[key].hit++; daysSince = 0; }
+            else { daysSince++; }
         }
         function fmt(s) { return s.total ? (s.hit / s.total * 100).toFixed(1) + '%' : '（这一档没跑到）'; }
         console.log(
-            '[红包主动触发概率模拟] 共跑 ' + rounds + ' 轮\n' +
-            '第1-4次检查 (理论15%)：跑到 ' + stats.t1.total + ' 次，命中 ' + stats.t1.hit + ' 次，实际 ' + fmt(stats.t1) + '\n' +
-            '第5-7次检查 (理论50%)：跑到 ' + stats.t2.total + ' 次，命中 ' + stats.t2.hit + ' 次，实际 ' + fmt(stats.t2) + '\n' +
-            '第8次及以后 (理论95%)：跑到 ' + stats.t3.total + ' 次，命中 ' + stats.t3.hit + ' 次，实际 ' + fmt(stats.t3)
+            '[红包兜底概率模拟] 共跑 ' + rounds + ' 轮判定\n' +
+            '<3天 (理论3%)：跑到 ' + stats.t1.total + ' 次，命中 ' + stats.t1.hit + ' 次，实际 ' + fmt(stats.t1) + '\n' +
+            '3~5天 (理论20%)：跑到 ' + stats.t2.total + ' 次，命中 ' + stats.t2.hit + ' 次，实际 ' + fmt(stats.t2) + '\n' +
+            '6~9天 (理论40%)：跑到 ' + stats.t3.total + ' 次，命中 ' + stats.t3.hit + ' 次，实际 ' + fmt(stats.t3) + '\n' +
+            '≥10天 (理论90%)：跑到 ' + stats.t4.total + ' 次，命中 ' + stats.t4.hit + ' 次，实际 ' + fmt(stats.t4)
         );
     }
 
@@ -517,10 +641,10 @@
     }
 
     // ── 发送（梦角 → 用户）：Step 3 才会接自动调度器，这一步先暴露成可以手动/控制台调用 ──────────────────
-    async function sendPartnerRedPacket() {
+    async function sendPartnerRedPacket(blessingOverride) {
         if (!_loaded) await _load();
         var amount = generatePartnerAmount();
-        var blessing = _drawPartnerBlessing();
+        var blessing = blessingOverride || _drawPartnerBlessing();
         var sticker = _drawPartnerSticker();
         var id = 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         var record = {
@@ -1244,13 +1368,15 @@
         };
     }
 
-    // ── 启动：等 SESSION_ID 就绪 → 加载数据（含留言库种子） → 立即检查一次 → 30秒轮询 ──────────────────────
+    // ── 启动：等 SESSION_ID 就绪 → 加载数据（含留言库种子） → 30秒轮询过期状态 ──────────────────────
+    // 注：梦角主动发红包这次改成跟"拍一拍"共用同一个触发时机（梦角每次生成回复时判定一次），
+    // 不再是这里启动一个独立的小时级调度器——Step 2 会把 evaluatePartnerTrigger() 接到
+    // core.js 里那个判定点上，这里就不用再 _scheduleNextPartnerCheck() 了
     async function _boot() {
         await _waitForSessionId(3000);
         await _load();
         checkRedPacketStatus();
         setInterval(checkRedPacketStatus, 30000);
-        _scheduleNextPartnerCheck();
         _updateExpiryReminder();
 
         // 把"更多菜单"里的红包坑位从占位升级成真实功能，不用改 more-menu.js
@@ -1282,8 +1408,10 @@
         debugAmountDistribution: debugAmountDistribution,
         debugForcePartnerCheck: debugForcePartnerCheck,
         debugSchedulerState: debugSchedulerState,
+        debugCheckSpecialDay: debugCheckSpecialDay,
         debugTestReminder: debugTestReminder,
-        debugSimulateScheduler: debugSimulateScheduler,
+        debugSimulateFallback: debugSimulateFallback,
+        evaluatePartnerTrigger: evaluatePartnerTrigger,
         jumpToExpiryReminder: jumpToExpiryReminder,
         openHistoryModal: openHistoryModal,
         openHistoryDetail: openHistoryDetail,

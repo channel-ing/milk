@@ -358,9 +358,26 @@
         } catch (e) { return null; }
     }
 
-    // 节日优先，其次纪念日；都没命中返回 null
-    function _rpCheckSpecialDay() {
-        return _rpCheckFestival() || _rpCheckAnniversary();
+    // 经期第一天关怀红包——文案控制在10个字以内，先写个草稿，你自己再改
+    var _RP_PERIOD_LINES = [
+        '经期第一天好好休息，不要太累了',
+        '痛痛飞走～',
+        '我在陪着你，痛了也不要忍着呀',
+        '经期第一天，不要吃冰的哦'
+    ];
+    async function _rpCheckPeriod() {
+        try {
+            if (typeof window._pdIsTodayPeriodStart !== 'function') return null;
+            var startedToday = await window._pdIsTodayPeriodStart();
+            if (!startedToday) return null;
+            var text = _RP_PERIOD_LINES[Math.floor(Math.random() * _RP_PERIOD_LINES.length)];
+            return { kind: 'period', text: text, name: '经期关怀' };
+        } catch (e) { return null; }
+    }
+
+    // 节日优先，其次纪念日，最后是经期第一天（用户实际记录的，不是预测的）——三者不叠加，哪个先判定到就用哪个
+    async function _rpCheckSpecialDay() {
+        return _rpCheckFestival() || _rpCheckAnniversary() || await _rpCheckPeriod();
     }
 
     function _isGatedByOtherModes() {
@@ -412,7 +429,7 @@
 
         var special = null;
         if (_data.scheduler.specialUsedDate !== today) {
-            special = _rpCheckSpecialDay();
+            special = await _rpCheckSpecialDay();
         }
         var prob = special ? 0.8 : _rpFallbackProb();
         if (Math.random() >= prob) return null; // 没中
@@ -454,7 +471,7 @@
     }
 
     // 3. 看当前调度状态：连续几天没发、今天已经发了几个、今天特殊额度用没用过
-    function debugSchedulerState() {
+    async function debugSchedulerState() {
         _rpEnsureSchedulerShape();
         var days = _rpDaysSinceLastSent();
         var info = {
@@ -462,16 +479,17 @@
             当前兜底概率: (_rpFallbackProb() * 100) + '%',
             今天已发数量: _data.scheduler.dailyCount + ' / 3',
             今天特殊额度: _data.scheduler.specialUsedDate === _rpTodayStr() ? '已用过' : '还没用',
-            今天是不是特殊日子: _rpCheckSpecialDay()
+            今天是不是特殊日子: await _rpCheckSpecialDay()
         };
         console.log('[红包调度器状态]', info);
         return info;
     }
 
     // 4. 看"今天算不算特殊日子"判定得对不对，不发红包，纯看判定结果和文案
-    function debugCheckSpecialDay() {
-        var r = _rpCheckSpecialDay();
-        console.log('[红包] 今天特殊日子判定：', r || '今天不是节日也不是纪念日里程碑/倒数日');
+    //    （节日/纪念日/经期第一天三个都会查，命中优先级：节日 > 纪念日 > 经期）
+    async function debugCheckSpecialDay() {
+        var r = await _rpCheckSpecialDay();
+        console.log('[红包] 今天特殊日子判定：', r || '今天不是节日/纪念日里程碑・倒数日/经期第一天');
         return r;
     }
 

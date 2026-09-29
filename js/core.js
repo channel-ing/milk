@@ -1867,6 +1867,18 @@ const addMessage = (message) => {
             (function(){try{if(window._typingIndicatorAutoHideTimer){clearTimeout(window._typingIndicatorAutoHideTimer);window._typingIndicatorAutoHideTimer=null;}}catch(e){}var _tiW=document.getElementById('typing-indicator-wrapper');if(_tiW){var _tiInner=_tiW.querySelector('.typing-indicator');if(_tiInner){_tiInner.classList.add('hiding');setTimeout(function(){_tiW.style.display='none';if(_tiInner)_tiInner.classList.remove('hiding');},240);}else{_tiW.style.display='none';}}})();
         };
 
+        // 输入框高度动态测量——不管清空还是有内容，统一走这一个函数，不再写死具体像素值。
+        // styles.css 里 .message-input 在不同断点下 min-height 是不一样的（桌面46px/手机≤768px是
+        // 42px/更小屏幕≤480px是38px），写死一个数字在窄屏上就会跟正确值对不上，
+        // 表现出来就是"空的时候"（走写死值）比"有文字的时候"（走这里的scrollHeight动态测量）更高或更矮。
+        // 用 scrollHeight 量出来的高度，天然就是当前断点下 CSS 实际生效的那个值，不用关心断点数字本身。
+        function _syncMessageInputHeight() {
+            if (!DOMElements.messageInput) return;
+            DOMElements.messageInput.style.height = 'auto';
+            DOMElements.messageInput.style.height = `${Math.min(DOMElements.messageInput.scrollHeight, 120)}px`;
+        }
+        window._syncMessageInputHeight = _syncMessageInputHeight;
+
         function sendMessage(textOverride = null, type = 'normal') {
             const text = textOverride || DOMElements.messageInput.value.trim();
             const imageFile = DOMElements.imageInput.files[0];
@@ -1877,14 +1889,14 @@ const addMessage = (message) => {
                 const cmd = text.replace(/\s+/g, '').toLowerCase();
                 if (cmd === '/测试拍一拍' || cmd === '/testpoke') {
                     DOMElements.messageInput.value = '';
-                    DOMElements.messageInput.style.height = '46px';
+                    _syncMessageInputHeight();
                     if (typeof window._triggerPartnerPoke === 'function') window._triggerPartnerPoke();
                     if (typeof showNotification === 'function') showNotification('✦ 强制触发对方拍一拍', 'info', 1800);
                     return;
                 }
                 if (cmd === '/测试状态更新' || cmd === '/teststatus') {
                     DOMElements.messageInput.value = '';
-                    DOMElements.messageInput.style.height = '46px';
+                    _syncMessageInputHeight();
                     if (typeof window._triggerStatusChange === 'function') window._triggerStatusChange();
                     if (typeof showNotification === 'function') showNotification('✦ 强制触发状态更新', 'info', 1800);
                     return;
@@ -1892,7 +1904,7 @@ const addMessage = (message) => {
             }
 
             DOMElements.messageInput.value = '';
-            DOMElements.messageInput.style.height = '46px';
+            _syncMessageInputHeight();
             if (imageFile && imageFile.size > MAX_IMAGE_SIZE) {
                 showNotification('图片大小不能超过5MB', 'error'); DOMElements.imageInput.value = ''; return;
             }
@@ -1950,7 +1962,7 @@ if (!isBatchMode && type === 'normal') {
             batchMessages.push({
                 id: Date.now() + batchMessages.length, text: text || '', image: imageOverride || null
             });
-            DOMElements.messageInput.value = ''; DOMElements.messageInput.style.height = '46px';
+            DOMElements.messageInput.value = ''; _syncMessageInputHeight();
             updateBatchPreview();
         }
 

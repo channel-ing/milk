@@ -12,7 +12,9 @@
 (function () {
     // 图标里 emoji 优先于 iconClass（emoji 更容易一眼分辨，比如红包用 🧧 而不是信封，
     // 避免跟信箱功能的信封图标混淆）；iconClass 支持传完整的 class 字符串（包括 fab 品牌图标）
-    // 顺序：图片/视频通话/红包/批量发送——Yuying 定的顺序。
+    // 顺序：图片/让ta主动/红包/批量发送/位置/快问快答。
+    // "视频通话"和"让梦角主动说话"对调了位置：视频通话挪回输入区主行显示，
+    // "让梦角主动说话"(原 continue-btn)挪进这个面板，显示名叫"让ta主动"。
     // 原来的"位置/小红书/抖音/快问快答"那一整行先隐藏了，这些功能都还没做，
     // 留着一排点了只会弹"开发中"的占位格子没有意义。做好了哪个再挪回来加进这个数组就行，
     // 不用改这个文件其它任何逻辑——面板本身是按这个数组自动渲染的，加/删条目会自动跟着调整布局。
@@ -28,14 +30,22 @@
             }
         },
         {
-            id: 'videocall',
-            iconClass: 'fas fa-video',
-            label: '视频通话',
+            id: 'continue',
+            // 头像居中 + 右上角带三个点的对话气泡，代表"让ta主动说句话"。
+            // 用 svgIcon 而不是 iconClass，因为这是设计好的复合图标，不是字体库里现成的单个符号
+            svgIcon: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:28px;height:28px;" fill="none">' +
+                '<circle cx="12" cy="10" r="4.3" fill="currentColor"/>' +
+                '<path d="M5.7 21.5c0-4.7 3-7.4 6.3-7.4s6.3 2.7 6.3 7.4" fill="currentColor"/>' +
+                '<rect x="15.8" y="0.8" width="7.1" height="5.3" rx="2.65" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+                '<path d="M17.8 6.0 17.0 7.3 18.7 6.3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+                '<circle cx="17.9" cy="3.45" r="0.65" fill="currentColor"/>' +
+                '<circle cx="19.35" cy="3.45" r="0.65" fill="currentColor"/>' +
+                '<circle cx="20.8" cy="3.45" r="0.65" fill="currentColor"/>' +
+                '</svg>',
+            label: '让ta主动',
             ready: true,
             action: function () {
-                if (window.callFeature && typeof window.callFeature.startCall === 'function') {
-                    window.callFeature.startCall(false);
-                }
+                if (typeof simulateReply === 'function') simulateReply();
             }
         },
         {

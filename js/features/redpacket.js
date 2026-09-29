@@ -317,25 +317,33 @@
         return Math.round((db - da) / 86400000);
     }
 
-    // 从项目里已有的 festivals 数组（js/features.js，日签/动态问候语用的那份45条节气+节日全集）
-    // 里挑出来的12个"有仪式感、适合发红包"的正经节日——Yuying 明确确认过这份名单，
-    // 二十四节气（惊蛰/白露那类）、妇女节/儿童节/植树节这类不算在内
-    var _RP_FESTIVAL_MD = [
-        [1, 1] /* 元旦 */, [2, 14] /* 情人节 */, [2, 16] /* 除夕 */, [2, 17] /* 春节 */,
-        [3, 3] /* 元宵节 */, [5, 20] /* 520 */, [6, 19] /* 端午节 */, [8, 19] /* 七夕节 */,
-        [9, 25] /* 中秋节 */, [10, 1] /* 国庆节 */, [12, 25] /* 圣诞节 */, [12, 31] /* 跨年夜 */
+    // 12个节日的日期+祝福语——原本想直接复用 js/features.js 里的 festivals 数组，
+    // 但发现那个数组其实是定义在 _getDailyGreetingData() 函数内部的局部变量，不是真正的全局变量，
+    // 从 redpacket.js 这边根本访问不到（之前一直悄悄判定失败，Yuying 测出来才发现）。
+    // 不去碰 features.js（大文件，牵一发动全身），这12条文案直接照抄一份到这里，自己管自己的，
+    // 以后要改文案两边分开改就行，不用再折腾"怎么把一个函数内部变量暴露出来"这种事
+    var _RP_FESTIVALS = [
+        { m: 1, d: 1, name: '元旦', note: '新年快乐！愿新的一年里，你们的爱情越来越甜蜜，每一天都充满幸福与惊喜～' },
+        { m: 2, d: 14, name: '情人节', note: '情人节快乐，亲爱的！你是我最美好的礼物，爱你哦～' },
+        { m: 2, d: 16, name: '除夕', note: '除夕快乐！辞旧迎新，愿你们携手跨入幸福的新一年，万事如意！' },
+        { m: 2, d: 17, name: '春节', note: '新年快乐！新的一年，愿你们相爱如初，甜蜜长久。' },
+        { m: 3, d: 3, name: '元宵节', note: '元宵节快乐！花灯映月，你是我心里最亮的那盏灯。' },
+        { m: 5, d: 20, name: '520', note: '520，我爱你！感谢你出现在我的生命里，你是我最好的选择。' },
+        { m: 6, d: 19, name: '端午节', note: '粽子软糯，你更甜～端午安康！' },
+        { m: 8, d: 19, name: '七夕节', note: '七夕快乐！牛郎织女一年只见一次，而我们每天都在一起，真幸运。' },
+        { m: 9, d: 25, name: '中秋节', note: '月圆人团圆，有你才叫团圆。中秋快乐！' },
+        { m: 10, d: 1, name: '国庆节', note: '国庆快乐！和你在一起的每一天都像节日，爱你。' },
+        { m: 12, d: 25, name: '圣诞节', note: '圣诞快乐！你就是我收到的最好的礼物，永远爱你。' },
+        { m: 12, d: 31, name: '跨年夜', note: '再见这一年，你是我最好的收获。新的一年，继续爱你。' }
     ];
     var _RP_BLESSING_WORDS = ['快乐', '幸福', '甜蜜', '圆满', '顺遂'];
     function _rpRandomWord() { return _RP_BLESSING_WORDS[Math.floor(Math.random() * _RP_BLESSING_WORDS.length)]; }
 
-    // 今天算不算节日；命中就返回 {kind:'festival', text, name}，用 festivals 数组自带的 note 当文案，不新造
+    // 今天算不算节日；命中就返回 {kind:'festival', text, name}
     function _rpCheckFestival() {
         try {
-            if (typeof festivals === 'undefined' || !Array.isArray(festivals)) return null;
             var now = _rpNow(), m = now.getMonth() + 1, d = now.getDate();
-            var isListed = _RP_FESTIVAL_MD.some(function (md) { return md[0] === m && md[1] === d; });
-            if (!isListed) return null;
-            var f = festivals.find(function (x) { return x.m === m && x.d === d; });
+            var f = _RP_FESTIVALS.find(function (x) { return x.m === m && x.d === d; });
             if (!f) return null;
             return { kind: 'festival', text: f.note, name: f.name };
         } catch (e) { return null; }

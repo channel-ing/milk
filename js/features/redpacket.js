@@ -317,24 +317,21 @@
         return Math.round((db - da) / 86400000);
     }
 
-    // 12个节日的日期+祝福语——原本想直接复用 js/features.js 里的 festivals 数组，
-    // 但发现那个数组其实是定义在 _getDailyGreetingData() 函数内部的局部变量，不是真正的全局变量，
-    // 从 redpacket.js 这边根本访问不到（之前一直悄悄判定失败，Yuying 测出来才发现）。
-    // 不去碰 features.js（大文件，牵一发动全身），这12条文案直接照抄一份到这里，自己管自己的，
-    // 以后要改文案两边分开改就行，不用再折腾"怎么把一个函数内部变量暴露出来"这种事
+    // 12个节日的日期——祝福语格式统一成跟纪念日"倒数日"型一样的"{节日名称}+{词}"，
+    // 不再用完整的长句子（Yuying 嫌太长，改短的）
     var _RP_FESTIVALS = [
-        { m: 1, d: 1, name: '元旦', note: '新年快乐！愿新的一年里，你们的爱情越来越甜蜜，每一天都充满幸福与惊喜～' },
-        { m: 2, d: 14, name: '情人节', note: '情人节快乐，亲爱的！你是我最美好的礼物，爱你哦～' },
-        { m: 2, d: 16, name: '除夕', note: '除夕快乐！辞旧迎新，愿你们携手跨入幸福的新一年，万事如意！' },
-        { m: 2, d: 17, name: '春节', note: '新年快乐！新的一年，愿你们相爱如初，甜蜜长久。' },
-        { m: 3, d: 3, name: '元宵节', note: '元宵节快乐！花灯映月，你是我心里最亮的那盏灯。' },
-        { m: 5, d: 20, name: '520', note: '520，我爱你！感谢你出现在我的生命里，你是我最好的选择。' },
-        { m: 6, d: 19, name: '端午节', note: '粽子软糯，你更甜～端午安康！' },
-        { m: 8, d: 19, name: '七夕节', note: '七夕快乐！牛郎织女一年只见一次，而我们每天都在一起，真幸运。' },
-        { m: 9, d: 25, name: '中秋节', note: '月圆人团圆，有你才叫团圆。中秋快乐！' },
-        { m: 10, d: 1, name: '国庆节', note: '国庆快乐！和你在一起的每一天都像节日，爱你。' },
-        { m: 12, d: 25, name: '圣诞节', note: '圣诞快乐！你就是我收到的最好的礼物，永远爱你。' },
-        { m: 12, d: 31, name: '跨年夜', note: '再见这一年，你是我最好的收获。新的一年，继续爱你。' }
+        { m: 1, d: 1, name: '元旦' },
+        { m: 2, d: 14, name: '情人节' },
+        { m: 2, d: 16, name: '除夕' },
+        { m: 2, d: 17, name: '春节' },
+        { m: 3, d: 3, name: '元宵节' },
+        { m: 5, d: 20, name: '520' },
+        { m: 6, d: 19, name: '端午节' },
+        { m: 8, d: 19, name: '七夕节' },
+        { m: 9, d: 25, name: '中秋节' },
+        { m: 10, d: 1, name: '国庆节' },
+        { m: 12, d: 25, name: '圣诞节' },
+        { m: 12, d: 31, name: '跨年夜' }
     ];
     var _RP_BLESSING_WORDS = ['快乐', '幸福', '甜蜜', '圆满', '顺遂'];
     function _rpRandomWord() { return _RP_BLESSING_WORDS[Math.floor(Math.random() * _RP_BLESSING_WORDS.length)]; }
@@ -345,7 +342,7 @@
             var now = _rpNow(), m = now.getMonth() + 1, d = now.getDate();
             var f = _RP_FESTIVALS.find(function (x) { return x.m === m && x.d === d; });
             if (!f) return null;
-            return { kind: 'festival', text: f.note, name: f.name };
+            return { kind: 'festival', text: f.name + _rpRandomWord(), name: f.name };
         } catch (e) { return null; }
     }
 
@@ -384,10 +381,10 @@
 
     // 经期第一天关怀红包——Yuying 自己改过的文案
     var _RP_PERIOD_LINES = [
-        '经期第一天好好休息，不要太累了',
+        '经期第一天好好休息',
         '痛痛飞走～',
-        '我在陪着你，痛了也不要忍着呀',
-        '经期第一天，不要吃冰的哦'
+        '揉揉肚肚～',
+        '经期不吃冰的哦'
     ];
     async function _rpCheckPeriod() {
         try {
@@ -460,7 +457,7 @@
     //
     //   路径B（只有"今天纪念日/节日 且 经期第一天 两件事同时撞上"才会启用，撞车专属的"追加一个"机制，
     //     独立于路径A的额度，路径A命中过一次之后才会轮到这条路）：
-    //     还没发过经期关怀红包 → 50%命中，文案用经期关怀的
+    //     还没发过经期关怀红包 → 10%命中，文案用经期关怀的
     //
     //   路径C（前两条都不适用时的兜底，也是没有任何特殊日子时的默认路径）：
     //     经期第一天（没有撞车的情况，单独出现）→ 80%命中，文案用经期关怀的；
@@ -487,9 +484,9 @@
             prob = 0.8;
         } else if (isCollision && _data.scheduler.periodBonusUsedDate !== today) {
             // 路径B：只有撞车了才会走到这——纪念日/节日的额度已经用掉了（上面那个分支不成立），
-            // 且经期关怀的"追加名额"还没用过，50%概率追加一个
+            // 且经期关怀的"追加名额"还没用过，10%概率追加一个
             special = periodSpecial;
-            prob = 0.5;
+            prob = 0.1;
         } else if (_data.scheduler.specialUsedDate !== today && periodSpecial) {
             // 路径C：没撞车，今天单纯是经期第一天（没有纪念日/节日）——按原来的逻辑，80%命中
             special = periodSpecial;

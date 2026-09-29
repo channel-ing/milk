@@ -56,12 +56,12 @@
                 if (typeof toggleBatchMode === 'function') toggleBatchMode();
             }
         },
-        // 只加回"位置"这一个（凑够5个自然分成两行，看起来不那么空），
-        // 其它几个（小红书/抖音/快问快答）还是先不加，功能都没做
-        { id: 'location', iconClass: 'fas fa-location-dot', label: '位置', ready: false }
+        // 加回"位置"和"快问快答"这两个（凑够6个，两行各3个/4个，看起来不那么空），
+        // 小红书/抖音还是先不加，功能都没做
+        { id: 'location', iconClass: 'fas fa-location-dot', label: '位置', ready: false },
+        { id: 'qa', iconClass: 'fas fa-comments', label: '快问快答', ready: false }
         // { id: 'xiaohongshu', iconClass: 'fas fa-book', label: '小红书', ready: false },
-        // { id: 'douyin', iconClass: 'fab fa-tiktok', label: '抖音', ready: false },
-        // { id: 'qa', iconClass: 'fas fa-comments', label: '快问快答', ready: false }
+        // { id: 'douyin', iconClass: 'fab fa-tiktok', label: '抖音', ready: false }
     ];
 
     function getPanel() { return document.getElementById('more-menu-panel'); }

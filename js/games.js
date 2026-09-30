@@ -1342,10 +1342,12 @@ function _myStickerLib() {
 function _myStickerGroupsRaw() {
     return window.myStickerGroups || [];
 }
-// 分组筛选条要遍历的列表：默认分组（有内容才出现）+ 自建分组（新建的在前）
+// 分组筛选条要遍历的列表：默认分组（有内容才出现）+ 自建分组（按用户自己拖拽排好的顺序）
+// 分组的先后顺序现在直接由 window.myStickerGroups 数组的顺序决定（可以被长按拖拽改写并保存），
+// 不再按创建时间重新排序——否则用户刚拖好的顺序，下次打开又会被"新建的排前面"这条规则打乱
 function _myStickerGroupsList() {
     var lib = _myStickerLib();
-    var groups = _myStickerGroupsRaw().slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    var groups = _myStickerGroupsRaw().slice();
     var list = [];
     var hasDefault = lib.some(function (e) { return !e.groupId; });
     if (hasDefault) list.push({ id: null, name: '默认分组', isDefault: true });
@@ -1585,8 +1587,95 @@ function initComboMenu() {
                 renderMyStickerLibrary();
             };
         });
+        _bindMyStickerGroupChipReorder(row);
         wrap.appendChild(row);
         return wrap;
+    }
+
+    // 排序时用来找"该插到哪个分组前面"——标准的拖拽排序算法：
+    // 比较横坐标跟每个候选分组中点的距离，取最近的那个在拖动点右边的分组
+    function _myStickerDragAfterChip(row, x, draggedChip) {
+        var chips = Array.from(row.querySelectorAll('.my-sticker-group-chip[data-group-id]:not([data-group-id=""])'))
+            .filter(function (el) { return el !== draggedChip; });
+        var closest = { offset: -Infinity, element: null };
+        chips.forEach(function (el) {
+            var box = el.getBoundingClientRect();
+            var offset = x - box.left - box.width / 2;
+            if (offset < 0 && offset > closest.offset) closest = { offset: offset, element: el };
+        });
+        return closest.element;
+    }
+
+    // 分组排序交互：长按一个分组头像 300ms 后就能直接拖着换位置，松手立刻生效并保存——
+    // 不加"排序模式"开关、不加上移/下移按钮，跟长按表情弹"设为封面/移动分组"是同一套手势语言。
+    // "默认分组"位置固定不参与排序（它不是真正的分组，只是没归组的表情兜底显示的地方）。
+    function _bindMyStickerGroupChipReorder(row) {
+        var LONG_PRESS_MS = 300;
+        var MOVE_CANCEL_PX = 6;
+
+        row.querySelectorAll('.my-sticker-group-chip').forEach(function (chip) {
+            if (!chip.dataset.groupId) return; // data-group-id="" 就是默认分组，跳过
+            chip.addEventListener('pointerdown', function (e) {
+                if (e.button !== undefined && e.button !== 0) return;
+                var startX = e.clientX, startY = e.clientY;
+                var pointerId = e.pointerId;
+                var dragging = false;
+                try { chip.setPointerCapture(pointerId); } catch (err) {}
+
+                var pressTimer = setTimeout(function () {
+                    dragging = true;
+                    chip.classList.add('my-sticker-group-chip-dragging');
+                    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+                }, LONG_PRESS_MS);
+
+                function onMove(ev) {
+                    if (ev.pointerId !== pointerId) return;
+                    if (!dragging) {
+                        var dx = ev.clientX - startX, dy = ev.clientY - startY;
+                        if (Math.abs(dx) > MOVE_CANCEL_PX || Math.abs(dy) > MOVE_CANCEL_PX) finish(false);
+                        return;
+                    }
+                    ev.preventDefault();
+                    var after = _myStickerDragAfterChip(row, ev.clientX, chip);
+                    if (after == null) row.appendChild(chip);
+                    else if (after !== chip.nextSibling) row.insertBefore(chip, after);
+                }
+
+                function onUp(ev) {
+                    if (ev.pointerId !== pointerId) return;
+                    finish(dragging);
+                }
+
+                function finish(shouldCommit) {
+                    clearTimeout(pressTimer);
+                    chip.removeEventListener('pointermove', onMove);
+                    chip.removeEventListener('pointerup', onUp);
+                    chip.removeEventListener('pointercancel', onUp);
+                    try { chip.releasePointerCapture(pointerId); } catch (err) {}
+                    if (dragging) chip.classList.remove('my-sticker-group-chip-dragging');
+                    if (shouldCommit) _myStickerCommitGroupOrder(row);
+                    dragging = false;
+                }
+
+                chip.addEventListener('pointermove', onMove);
+                chip.addEventListener('pointerup', onUp);
+                chip.addEventListener('pointercancel', onUp);
+            });
+        });
+    }
+
+    // 把当前 DOM 里分组头像的先后顺序，写回 window.myStickerGroups 并保存
+    function _myStickerCommitGroupOrder(row) {
+        var orderedIds = Array.from(row.querySelectorAll('.my-sticker-group-chip[data-group-id]:not([data-group-id=""])'))
+            .map(function (c) { return c.dataset.groupId; });
+        var raw = _myStickerGroupsRaw();
+        var byId = {};
+        raw.forEach(function (g) { byId[g.id] = g; });
+        var reordered = orderedIds.map(function (id) { return byId[id]; }).filter(Boolean);
+        raw.forEach(function (g) { if (reordered.indexOf(g) === -1) reordered.push(g); }); // 兜底，理论上不会有漏网的
+        window.myStickerGroups = reordered;
+        _myStickerSaveGroups();
+        renderMyStickerLibrary();
     }
 
     // 长按一个表情，弹出"设为分组封面 / 移动分组"的小浮窗

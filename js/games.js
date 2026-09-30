@@ -1544,10 +1544,13 @@ function initComboMenu() {
     function _myStickerGroupChipHTML(g, isActive) {
         var cover = _myStickerCoverFor(g.id);
         var isCloud = typeof cover === 'string' && cover.indexOf('oss://') === 0;
+        // draggable="false" 只能挡住桌面浏览器原生的"拖图片"手势——
+        // iOS Safari 长按图片弹出的"存储图像/拷贝"菜单不吃这个，得靠 CSS 的
+        // -webkit-touch-callout:none（配合下面 contextmenu 的 preventDefault）才能压住
         var inner = cover
             ? (isCloud
-                ? `<img loading="lazy" data-cover-ref="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-                : `<img loading="lazy" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`)
+                ? `<img loading="lazy" draggable="false" data-cover-ref="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+                : `<img loading="lazy" draggable="false" src="${cover}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`)
             : `<i class="fas fa-images" style="font-size:13px;"></i>`;
         return `<button class="my-sticker-group-chip${isActive ? ' active' : ''}" data-group-id="${g.id === null ? '' : g.id}" title="${g.name}">${inner}</button>`;
     }
@@ -1615,6 +1618,9 @@ function initComboMenu() {
 
         row.querySelectorAll('.my-sticker-group-chip').forEach(function (chip) {
             if (!chip.dataset.groupId) return; // data-group-id="" 就是默认分组，跳过
+            // iOS Safari 长按图片会自己弹出"存储图像/拷贝"系统菜单，抢在我们的长按计时器前面，
+            // 必须把这个默认行为按住，不然长按永远走不到拖拽逻辑
+            chip.addEventListener('contextmenu', function (e) { e.preventDefault(); });
             chip.addEventListener('pointerdown', function (e) {
                 if (e.button !== undefined && e.button !== 0) return;
                 var startX = e.clientX, startY = e.clientY;

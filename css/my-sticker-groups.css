@@ -81,6 +81,16 @@
 }
 .my-sticker-group-chip img { width: 100%; height: 100%; object-fit: cover; }
 
+/* 长按分组头像进入拖拽排序时的抬起反馈——放大+阴影，提示"可以拖了" */
+.my-sticker-group-chip-dragging {
+    position: relative;
+    z-index: 5;
+    transform: scale(1.15);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.28);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    touch-action: none;
+}
+
 /* 长按弹出的小浮窗 */
 .my-sticker-action-popover {
     position: fixed;

@@ -1623,23 +1623,32 @@ function initComboMenu() {
             chip.addEventListener('contextmenu', function (e) { e.preventDefault(); });
             chip.addEventListener('pointerdown', function (e) {
                 if (e.button !== undefined && e.button !== 0) return;
+                // 触屏要跟"横向滑动看更多分组"这个手势抢同一个方向，所以必须先长按 300ms 再进入拖拽；
+                // 鼠标不存在这个冲突（鼠标本来就没有"划着滚动"这回事），按住立刻就能拖，符合桌面端的直觉，
+                // 之前不管鼠标触屏都要求先长按，导致鼠标测试时随手一拖就被 MOVE_CANCEL_PX 判成"取消"了
+                var isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
                 var startX = e.clientX, startY = e.clientY;
                 var pointerId = e.pointerId;
                 var dragging = false;
+                var settled = false; // 保证收尾逻辑不管被哪个事件触发都只真正跑一次
                 try { chip.setPointerCapture(pointerId); } catch (err) {}
 
-                var pressTimer = setTimeout(function () {
+                function engage() {
+                    if (dragging || settled) return;
                     dragging = true;
                     chip.classList.add('my-sticker-group-chip-dragging');
                     if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
-                }, LONG_PRESS_MS);
+                }
+
+                var pressTimer = isTouch ? setTimeout(engage, LONG_PRESS_MS) : null;
 
                 function onMove(ev) {
                     if (ev.pointerId !== pointerId) return;
+                    var dx = ev.clientX - startX, dy = ev.clientY - startY;
                     if (!dragging) {
-                        var dx = ev.clientX - startX, dy = ev.clientY - startY;
-                        if (Math.abs(dx) > MOVE_CANCEL_PX || Math.abs(dy) > MOVE_CANCEL_PX) finish(false);
-                        return;
+                        if (Math.abs(dx) <= MOVE_CANCEL_PX && Math.abs(dy) <= MOVE_CANCEL_PX) return;
+                        if (isTouch) { finish(false); return; } // 长按判定前就滑动了——当成普通滑动，交回默认行为
+                        engage(); // 鼠标：移动超过阈值就直接开始拖，不用等
                     }
                     ev.preventDefault();
                     var after = _myStickerDragAfterChip(row, ev.clientX, chip);
@@ -1652,20 +1661,28 @@ function initComboMenu() {
                     finish(dragging);
                 }
 
+                // 保底收尾：不管什么原因(触摸被系统手势打断、DOM 挪动触发的浏览器怪癖等)导致
+                // 抓取意外丢失、pointerup/pointercancel 没能正常送达，都会走到这里——
+                // 这是唯一"抓取丢失"必定会触发的事件，用它兜底就不会再出现"松手不保存、阴影卡住"的情况
+                function onLostCapture() { finish(dragging); }
+
                 function finish(shouldCommit) {
+                    if (settled) return;
+                    settled = true;
                     clearTimeout(pressTimer);
                     chip.removeEventListener('pointermove', onMove);
                     chip.removeEventListener('pointerup', onUp);
                     chip.removeEventListener('pointercancel', onUp);
+                    chip.removeEventListener('lostpointercapture', onLostCapture);
                     try { chip.releasePointerCapture(pointerId); } catch (err) {}
-                    if (dragging) chip.classList.remove('my-sticker-group-chip-dragging');
+                    chip.classList.remove('my-sticker-group-chip-dragging');
                     if (shouldCommit) _myStickerCommitGroupOrder(row);
-                    dragging = false;
                 }
 
                 chip.addEventListener('pointermove', onMove);
                 chip.addEventListener('pointerup', onUp);
                 chip.addEventListener('pointercancel', onUp);
+                chip.addEventListener('lostpointercapture', onLostCapture);
             });
         });
     }

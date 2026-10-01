@@ -1162,6 +1162,45 @@
             padding: 6px 2px 2px;
         }
 
+        /* 婊″睆椋樿〃鎯呮晥鏋滐紙iMessage 姘旂悆椋庢牸锛夛細绾睍绀烘诞灞傦紝涓嶆嫤鎴偣鍑� */
+        .reaction-burst-container {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 999999;
+            overflow: hidden;
+        }
+        .reaction-burst-item {
+            position: absolute;
+            bottom: -10vh;
+            left: 0;
+            opacity: 0;
+            line-height: 1;
+            animation-name: reaction-burst-float;
+            animation-timing-function: ease-in;
+            animation-fill-mode: forwards;
+            will-change: transform, opacity;
+        }
+        @keyframes reaction-burst-float {
+            0% {
+                transform: translate(0, 0);
+                opacity: 0;
+            }
+            12% {
+                opacity: 0.95;
+            }
+            50% {
+                transform: translate(var(--burst-sway), -55vh);
+            }
+            82% {
+                opacity: 0.9;
+            }
+            100% {
+                transform: translate(calc(var(--burst-sway) * -1), -115vh);
+                opacity: 0;
+            }
+        }
+
         .meta-action-btn {
             font-size: 13px;
             color: var(--text-secondary);

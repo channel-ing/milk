@@ -89,6 +89,23 @@ function initChatActionListeners() {
                 }
             });
 
+            // ── 点一下气泡上的反应小标签直接撤回（方案A）──────────────────────
+            // 反应标签是贴在气泡外面那层 .message-bubble-wrap 上的（跟语音条/红包/图片/表情包
+            // 不是同一个节点、也不是它们的子节点），所以这里不会跟那些气泡自己的点击逻辑冲突；
+            // 多加一道 stopPropagation 纯粹是保险，防止以后别处加了更上层的点击监听
+            DOMElements.chatContainer.addEventListener('click', (e) => {
+                const badge = e.target.closest('.message-reaction-badge');
+                if (!badge) return;
+                e.stopPropagation();
+                const wrapper = badge.closest('.message-wrapper');
+                if (!wrapper) return;
+                const messageId = Number(wrapper.dataset.id);
+                const message = messages.find(m => m.id === messageId);
+                if (message && message.reaction && typeof window.addReactionToMessage === 'function') {
+                    window.addReactionToMessage(messageId, message.reaction);
+                }
+            });
+
             // ── 点击语音条直接播放 ─────────────────────────────────────
             DOMElements.chatContainer.addEventListener('click', (e) => {
                 // 如果是长按触发的，忽略随后的click

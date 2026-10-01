@@ -1626,12 +1626,35 @@ function _isCaughtUpToLatest() {
 }
 
 // ── 消息反应（emoji reaction）────────────────────────────────────────
-// 常用反应表：覆盖日常聊天最常见的几种情绪反馈；不在这个列表里的，走"+"按钮自己输入
+// 常用反应表：长按面板第一行直接展示的 7 个 + 一个"+"号，覆盖日常聊天最常见的几种情绪反馈
 window.COMMON_REACTIONS = ['❤️', '😂', '😲', '😢', '😡', '🥺', '👍🏻'];
+
+// "+"展开后的完整表情表（已去重、去掉水果类）
+window.EXTRA_REACTIONS = ['😀','🥲','☺️','😊','😍','🥰','😘','🤨','🧐','🤓','🤩','🥳','🙂‍↕️','😏','😒','🙂‍↔️','😞','😔','🙁','☹️','😫','😢','😭','😡','😑','😠','🤬','🤯','😳','😱','😨','😰','🫣','🤫','🫡','😶','😐','🙄','😯','😧','😲','🥱','🫩','😴','😪','😮‍💨','😵','🤢','🤮','😈','💩','👻','☠️','🫶','🤲🏻','🙌🏻','👏🏻','🤝🏻','👍🏻','👎🏻','👊🏻','✊🏻','✌🏻','🫰🏻','🤟🏻','🫳🏻','👌🏻','🤏🏻','👋🏻','💪🏻','🙏🏻','🖕🏻','👀','🌝','🌚','⭐️','🔥','❄️','🩷','❤️','🧡','💛','💚','🩵','💙','💜','🖤','🩶','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💓','💗','💖','💘','🉑','❌','❗️','✅','❎','✔️'];
+
+const RECENT_REACTIONS_KEY = 'recentReactionEmojis';
+const RECENT_REACTIONS_MAX = 8;
+
+function _getRecentReactions() {
+    try {
+        const raw = localStorage.getItem(RECENT_REACTIONS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+}
+
+function _recordRecentReaction(emoji) {
+    try {
+        let arr = _getRecentReactions().filter(e => e !== emoji);
+        arr.unshift(emoji);
+        arr = arr.slice(0, RECENT_REACTIONS_MAX);
+        localStorage.setItem(RECENT_REACTIONS_KEY, JSON.stringify(arr));
+    } catch (e) {}
+}
 
 // 每条消息最多保留一个反应（不分是谁点的），位置固定跟着这条消息本身的气泡走：
 // 用户发的消息 → 左下角；梦角发的消息 → 右下角（见 CSS .message-wrapper.sent/.received .message-reaction-badge）。
-// 再点一次同一个表情 = 取消反应。
+// 再点一次同一个表情 = 取消反应（气泡上的反应小标签本身也是直接点一下就撤回，走的是同一个函数）。
 window.addReactionToMessage = function(messageId, emoji) {
     const message = messages.find(m => m.id === messageId);
     if (!message) return;
@@ -1640,7 +1663,15 @@ window.addReactionToMessage = function(messageId, emoji) {
     renderMessages(true);
 };
 
-// 长按工具栏里点击"表情回应"弹出的小面板：常用反应 + 自定义 emoji 库 + "+"号手动输入任意表情
+function _buildReactionGridItem(emoji, onPick) {
+    const item = document.createElement('div');
+    item.className = 'reaction-picker-item';
+    item.textContent = emoji;
+    item.addEventListener('click', () => onPick(emoji));
+    return item;
+}
+
+// 长按工具栏里点击"表情回应"弹出的小面板：常用 7 个 + "+"号；点"+"展开完整表情表（含"最近使用"）
 window.openReactionPicker = function(messageId, anchorEl) {
     const existing = document.getElementById('reaction-picker-popup');
     if (existing) existing.remove();
@@ -1649,61 +1680,45 @@ window.openReactionPicker = function(messageId, anchorEl) {
     popup.id = 'reaction-picker-popup';
     popup.className = 'reaction-picker-popup';
 
-    const pool = [...window.COMMON_REACTIONS];
-    (customEmojis || []).forEach(e => { if (!pool.includes(e)) pool.push(e); });
+    const pick = (emoji) => {
+        window.addReactionToMessage(messageId, emoji);
+        _recordRecentReaction(emoji);
+        popup.remove();
+    };
 
-    pool.forEach(emoji => {
-        const item = document.createElement('div');
-        item.className = 'reaction-picker-item';
-        item.textContent = emoji;
-        item.addEventListener('click', () => {
-            window.addReactionToMessage(messageId, emoji);
-            popup.remove();
-        });
-        popup.appendChild(item);
-    });
+    window.COMMON_REACTIONS.forEach(emoji => popup.appendChild(_buildReactionGridItem(emoji, pick)));
 
-    // "+"：这里没法用代码强制弹出系统/手机输入法自带的 emoji 面板（浏览器没有这个权限），
-    // 只能聚焦一个输入框，用户自己用系统输入法里的 emoji 键输入——加一行提示文字说明这一点，
-    // 避免用户以为点了没反应是功能坏了
     const moreBtn = document.createElement('div');
     moreBtn.className = 'reaction-picker-item reaction-picker-more';
     moreBtn.innerHTML = '<i class="fas fa-plus"></i>';
     moreBtn.title = '更多表情';
     moreBtn.addEventListener('click', () => {
-        popup.innerHTML = `
-            <div class="reaction-picker-hint">用你自己的 emoji 键盘输入～</div>
-            <input type="text" class="reaction-picker-input" placeholder="按 Enter 确认" maxlength="8" autofocus>
-        `;
-        const input = popup.querySelector('.reaction-picker-input');
-        requestAnimationFrame(() => input.focus());
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && input.value.trim()) {
-                window.addReactionToMessage(messageId, input.value.trim());
-                popup.remove();
-            }
-        });
-        input.addEventListener('blur', () => {
-            setTimeout(() => { if (document.body.contains(popup)) popup.remove(); }, 150);
-        });
+        popup.classList.add('reaction-picker-popup-expanded');
+        popup.innerHTML = '';
+
+        const recent = _getRecentReactions();
+        if (recent.length > 0) {
+            const label = document.createElement('div');
+            label.className = 'reaction-picker-section-label';
+            label.textContent = '最近使用';
+            popup.appendChild(label);
+            recent.forEach(emoji => popup.appendChild(_buildReactionGridItem(emoji, pick)));
+            const sep = document.createElement('div');
+            sep.className = 'reaction-picker-section-label';
+            sep.textContent = '全部';
+            popup.appendChild(sep);
+        }
+
+        window.EXTRA_REACTIONS.forEach(emoji => popup.appendChild(_buildReactionGridItem(emoji, pick)));
+
+        // 内容变多了，重新定位一次，避免还按原来那个小面板的尺寸算，导致超出屏幕
+        _repositionReactionPicker(popup, anchorEl);
     });
     popup.appendChild(moreBtn);
 
     document.body.appendChild(popup);
 
-    // 定位在触发按钮附近，并保证不会贴着屏幕边缘（留安全边距）
-    const SAFE_MARGIN = 10;
-    const rect = anchorEl.getBoundingClientRect();
-    const popupRect = popup.getBoundingClientRect();
-    let left = rect.left + rect.width / 2 - popupRect.width / 2;
-    left = Math.max(SAFE_MARGIN, Math.min(left, window.innerWidth - popupRect.width - SAFE_MARGIN));
-    let top = rect.top - popupRect.height - 8;
-    if (top < SAFE_MARGIN) top = rect.bottom + 8;
-    if (top + popupRect.height > window.innerHeight - SAFE_MARGIN) {
-        top = Math.max(SAFE_MARGIN, window.innerHeight - popupRect.height - SAFE_MARGIN);
-    }
-    popup.style.left = left + 'px';
-    popup.style.top = top + 'px';
+    _repositionReactionPicker(popup, anchorEl);
 
     setTimeout(() => {
         document.addEventListener('click', function handler(e) {
@@ -1714,6 +1729,24 @@ window.openReactionPicker = function(messageId, anchorEl) {
         });
     }, 0);
 };
+
+// 定位在触发按钮附近，并保证不会贴着屏幕边缘（留安全边距）；展开成完整表情表之后内容变多了，
+// 也会重新调一次，避免还按小面板的尺寸算，导致超出屏幕
+function _repositionReactionPicker(popup, anchorEl) {
+    const SAFE_MARGIN = 10;
+    const rect = anchorEl.getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - popupRect.width / 2;
+    left = Math.max(SAFE_MARGIN, Math.min(left, window.innerWidth - popupRect.width - SAFE_MARGIN));
+    let top = rect.top - popupRect.height - 8;
+    if (top < SAFE_MARGIN) top = rect.bottom + 8;
+    if (top + popupRect.height > window.innerHeight - SAFE_MARGIN) {
+        top = Math.max(SAFE_MARGIN, window.innerHeight - SAFE_MARGIN - popupRect.height);
+    }
+    if (top < SAFE_MARGIN) top = SAFE_MARGIN; // 面板本身比屏幕还高时，至少贴顶，靠自身滚动条处理溢出
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+}
 
 const addMessage = (message) => {
     if (!(message.timestamp instanceof Date)) message.timestamp = new Date(message.timestamp);

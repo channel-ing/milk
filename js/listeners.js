@@ -30,6 +30,27 @@ function initChatActionListeners() {
             function _hideAllActions() {
                 document.querySelectorAll('.message-wrapper.actions-visible').forEach(w => {
                     w.classList.remove('actions-visible');
+                    const bar = w.querySelector('.message-meta-actions');
+                    if (bar) bar.style.removeProperty('--safe-shift');
+                });
+            }
+
+            // 工具栏贴着气泡定位，如果气泡靠近屏幕边缘，工具栏可能被切掉一截——
+            // 这里测量一下工具栏实际渲染的位置，超出安全边距就用 --safe-shift 把它推回来
+            function _clampActionsToolbar(wrapper) {
+                const bar = wrapper.querySelector('.message-meta-actions');
+                if (!bar) return;
+                bar.style.removeProperty('--safe-shift');
+                requestAnimationFrame(() => {
+                    const SAFE_MARGIN = 10;
+                    const rect = bar.getBoundingClientRect();
+                    let shift = 0;
+                    if (rect.left < SAFE_MARGIN) {
+                        shift = SAFE_MARGIN - rect.left;
+                    } else if (rect.right > window.innerWidth - SAFE_MARGIN) {
+                        shift = (window.innerWidth - SAFE_MARGIN) - rect.right;
+                    }
+                    if (shift !== 0) bar.style.setProperty('--safe-shift', shift + 'px');
                 });
             }
 
@@ -43,6 +64,7 @@ function initChatActionListeners() {
                     _longPressTriggered = true;
                     _hideAllActions();
                     wrapper.classList.add('actions-visible');
+                    _clampActionsToolbar(wrapper);
                     // 阻止文字选中
                     if (window.getSelection) window.getSelection().removeAllRanges();
                     // 触觉反馈
@@ -127,23 +149,63 @@ function initChatActionListeners() {
                         showNotification(message.favorited ? '已收藏': '已取消收藏', 'success', 1500);
                         playSound('favorite');
 
-                        // 收藏语音消息时，把已播放过的音频持久化到 IndexedDB（存Base64）
+                        // 收藏语音消息时，把已播放过的音频持久化（优先存云端）
                         if (message.favorited && message.voice && message.voice.fakeText) {
-                            const cachedUrl = window.voiceTTS?._getAudioCache?.(String(messageId));
-                            if (cachedUrl) {
-                                fetch(cachedUrl).then(r => r.arrayBuffer()).then(buf => {
-                                    // 转成 Base64 字符串存储，更稳定
-                                    const uint8 = new Uint8Array(buf);
-                                    let binary = '';
-                                    uint8.forEach(b => binary += String.fromCharCode(b));
-                                    const base64 = btoa(binary);
-                                    localforage.setItem(`favAudio_${messageId}`, base64);
-                                }).catch(() => {});
-                            }
+                            (async () => {
+                                try {
+                                    const key = window.favAudioKey ? window.favAudioKey(messageId) : `favAudio_${messageId}`;
+                                    // 先检查本地是否已有缓存（之前存过的）
+                                    const existing = await localforage.getItem(key);
+                                    if (existing) return; // 已有，不重复存
+
+                                    // 尝试从 TTS 运行时缓存拿（用户播放过才有）
+                                    let audioUrl = window.voiceTTS?._getAudioCache?.(String(messageId));
+
+                                    // 没有缓存：主动调 TTS 生成（需要 TTS 已配置）
+                                    if (!audioUrl && window.voiceTTS?.isTtsReady() && message.voice.fakeText) {
+                                        try {
+                                            audioUrl = await window.voiceTTS.getAudioForMessage(String(messageId), message.voice.fakeText);
+                                        } catch (e) {
+                                            console.warn('[fav-audio] TTS 生成失败', e);
+                                        }
+                                    }
+
+                                    if (!audioUrl) return; // 实在没有，放弃
+
+                                    const buf = await fetch(audioUrl).then(r => r.arrayBuffer());
+                                    const blob = new Blob([buf], { type: 'audio/mpeg' });
+
+                                    if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                                        try {
+                                            const result = await window.CloudMedia.upload(blob, 'fav-audio', String(messageId));
+                                            await localforage.setItem(key, result.url);
+                                        } catch (e) {
+                                            console.warn('[fav-audio] 云端上传失败，降级本地', e);
+                                            const uint8 = new Uint8Array(buf);
+                                            let binary = '';
+                                            uint8.forEach(b => binary += String.fromCharCode(b));
+                                            await localforage.setItem(key, btoa(binary));
+                                        }
+                                    } else {
+                                        const uint8 = new Uint8Array(buf);
+                                        let binary = '';
+                                        uint8.forEach(b => binary += String.fromCharCode(b));
+                                        await localforage.setItem(key, btoa(binary));
+                                    }
+                                } catch (e) {
+                                    console.warn('[fav-audio] 收藏存储失败', e);
+                                }
+                            })();
                         }
-                        // 取消收藏时删除缓存
+                        // 取消收藏时删除缓存（本地 + 云端）
                         if (!message.favorited) {
-                            localforage.removeItem(`favAudio_${messageId}`).catch(() => {});
+                            const key = window.favAudioKey ? window.favAudioKey(messageId) : `favAudio_${messageId}`;
+                            localforage.getItem(key).then(async val => {
+                                if (typeof val === 'string' && val.startsWith('oss://') && window.CloudMedia) {
+                                    try { await window.CloudMedia.delete(val); } catch (e) {}
+                                }
+                                localforage.removeItem(key).catch(() => {});
+                            }).catch(() => {});
                         }
                         
                         throttledSaveData();
@@ -162,6 +224,12 @@ function initChatActionListeners() {
                 const message = messages.find(m => m.id === messageId);
                 if (!message) return;
 
+if (target.classList.contains('reaction-btn')) {
+    if (typeof window.openReactionPicker === 'function') {
+        window.openReactionPicker(messageId, target);
+    }
+    return;
+}
 if (target.classList.contains('delete-btn')) {
     if (confirm('确定要删除这条消息吗？')) {
         const index = messages.findIndex(m => m.id === messageId);
@@ -178,12 +246,6 @@ if (target.classList.contains('delete-btn')) {
     }
     return;
 }
-                if (target.classList.contains('reaction-btn')) {
-                    if (typeof window.openReactionPicker === 'function') {
-                        window.openReactionPicker(message.id, target);
-                    }
-                    return;
-                }
                 if (target.classList.contains('reply-btn')) {
                     currentReplyTo = {
                         id: message.id,
@@ -454,12 +516,22 @@ fileInput.addEventListener('change', function(e) {
 
 
                 saveBtn.addEventListener('click',
-                    () => {
+                    async () => {
                         if (currentAvatarData) {
                             updateAvatar(isPartner ? DOMElements.partner.avatar: DOMElements.me.avatar, currentAvatarData);
                             throttledSaveData();
                             showNotification('头像已更新', 'success');
                             hideModal(modal.modal);
+                            // 阶段四：头像上传云端备份（失败不影响本地使用）
+                            if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                                try {
+                                    const category = isPartner ? 'avatars' : 'my-avatars';
+                                    const avatarId = isPartner ? 'partner' : 'me';
+                                    await window.CloudMedia.upload(currentAvatarData, category, avatarId);
+                                } catch (e) {
+                                    console.warn('[avatar] 云端备份失败', e);
+                                }
+                            }
                         }
                     });
 
@@ -528,11 +600,12 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
         '#read-receipts-toggle': { prop: 'readReceiptsEnabled', name: '已读回执' },
         '#typing-indicator-toggle': { prop: 'typingIndicatorEnabled', name: '正在输入' },
         '#read-no-reply-toggle': { prop: 'allowReadNoReply', name: '已读不回' },
-        '#emoji-mix-toggle': { prop: 'emojiMixEnabled', name: '表情消息' }
+        '#emoji-mix-toggle': { prop: 'emojiMixEnabled', name: '表情消息' },
+        '#auto-reaction-toggle': { prop: 'autoReactionEnabled', name: '表情反应' }
     };
     for (const [selector, { prop }] of Object.entries(toggleSyncMap)) {
         const el = document.querySelector(selector);
-        const val = prop === 'emojiMixEnabled' ? (settings[prop] !== false) : !!settings[prop];
+        const val = (prop === 'emojiMixEnabled' || prop === 'autoReactionEnabled') ? (settings[prop] !== false) : !!settings[prop];
         if (el) el.classList.toggle('active', val);
     }
     const svSlider = document.getElementById('sound-volume-slider');
@@ -634,6 +707,7 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
     const autoToggle = document.getElementById('auto-send-toggle');
     if (autoToggle) autoToggle.classList.toggle('active', !!settings.autoSendEnabled);
     updateAutoSendUI();
+    if (typeof updateCombineCardsUI === 'function') updateCombineCardsUI(); // 每次打开设置都重新刷新一次，跟"主动发消息"那个开关同样的做法，避免显示的还是网页刚启动、设置数据还没读完时的旧状态
     updateDelayUI();
     const immToggle = document.getElementById('immersive-toggle');
     if (immToggle) immToggle.classList.toggle('active', document.body.classList.contains('immersive-mode'));
@@ -1408,14 +1482,45 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                         showNotification('文件较大，正在处理中...', 'info', 2000);
                     }
                     const reader = new FileReader();
-                    reader.onload = (event) => {
+                    reader.onload = async (event) => {
                         const base64 = event.target.result;
-                        savedBackgrounds.push({
-                            id: `user-${Date.now()}`,
-                            type: file.type === 'image/gif' ? 'gif' : 'image',
-                            value: base64
-                        });
+                        const bgType = file.type === 'image/gif' ? 'gif' : 'image';
+                        const bgId = `user-${Date.now()}`;
+
+                        // 本地永远存全尺寸 base64（保证离线/刷新后立刻显示）
+                        // 云端上传一份备份 + 生成缩略图（供图库预览 + 换设备恢复）
+                        let stored = { id: bgId, type: bgType, value: base64 };
+                        if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
+                            showNotification('正在上传到云端...', 'info', 2000);
+                            try {
+                                const uploadResult = await window.CloudMedia.upload(base64, 'backgrounds', bgId);
+                                let thumb = null;
+                                try {
+                                    thumb = await window.CloudMedia.makeThumbnail(base64, 200);
+                                } catch (thumbErr) {
+                                    console.warn('[cloud-media] 缩略图生成失败', thumbErr);
+                                }
+                                // value 保持本地 base64；cloudKey/cloudUrl/thumbnail 存云端信息
+                                stored = {
+                                    id: bgId,
+                                    type: bgType,
+                                    value: base64,             // 本地全尺寸（刷新立刻显示）
+                                    thumbnail: thumb,           // 缩略图（图库预览）
+                                    cloudKey: uploadResult.key, // 云端对象 key
+                                    cloudUrl: uploadResult.url  // 云端 oss:// 引用（同步/换设备用）
+                                };
+                            } catch (err) {
+                                console.warn('[cloud-media] 背景上传失败，仅本地存储', err);
+                                showNotification('云端上传失败，暂存本地', 'error', 2500);
+                            }
+                        }
+
+                        savedBackgrounds.push(stored);
                         saveBackgroundGallery();
+                        // 写 localStorage 让 renderBackgroundGallery 里 safeGetItem 能立刻读到激活值
+                        if (typeof safeSetItem === 'function') {
+                            try { safeSetItem(getStorageKey('chatBackground'), base64); } catch (e) {}
+                        }
                         renderBackgroundGallery();
                         applyBackground(base64);
                         localforage.setItem(getStorageKey('chatBackground'), base64);
@@ -1458,6 +1563,61 @@ autoSendSlider.addEventListener('input', (e) => {
     autoSendValue.textContent = `${val}分钟`;
 });
 
+const combineCardsToggle  = document.getElementById('combine-cards-toggle');
+const combineCardsControl = document.getElementById('combine-cards-control');
+const combineCardsSlider  = document.getElementById('combine-cards-slider');
+const combineCardsValue   = document.getElementById('combine-cards-value');
+
+const updateCombineCardsUI = () => {
+    const on = !!settings.combineReplyCards;
+    combineCardsToggle.classList.toggle('active', on);
+    combineCardsSlider.disabled = !on;
+    combineCardsControl.style.opacity = on ? '1' : '0.4';
+    combineCardsControl.style.pointerEvents = on ? 'auto' : 'none';
+    const currentVal = settings.combineReplyMaxCards || 3;
+    combineCardsSlider.value = currentVal;
+    combineCardsValue.textContent = `${currentVal}句`;
+};
+
+updateCombineCardsUI();
+
+combineCardsToggle.addEventListener('click', () => {
+    settings.combineReplyCards = !settings.combineReplyCards;
+    updateCombineCardsUI();
+    // 开关这种一次性点击的操作，不能用"等0.5秒再存"的节流保存——万一点完立刻退出网页，
+    // 这0.5秒还没到就直接白点了，等于没保存。改成点了立刻存，不等待
+    if (typeof saveData === 'function') {
+        try {
+            const p = saveData();
+            if (p && typeof p.catch === 'function') p.catch(e => console.error('[回复拼接字卡] 保存失败:', e));
+        } catch (e) { console.error('[回复拼接字卡] 保存失败:', e); }
+    }
+    showNotification(`回复拼接字卡已${settings.combineReplyCards ? '开启' : '关闭'}`, 'success');
+});
+
+combineCardsSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    settings.combineReplyMaxCards = val;
+    combineCardsValue.textContent = `${val}句`;
+});
+combineCardsSlider.addEventListener('change', throttledSaveData);
+
+const autoReactionToggle = document.getElementById('auto-reaction-toggle');
+if (autoReactionToggle) {
+    autoReactionToggle.classList.toggle('active', settings.autoReactionEnabled !== false);
+    autoReactionToggle.addEventListener('click', () => {
+        settings.autoReactionEnabled = !(settings.autoReactionEnabled !== false);
+        autoReactionToggle.classList.toggle('active', settings.autoReactionEnabled !== false);
+        if (typeof saveData === 'function') {
+            try {
+                const p = saveData();
+                if (p && typeof p.catch === 'function') p.catch(e => console.error('[表情反应] 保存失败:', e));
+            } catch (e) { console.error('[表情反应] 保存失败:', e); }
+        }
+        showNotification(`表情反应已${settings.autoReactionEnabled !== false ? '开启' : '关闭'}`, 'success');
+    });
+}
+
 autoSendSlider.addEventListener('change', () => {
     manageAutoSendTimer(); 
     throttledSaveData();
@@ -1476,6 +1636,24 @@ autoSendSlider.addEventListener('change', () => {
 
 
         function initNewFeatureListeners() {
+            const periodEntry = document.getElementById('period-function');
+            if (periodEntry) {
+                periodEntry.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    showModal(document.getElementById('period-modal'));
+                    if (typeof window._pdInit === 'function') window._pdInit();
+                });
+            }
+
+            // Step 2：入口改成先打开历史列表页，"+"里再选"问梦角"打开创建弹窗
+            const surveyEntry = document.getElementById('survey-function');
+            if (surveyEntry) {
+                surveyEntry.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    if (typeof window._surveyOpenListModal === 'function') window._surveyOpenListModal();
+                });
+            }
+
             const flEntry = document.getElementById('fortune-lenormand-function');
             if (flEntry) {
                 flEntry.addEventListener('click', () => {
@@ -2569,6 +2747,67 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
     const cancelAddSongBtn = document.getElementById('cancel-add-song');
     const modalTitleElem = addSongModal.querySelector('.modal-title span');
 
+    // ── 本地音频文件上传（走云端存储，跟"更换头像"这些走的是同一套 CloudMedia） ──
+    const musicLocalFileInput = document.getElementById('new-song-file');
+    const musicLocalUploadLabel = document.getElementById('music-local-upload-label');
+    const musicLocalClearBtn = document.getElementById('music-local-clear-btn');
+    const musicLocalFilenameEl = document.getElementById('music-local-filename');
+    const musicLocalHintEl = document.getElementById('music-local-hint');
+    let _pendingLocalFile = null;      // 选中但还没确认添加的本地文件
+    let _editingCloudUrl = null;       // 编辑模式下，原来就是云端引用的url（避免被误当成普通链接改掉）
+
+    function _cloudReady() {
+        return !!(window.CloudSync && typeof window.CloudSync.isConnected === 'function' && window.CloudSync.isConnected());
+    }
+
+    function _updateLocalUploadAvailability() {
+        const ready = _cloudReady();
+        musicLocalUploadLabel.classList.toggle('disabled', !ready);
+        musicLocalFileInput.disabled = !ready;
+        musicLocalHintEl.classList.toggle('is-blocked', !ready);
+        musicLocalHintEl.textContent = ready
+            ? '选择本地音频文件后会上传到云端存储'
+            : '未配置云端存储，本地音频上传不可用';
+    }
+
+    function _resetLocalUploadUI() {
+        _pendingLocalFile = null;
+        _editingCloudUrl = null;
+        musicLocalFileInput.value = '';
+        musicLocalFilenameEl.textContent = '';
+        musicLocalClearBtn.style.display = 'none';
+        newSongUrl.disabled = false;
+        newSongUrl.style.opacity = '';
+        _updateLocalUploadAvailability();
+    }
+
+    musicLocalFileInput.addEventListener('change', () => {
+        const file = musicLocalFileInput.files && musicLocalFileInput.files[0];
+        if (!file) return;
+        _pendingLocalFile = file;
+        _editingCloudUrl = null; // 重新选了本地文件，之前编辑时带着的旧云端引用不再需要
+        musicLocalFilenameEl.textContent = '已选择：' + file.name;
+        musicLocalClearBtn.style.display = 'flex';
+        // 链接框跟着变灰禁用，避免同时填两种搞混
+        newSongUrl.value = '';
+        newSongUrl.disabled = true;
+        newSongUrl.style.opacity = '0.5';
+        // 歌名没填的话，顺手用文件名（去掉后缀）帮着填一下
+        if (!newSongTitle.value.trim()) {
+            newSongTitle.value = file.name.replace(/\.[^.]+$/, '');
+        }
+    });
+
+    musicLocalClearBtn.addEventListener('click', () => {
+        _pendingLocalFile = null;
+        _editingCloudUrl = null;
+        musicLocalFileInput.value = '';
+        musicLocalFilenameEl.textContent = '';
+        musicLocalClearBtn.style.display = 'none';
+        newSongUrl.disabled = false;
+        newSongUrl.style.opacity = '';
+    });
+
     let currentIndex = 0;
     let isPlaying = false;
     let playMode = 'sequence';
@@ -2576,7 +2815,14 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
     let searchTerm = '';
     let isSearchVisible = false;
 
-    function loadSong(index) {
+    function _markPlaying(playing) {
+        isPlaying = playing;
+        document.getElementById('icon-play').style.display = playing ? 'none' : 'block';
+        document.getElementById('icon-pause').style.display = playing ? 'block' : 'none';
+        player.classList.toggle('playing', playing);
+    }
+
+    function loadSong(index, forcePlay) {
         if (songs.length === 0) return;
         if (index >= songs.length) index = 0;
         if (index < 0) index = songs.length - 1;
@@ -2584,8 +2830,25 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         const song = songs[index];
         document.getElementById('music-title').innerText = song.title;
         document.getElementById('music-subtitle').innerText = song.sub;
-        
-        if (song.url) audio.src = song.url;
+
+        const isCloud = window.CloudMedia && window.CloudMedia.isCloudRef && window.CloudMedia.isCloudRef(song.url);
+        if (isCloud) {
+            // 云端引用要先解析成真实可播放的地址，这一步是异步的——
+            // 不能像本地链接那样直接同步赋值给 audio.src
+            window.CloudMedia.fetchUrl(song.url).then((blobUrl) => {
+                audio.src = blobUrl;
+                if (forcePlay || isPlaying) {
+                    audio.play().then(() => _markPlaying(true)).catch(() => {});
+                }
+            }).catch((e) => {
+                showNotification('云端音频加载失败：' + (e && e.message || e), 'error');
+            });
+        } else if (song.url) {
+            audio.src = song.url;
+            if (forcePlay || isPlaying) {
+                audio.play().then(() => _markPlaying(true)).catch(() => {});
+            }
+        }
         updatePlaylistHighlight();
     }
 
@@ -2596,18 +2859,12 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         }
         if (isPlaying) {
             audio.pause();
-            isPlaying = false;
-            document.getElementById('icon-play').style.display = 'block';
-            document.getElementById('icon-pause').style.display = 'none';
-            player.classList.remove('playing');
+            _markPlaying(false);
         } else {
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(_ => {
-                    isPlaying = true;
-                    document.getElementById('icon-play').style.display = 'none';
-                    document.getElementById('icon-pause').style.display = 'block';
-                    player.classList.add('playing');
+                    _markPlaying(true);
                 }).catch(error => {
                     console.error(error);
                     showNotification('播放失败，请检查网络或链接是否有效', 'error');
@@ -2622,14 +2879,12 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         else if (playMode === 'shuffle') currentIndex = Math.floor(Math.random() * songs.length);
         else currentIndex = (currentIndex + 1) % songs.length;
         if (playMode !== 'single') loadSong(currentIndex);
-        if (isPlaying) audio.play();
     }
 
     function prevSong() {
         if (songs.length === 0) return;
         currentIndex = (currentIndex - 1 + songs.length) % songs.length;
         loadSong(currentIndex);
-        if (isPlaying) audio.play();
     }
 
     function savePlaylist() {
@@ -2646,7 +2901,19 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         editModeIndex = index;
         newSongTitle.value = song.title;
         newSongSub.value = song.sub;
-        newSongUrl.value = song.url;
+        _resetLocalUploadUI();
+        const isCloud = window.CloudMedia && window.CloudMedia.isCloudRef && window.CloudMedia.isCloudRef(song.url);
+        if (isCloud) {
+            // 这首歌原来就是本地上传的，链接框留空、灰掉，用文件名提示区显示状态，
+            // 不要把 oss:// 这种内部引用当成普通链接显示出来
+            _editingCloudUrl = song.url;
+            newSongUrl.value = '';
+            newSongUrl.disabled = true;
+            newSongUrl.style.opacity = '0.5';
+            musicLocalFilenameEl.textContent = '当前使用：已上传的本地音频文件（重新选择可替换）';
+        } else {
+            newSongUrl.value = song.url;
+        }
         modalTitleElem.innerText = "编辑歌曲信息";
         confirmAddSongBtn.innerText = "保存修改";
         showModal(addSongModal);
@@ -2657,6 +2924,7 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         newSongTitle.value = '';
         newSongSub.value = '';
         newSongUrl.value = '';
+        _resetLocalUploadUI();
         modalTitleElem.innerText = "添加自定义歌曲";
         confirmAddSongBtn.innerText = "添加播放";
         showModal(addSongModal);
@@ -2858,10 +3126,9 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
                         if (songs.length > 0) {
                             currentIndex = realIndex % songs.length;
                             loadSong(currentIndex);
-                            if (isPlaying) audio.play();
                         } else {
                             audio.pause();
-                            isPlaying = false;
+                            _markPlaying(false);
                             loadSong(0);
                         }
                     } else if (realIndex < currentIndex) {
@@ -2873,9 +3140,7 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
             div.addEventListener('click', (e) => {
                 e.stopPropagation();
                 currentIndex = realIndex;
-                loadSong(currentIndex);
-                if (!isPlaying) togglePlay();
-                else audio.play();
+                loadSong(currentIndex, true);
             });
 
             container.appendChild(div);
@@ -2887,20 +3152,52 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         if (contentDiv) renderListContent(contentDiv);
     }
 
-    confirmAddSongBtn.addEventListener('click', () => {
+    confirmAddSongBtn.addEventListener('click', async () => {
         const title = newSongTitle.value.trim();
         const sub = newSongSub.value.trim();
         const url = newSongUrl.value.trim();
 
-        if (!title || !url) {
-            showNotification('歌名和链接不能为空', 'error');
+        if (!title) {
+            showNotification('歌名不能为空', 'error');
+            return;
+        }
+
+        let finalUrl = null;
+
+        if (_pendingLocalFile) {
+            // 选了本地文件——上传到云端，拿到 oss:// 引用再存
+            if (!_cloudReady()) {
+                showNotification('未配置云端存储，无法上传本地音频', 'error');
+                return;
+            }
+            const originalBtnText = confirmAddSongBtn.innerText;
+            confirmAddSongBtn.innerText = '上传中…';
+            confirmAddSongBtn.disabled = true;
+            try {
+                const result = await window.CloudMedia.upload(_pendingLocalFile, 'music');
+                finalUrl = result.url; // 'oss://media/.../music/xxx.mp3'
+            } catch (e) {
+                showNotification('上传失败：' + (e && e.message || e), 'error');
+                confirmAddSongBtn.innerText = originalBtnText;
+                confirmAddSongBtn.disabled = false;
+                return;
+            }
+            confirmAddSongBtn.innerText = originalBtnText;
+            confirmAddSongBtn.disabled = false;
+        } else if (_editingCloudUrl) {
+            // 编辑模式：用户没重新选本地文件，也没填新链接——保留原来的云端引用不动
+            finalUrl = _editingCloudUrl;
+        } else if (url) {
+            finalUrl = url;
+        } else {
+            showNotification('请填写音频链接，或选择本地文件上传', 'error');
             return;
         }
 
         const songData = {
             title,
             sub: sub || '未知艺术家',
-            url,
+            url: finalUrl,
             isCustom: true
         };
 
@@ -2918,10 +3215,12 @@ const savedCover = safeGetItem(APP_PREFIX + 'playerCover');
         newSongTitle.value = '';
         newSongSub.value = '';
         newSongUrl.value = '';
+        _resetLocalUploadUI();
         hideModal(addSongModal);
     });
 
     cancelAddSongBtn.addEventListener('click', () => {
+        _resetLocalUploadUI();
         hideModal(addSongModal);
     });
 
@@ -3045,8 +3344,15 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
             DOMElements.chatContainer.addEventListener('scroll', () => {
                 const container = DOMElements.chatContainer;
                 if (!container) return;
-                if (container.scrollTop < 50 && !isLoadingHistory && messages.length > displayedMessageCount) {
+                const hasMoreOlder = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
+                if (container.scrollTop < 50 && !isLoadingHistory && hasMoreOlder) {
                     if (typeof loadMoreHistory === 'function') loadMoreHistory();
+                }
+                if (msgViewMode === 'window' && !isLoadingFuture && msgWinEnd < messages.length) {
+                    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+                    if (distanceFromBottom < 50) {
+                        if (typeof loadMoreFuture === 'function') loadMoreFuture();
+                    }
                 }
             });
 
@@ -3056,9 +3362,11 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
                     e.preventDefault(); isBatchMode ? addToBatch(): sendMessage();
                 }
             });
-            DOMElements.messageInput.addEventListener('input', () => {
-                DOMElements.messageInput.style.height = 'auto'; DOMElements.messageInput.style.height = `${Math.min(DOMElements.messageInput.scrollHeight, 120)}px`;
-            });
+            DOMElements.messageInput.addEventListener('input', window._syncMessageInputHeight);
+            // 页面刚加载、输入框还是空的这一下也要跟着量一次——不然空的时候就只能靠 CSS
+            // min-height 的原生渲染撑着，手机上不同断点（46/42/38px三档）算出来的高度
+            // 跟这套 JS 动态测量对不上，会出现"没文字反而比有文字还高"的错位
+            window._syncMessageInputHeight();
 
 
             DOMElements.attachmentBtn.addEventListener('click', () => {
@@ -3220,18 +3528,71 @@ playlist.style.top = (rect.top + (player.classList.contains('collapsed') ? 65 : 
                 sendBtn.addEventListener('click',
                     () => {
                         if (currentImageData) {
+                            const messageId = Date.now();
+                            let imageField = currentImageData;
+                            let uploadStatus = null;
+
+                            // 阶段三B：如果是 base64 且连了云端，走上传队列（无感知重试）
+                            const isBase64Img = typeof currentImageData === 'string' && currentImageData.indexOf('data:image') === 0;
+                            const cloudReady = !!(window.CloudMedia && window.CloudSync && window.CloudSync.isConnected());
+                            if (isBase64Img && cloudReady) {
+                                const taskId = 'up_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                                imageField = 'pending://' + taskId;
+                                uploadStatus = 'uploading';
+                                // 同步入队：内部同步写内存缓存 + 队列，随后消息渲染能立刻读到 base64
+                                window.CloudMedia.queueUpload(currentImageData, 'chat-images', {
+                                    taskId: taskId,
+                                    messageId: messageId,
+                                    onSuccess: async (result) => {
+                                        const target = messages.find(m => String(m.id) === String(messageId));
+                                        if (!target) return;
+                                        target.image = result.url;
+                                        delete target.uploadStatus;
+                                        try { throttledSaveData(); } catch (e) {}
+                                        // 先拉 blob URL，拿到后再替换 DOM，避免 img.src='' 的白屏闪烁
+                                        try {
+                                            const wrapper = document.querySelector('.message-wrapper[data-id="' + messageId + '"]');
+                                            if (!wrapper) return;
+                                            const wrap = wrapper.querySelector('.message-image-pending-wrap');
+                                            if (!wrap) return;
+                                            const img = wrap.querySelector('img');
+                                            const parent = wrap.parentNode;
+                                            if (!img || !parent) return;
+                                            // 先拉全尺寸 blob
+                                            let blobUrl = null;
+                                            try {
+                                                blobUrl = window.CloudMedia ? await window.CloudMedia.fetchUrl(result.url) : null;
+                                            } catch (fetchErr) {
+                                                console.warn('[cloud-media] 上传完拉图失败，继续显示本地图', fetchErr);
+                                            }
+                                            // 有 blob 就直接设 src；没有就走懒加载（下次滚动到触发）
+                                            img.removeAttribute('data-pending-ref');
+                                            img.setAttribute('onclick', "viewImage('" + result.url + "')");
+                                            if (blobUrl) {
+                                                img.src = blobUrl;
+                                            } else {
+                                                img.src = '';
+                                                img.setAttribute('data-lazy-cloud-ref', result.url);
+                                                if (window.CloudMedia) window.CloudMedia.bindLazyImage(img, result.url);
+                                            }
+                                            parent.replaceChild(img, wrap);
+                                        } catch (e) { console.warn('[cloud-media] 局部更新失败', e); }
+                                    }
+                                });
+                            }
 
                             addMessage({
-                                id: Date.now(),
+                                id: messageId,
                                 sender: 'user',
                                 text: '',
                                 timestamp: new Date(),
-                                image: currentImageData,
+                                image: imageField,
                                 status: 'sent',
                                 favorited: false,
                                 note: null,
                                 replyTo: currentReplyTo,
-                                type: 'normal'
+                                type: 'normal',
+                                uploadStatus: uploadStatus
                             });
                             playSound('send');
                             currentReplyTo = null;

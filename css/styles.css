@@ -1089,6 +1089,16 @@
             z-index: 1;
             cursor: pointer;
         }
+        /* 绾� emoji锛堜笉鍚嫭鍙�/瀛楁瘝杩欎簺棰滄枃瀛楃壒寰佸瓧绗︼級鐢ㄥ渾褰㈠簳锛岄鏂囧瓧/鑷畾涔夋嫾鎺ヨ〃鎯�
+           杩樻槸鐢ㄤ笂闈㈤偅绉嶈兌鍥婂舰鈥斺€斿渾褰㈠簳瀹介珮鍐欐銆佷笉闅忓唴瀹规拺寮€锛屾墍浠ュ彧缁欑湡鐨勫彧鏈変竴涓や釜瀛楃鐨�
+           emoji 鐢紱棰滄枃瀛楁櫘閬嶆瘮杈冮暱锛岀‖濂楀渾褰細鎶婂唴瀹规尋鍙樺舰锛屾墍浠ョ户缁蛋鑳跺泭褰㈣嚜閫傚簲瀹藉害 */
+        .message-reaction-badge.reaction-badge-emoji {
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 15px;
+        }
         /* 鐐瑰嚮鐑尯姣旇倝鐪肩湅鍒扮殑鑳跺泭鑼冨洿鍐嶅ぇ涓€鍦堬紙寰€澶栨墿6px锛夛紝杩欐牱鎵嬫寚鐐圭殑鏃跺€欏懡涓巼鏇撮珮锛�
            涓嶅鏄撳洜涓哄樊涓€鐐圭偣灏辨紡鐐瑰埌涓嬮潰鐨勬皵娉★紙璇煶鏉�/绾㈠寘/鍥剧墖/琛ㄦ儏鍖咃級涓� */
         .message-reaction-badge::before {
@@ -1096,11 +1106,17 @@
             position: absolute;
             inset: -6px;
         }
+        /* 涓嶅啀鐢�"涓€鏉¤竟璐寸潃瑙掋€佸線鍙︿竴杈归暱"鐨勬柟寮忥紙鍐呭闀夸簡浼氭暣涓線涓€渚ф粦鍑哄睆骞曪級锛�
+           鏀规垚璁╂爣绛剧殑涓績鐐规濂藉崱鍦ㄦ皵娉＄殑宸︿笅瑙�/鍙充笅瑙掞紝鍐呭鍙橀暱鐨勬椂鍊欐槸涓よ竟瀵圭О鍦板線澶栨墿锛�
+           婧㈠嚭灞忓箷鐨勬鐜囧皬浜嗗緢澶氥€�--badge-safe-shift 鏄� JS 鍦ㄦ瀬绔儏鍐典笅锛堣〃鎯呮湰韬氨寰堥暱锛�
+           閲忓嚭鏉ヨ繕鏄細瓒呭嚭灞忓箷鏃讹紝鍐嶉澶栧仛鐨勪竴娆＄籂鍋忥紝瑙� _clampReactionBadges */
         .message-wrapper.sent .message-reaction-badge {
-            left: -6px;
+            left: 0;
+            transform: translateX(calc(-50% + var(--badge-safe-shift, 0px)));
         }
         .message-wrapper.received .message-reaction-badge {
-            right: -6px;
+            right: 0;
+            transform: translateX(calc(50% + var(--badge-safe-shift, 0px)));
         }
 
         /* 闀挎寜闈㈡澘锛氫竴琛屽浐瀹� 8 涓牸瀛愶紙7涓父鐢ㄥ弽搴� + 涓€涓�"+"锛夈€傜偣"+"涔嬪悗鍔犱笂

@@ -10,8 +10,11 @@
      连续扔同一种只保留一条：只有当上一条气泡是聊天记录的最后一条、
      同一个人扔的、同一种道具、而且是同一次打开面板时才合并；
      换道具、中间插了别的消息、关掉面板再打开，都会新起一条
-   - 每新起一条（用户扔的）就接一次 window._triggerDelayedReply(true)，
-     让梦角照常回复；合并掉的那些不再重复触发
+   - 回复时机：用户扔的时候不立刻触发梦角回复，等用户停手 3 秒、或点关闭
+     面板（以先到的为准），才当作"一轮消息发完"调一次 window._triggerDelayedReply(true)，
+     走正常的已读 -> 正在输入 -> 回复（也可能已读不回）流程，一轮只触发一次
+   - 目标头像：扔向聊天区里当前可见、最靠下的那个头像（用户扔 -> 梦角的，
+     梦角扔 -> 我的），找不到才退回头部的头像
    - 梦角也会扔：core.js 的 simulateReply 里跟拍一拍同样 3% 判定，
      调 window.ThrowEgg.partnerThrow()，从梦角头像飞向"我"的头像
    ============================================================ */
@@ -396,17 +399,52 @@
     return true;
   }
 
+  // ---------- 找聊天区里最近的头像 ----------
+  // side: 'received' = 梦角的消息头像，'sent' = 我的消息头像。
+  // 只看当前在聊天区可视范围内、没被隐藏的，取最靠下（也就是最新、离输入框最近）的一个
+  function nearestChatAvatar(side, fallbackId) {
+    const container = document.getElementById('chat-container');
+    if (container) {
+      const cr = container.getBoundingClientRect();
+      const list = container.querySelectorAll('.message-wrapper.' + side + ' .message-avatar');
+      let best = null, bestBottom = -Infinity;
+      list.forEach(function (elm) {
+        if (getComputedStyle(elm).visibility === 'hidden' || getComputedStyle(elm).display === 'none') return;
+        const r = elm.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+        if (r.bottom < cr.top + 4 || r.top > cr.bottom - 4) return;
+        if (r.bottom > bestBottom) { best = elm; bestBottom = r.bottom; }
+      });
+      if (best) return best;
+    }
+    return document.getElementById(fallbackId);
+  }
+
+  // ---------- 回复时机：停手 3 秒 / 关面板，才算"一轮消息发完" ----------
+  const IDLE_MS = 3000;
+  let replyTimer = null, replyDirty = false;
+  function flushReply() {
+    if (replyTimer) { clearTimeout(replyTimer); replyTimer = null; }
+    if (!replyDirty) return;
+    replyDirty = false;
+    if (typeof window._triggerDelayedReply === 'function') window._triggerDelayedReply(true);
+  }
+  function markReplyPending() {
+    replyDirty = true;
+    if (replyTimer) clearTimeout(replyTimer);
+    replyTimer = setTimeout(flushReply, IDLE_MS);
+  }
+
   // ---------- 用户扔 ----------
   function userThrow(itemId, fromEl) {
     const item = ITEMS.find(function (i) { return i.id === itemId; });
-    const avatar = document.getElementById('partner-avatar');
+    const avatar = nearestChatAvatar('received', 'partner-avatar');
     if (!item || !avatar) return;
     const from = fromEl ? centerOf(fromEl) : { x: window.innerWidth - 60, y: window.innerHeight - 120 };
     playSequence(item.id, from, centerOf(avatar), function () {
       shake(avatar);
-      if (recordThrow('user', item) && typeof window._triggerDelayedReply === 'function') {
-        window._triggerDelayedReply(true);
-      }
+      recordThrow('user', item);
+      markReplyPending();
     });
   }
 
@@ -421,8 +459,8 @@
   function partnerThrow(itemId) {
     const item = ITEMS.find(function (i) { return i.id === itemId; }) || ITEMS[Math.floor(Math.random() * ITEMS.length)];
     hideTypingIndicator();
-    const fromEl = document.getElementById('partner-avatar');
-    const toEl = document.getElementById('my-avatar');
+    const fromEl = nearestChatAvatar('received', 'partner-avatar');
+    const toEl = nearestChatAvatar('sent', 'my-avatar');
     const done = function () { shake(toEl); recordThrow('partner', item); };
     if (!fromEl || !toEl || toEl.getBoundingClientRect().width === 0) { done(); return; }
     playSequence(item.id, centerOf(fromEl), centerOf(toEl), done);
@@ -443,6 +481,7 @@
     if (panel) panel.remove();
     window.removeEventListener('resize', onResize);
     panelSession++; // 关掉就算这一轮结束，再打开扔同一种会新起一条
+    flushReply();   // 关面板 = 这一轮发完了，立刻进入正常的"已读 / 正在输入 / 回复"流程
   }
   function openPanel() {
     if (typeof gsap === 'undefined') {

@@ -1742,6 +1742,10 @@ window.openReactionPicker = function(messageId, anchorEl) {
         popup.remove();
     };
 
+    // 小面板的列数按"常用反应数量 + 1（"+"号）"来定，不要写死 8 列——不然常用反应数量以后
+    // 再调（比如这次从 7 个减到 6 个），列数和实际格子数对不上，最后会空出一截不上不下的缺口
+    popup.style.gridTemplateColumns = `repeat(${window.COMMON_REACTIONS.length + 1}, 34px)`;
+
     window.COMMON_REACTIONS.forEach(emoji => popup.appendChild(_buildReactionGridItem(emoji, pick)));
 
     const moreBtn = document.createElement('div');
@@ -1750,6 +1754,7 @@ window.openReactionPicker = function(messageId, anchorEl) {
     moreBtn.title = '更多表情';
     moreBtn.addEventListener('click', () => {
         popup.classList.add('reaction-picker-popup-expanded');
+        popup.style.gridTemplateColumns = 'repeat(8, 34px)'; // 完整表情表固定按 8 列铺开
         popup.innerHTML = '';
 
         const recent = _getRecentReactions();

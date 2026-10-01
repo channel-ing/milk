@@ -2554,17 +2554,18 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                      throttledSaveData();
                 }
             }
-            if (Math.random() < 0.03) {
-                // ── 对方拍一拍：调用提取的通用函数（同时供 /测试拍一拍 指令使用）──
+            // ── 对方拍一拍 和 梦角搞怪：两套判定各掷各的骰子（各 3%），互不排斥，
+            //    有可能同一次同时出现；只要其中任何一个触发了，这次就不再走普通回复 ──
+            const _doPoke = Math.random() < 0.03;
+            const _doThrow = Math.random() < 0.03 && window.ThrowEgg && typeof window.ThrowEgg.partnerThrow === 'function';
+            if (_doPoke) {
+                // 调用提取的通用函数（同时供 /测试拍一拍 指令使用）
                 if (typeof window._triggerPartnerPoke === 'function') window._triggerPartnerPoke();
-                return;
             }
-
-            // ── 梦角搞怪（朝"我"扔番茄/鸡蛋/蛋糕/泼水）：跟拍一拍同样的判定方式，3% 概率，触发后这次不再回复 ──
-            if (Math.random() < 0.03 && window.ThrowEgg && typeof window.ThrowEgg.partnerThrow === 'function') {
+            if (_doThrow) {
                 window.ThrowEgg.partnerThrow();
-                return;
             }
+            if (_doPoke || _doThrow) return;
 
             // ── 梦角主动发红包：跟上面拍一拍是完全独立的两套判定，互不影响——
             // 不 return，不影响这次正常回复照常生成；异步调用，不 await，不拖慢/阻塞回复流程，

@@ -1,13 +1,5 @@
 /*核心应用逻辑：数据加载保存、消息渲染、会话管理等*/
 
-// 梦角回复消息的多监听通道（跟 window._onPartnerMessage 单函数钩子并行，互不覆盖）
-// 需要监听"梦角发了消息"这个事件的新模块，用 window._registerPartnerMessageListener(fn) 注册，
-// 不要直接赋值 window._onPartnerMessage，那个是给旧模块（陪伴模块）用的，赋值会覆盖掉它。
-window._partnerMessageListeners = window._partnerMessageListeners || [];
-window._registerPartnerMessageListener = window._registerPartnerMessageListener || function (fn) {
-    if (typeof fn === 'function') window._partnerMessageListeners.push(fn);
-};
-
         function clearAllAppData() {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
@@ -48,9 +40,6 @@ window._registerPartnerMessageListener = window._registerPartnerMessageListener 
             messages = [];
             window.messages = messages; // 双保险：同步 window 属性
             displayedMessageCount = HISTORY_BATCH_SIZE;
-            msgViewMode = 'latest'; // 清空消息了，历史浏览模式的窗口下标肯定全部失效，一并重置
-            newMsgCountWhileBrowsing = 0;
-            if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
 
             // 立即清除 localStorage 备份，防止 _tryRecoverFromBackup 在 IndexedDB 写入前恢复旧消息
             try { localStorage.removeItem('BACKUP_V1_critical'); } catch(e) {}
@@ -83,76 +72,10 @@ window._registerPartnerMessageListener = window._registerPartnerMessageListener 
     };
 }
 
-// 把 messages[startIdx, endIdxExclusive) 这一批更早的消息，直接插到聊天区域最上面——
-// 不清空、不重画已经显示着的内容，所以不会有"整个区域先藏起来再露出来"那种白屏闪烁
-function _prependOlderMessages(startIdx, endIdxExclusive) {
-    const container = DOMElements.chatContainer;
-    const batch = messages.slice(startIdx, endIdxExclusive);
-    if (!batch.length || !container) return;
-
-    const fragment = new DocumentFragment();
-    let lastSenderRef = { current: null };
-    batch.forEach((msg, i) => {
-        const globalIdx = startIdx + i;
-        const prevMsg = globalIdx > 0 ? messages[globalIdx - 1] : null;
-        const nextMsg = messages[globalIdx + 1] || null; // 批次内的下一条，或者已经渲染在下面的那一条，都能正确取到
-        const msgFragment = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
-        fragment.appendChild(msgFragment);
-    });
-
-    // 最上面固定有一个用来撑高度的占位div（spacer），新内容要插在它后面、原有消息前面
-    const spacer = container.querySelector('div[style*="flex: 1"]');
-    const insertBeforeNode = spacer ? spacer.nextSibling : container.firstChild;
-
-    // 聊天框本身开着"平滑滚动"效果（CSS scroll-behavior: smooth），这跟"瞬间精确挪到某个位置"是冲突的——
-    // 不临时关掉的话，下面这行补偿滚动条位置的操作会被浏览器理解成"慢慢滑过去"，
-    // 读到的中间值就会不准，视觉上也会变成"先加载、又滑到别的地方"，这正是这次要修的问题
-    const prevScrollBehavior = container.style.scrollBehavior;
-    container.style.scrollBehavior = 'auto';
-
-    const oldScrollHeight = container.scrollHeight;
-    if (insertBeforeNode) {
-        container.insertBefore(fragment, insertBeforeNode);
-    } else {
-        container.appendChild(fragment);
-    }
-    // 上面新插入了这么多高度，滚动条也跟着往下挪同样的距离，视觉上就像"没有动过"，用户能无缝接着往上看
-    const newScrollHeight = container.scrollHeight;
-    container.scrollTop += (newScrollHeight - oldScrollHeight);
-
-    container.style.scrollBehavior = prevScrollBehavior || '';
-}
-
-// 把 messages[startIdx, endIdxExclusive) 这一批更晚的消息，直接接在聊天区域最下面——
-// 同样不清空重画，往下追加不会影响当前已经看到的内容和滚动位置，不需要额外补偿滚动条
-function _appendNewerMessages(startIdx, endIdxExclusive) {
-    const container = DOMElements.chatContainer;
-    const batch = messages.slice(startIdx, endIdxExclusive);
-    if (!batch.length || !container) return;
-
-    const fragment = new DocumentFragment();
-    // lastSenderRef 要先接上"当前已经渲染的最后一条是谁发的"，不然本来该合并显示的头像/时间会重复冒出来
-    let lastSenderRef = { current: null };
-    if (startIdx > 0) {
-        const lastRenderedMsg = messages[startIdx - 1];
-        const prevGroupMember = (lastRenderedMsg.sender !== 'user' && typeof getGroupMemberForMessage === 'function') ? getGroupMemberForMessage(lastRenderedMsg.id) : null;
-        lastSenderRef.current = prevGroupMember ? ('group_' + prevGroupMember.name) : lastRenderedMsg.sender;
-    }
-    batch.forEach((msg, i) => {
-        const globalIdx = startIdx + i;
-        const prevMsg = globalIdx > 0 ? messages[globalIdx - 1] : null;
-        const nextMsg = messages[globalIdx + 1] || null;
-        const msgFragment = createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef);
-        fragment.appendChild(msgFragment);
-    });
-
-    container.appendChild(fragment);
-}
-
 function loadMoreHistory() {
     const historyLoader = document.getElementById('history-loader');
     const container = DOMElements && DOMElements.chatContainer;
-    const currentOldestMsgIndex = msgViewMode === 'window' ? msgWinStart : (messages.length - displayedMessageCount);
+    const currentOldestMsgIndex = messages.length - displayedMessageCount;
 
     if (!container) return;
     if (isLoadingHistory) return;
@@ -165,64 +88,49 @@ function loadMoreHistory() {
     isLoadingHistory = true;
     if (historyLoader) historyLoader.style.display = 'flex';
 
-    // 消息本来就已经在内存里了，不是要发网络请求，这里保留一点延迟纯粹是为了让转圈动效能被看清楚、
-    // 感觉更像"正在加载"，不会显得太突兀。真正的DOM操作只插入新增的这一批，不会有白屏闪烁。
-    setTimeout(() => {
-        const oldStart = msgViewMode === 'window' ? msgWinStart : Math.max(0, messages.length - displayedMessageCount);
-        let newStart;
-        if (msgViewMode === 'window') {
-            msgWinStart = Math.max(0, msgWinStart - HISTORY_BATCH_SIZE);
-            newStart = msgWinStart;
-        } else {
-            displayedMessageCount = Math.min(messages.length, displayedMessageCount + HISTORY_BATCH_SIZE);
-            newStart = Math.max(0, messages.length - displayedMessageCount);
-        }
+    const visibleWrappers = Array.from(container.querySelectorAll('.message-wrapper'));
+    const firstVisible = visibleWrappers.find(function(el) {
+        return el.offsetTop + el.offsetHeight >= container.scrollTop;
+    }) || visibleWrappers[0] || null;
 
-        _prependOlderMessages(newStart, oldStart);
+    const anchorId = firstVisible ? firstVisible.dataset.msgId : null;
+    const anchorTop = firstVisible ? firstVisible.getBoundingClientRect().top : 0;
 
-        const stillHasMore = msgViewMode === 'window' ? msgWinStart > 0 : (messages.length > displayedMessageCount);
-        if (historyLoader) {
-            historyLoader.style.display = stillHasMore ? 'flex' : 'none';
-        }
-        isLoadingHistory = false;
-    }, 120);
-}
+    const prevVisibility = container.style.visibility;
+    const prevOverflow = container.style.overflow;
+    const prevScrollBehavior = container.style.scrollBehavior;
+    const prevOpacity = container.style.opacity;
 
-// 往下翻，加载更晚的消息——跟 loadMoreHistory 对称，只在 window（历史浏览）模式下会用到，
-// 正常的 latest 模式本来就已经渲染到最新消息了，没有"更晚"可以加载
-function loadMoreFuture() {
-    const futureLoader = document.getElementById('future-loader');
-    const container = DOMElements && DOMElements.chatContainer;
-    if (!container) return;
-    if (msgViewMode !== 'window') return;
-    if (isLoadingFuture) return;
-
-    if (msgWinEnd >= messages.length) {
-        if (futureLoader) futureLoader.style.display = 'none';
-        return;
-    }
-
-    isLoadingFuture = true;
-    if (futureLoader) futureLoader.style.display = 'flex';
+    container.style.opacity = '0.015';
+    container.style.visibility = 'hidden';
+    container.style.overflow = 'hidden';
+    container.style.scrollBehavior = 'auto';
 
     setTimeout(() => {
-        const oldEnd = msgWinEnd;
-        msgWinEnd = Math.min(messages.length, msgWinEnd + HISTORY_BATCH_SIZE);
+        displayedMessageCount = Math.min(messages.length, displayedMessageCount + HISTORY_BATCH_SIZE);
+        renderMessages(true);
 
-        // 如果这一下已经追到最新消息了，直接切回正常模式，体验上等同于"回到最新"——
-        // 这是一次性的模式切换，不是重复的翻页动作，用一次完整渲染没问题
-        if (msgWinEnd >= messages.length) {
-            window._backToLatestMessages();
-            isLoadingFuture = false;
-            return;
-        }
+        requestAnimationFrame(() => {
+            if (anchorId) {
+                const newAnchor = container.querySelector('[data-msg-id="' + anchorId + '"]');
+                if (newAnchor) {
+                    const newTop = newAnchor.getBoundingClientRect().top;
+                    container.scrollTop += (newTop - anchorTop);
+                }
+            }
 
-        _appendNewerMessages(oldEnd, msgWinEnd);
+            requestAnimationFrame(() => {
+                container.style.opacity = prevOpacity || '';
+                container.style.visibility = prevVisibility || '';
+                container.style.overflow = prevOverflow || '';
+                container.style.scrollBehavior = prevScrollBehavior || '';
 
-        if (futureLoader) {
-            futureLoader.style.display = (msgWinEnd < messages.length) ? 'flex' : 'none';
-        }
-        isLoadingFuture = false;
+                if (historyLoader) {
+                    historyLoader.style.display = (messages.length > displayedMessageCount) ? 'flex' : 'none';
+                }
+                isLoadingHistory = false;
+            });
+        });
     }, 120);
 }
 
@@ -265,8 +173,6 @@ autoSendEnabled: false,
 autoSendInterval: 5,
         allowReadNoReply: false, 
         readNoReplyChance: 0.2,
-        combineReplyCards: false,
-        combineReplyMaxCards: 3,
         timeFormat: 'HH:mm',
         customSoundUrl: '',
         // 音效：两方分别可选（若对应 URL 为空则使用内置预设）
@@ -305,30 +211,19 @@ autoSendInterval: 5,
                 const item = document.createElement('div');
                 let isActive = false;
 
-                if (currentBg) {
-                    if (currentBg === bg.value) {
-                        // 本地 base64 完全匹配
-                        isActive = true;
-                    } else if (typeof currentBg === 'string' && currentBg.indexOf('oss://') === 0) {
-                        // 换设备恢复后 currentBg 是 oss:// 引用，跟 cloudUrl 比较
-                        isActive = bg.cloudUrl === currentBg;
-                    }
-                }
+                if (currentBg && currentBg === bg.value) isActive = true;
 
                 item.className = `bg-item ${isActive ? 'active': ''}`;
 
-                if (bg.type === 'image' || bg.type === 'gif') {
-                    // 图库预览：优先用缩略图（省内存），没有缩略图才用本地 base64
-                    // cloudUrl 存云端备份引用，但图库预览不走云端
-                    const displaySrc = bg.thumbnail || bg.value;
-                    item.innerHTML = `<img src="${displaySrc}" loading="lazy" alt="bg">`;
+                if (bg.type === 'image') {
+                    item.innerHTML = `<img src="${bg.value}" loading="lazy" alt="bg">`;
                 } else {
                     item.innerHTML = `<div class="bg-color-block" style="background: ${bg.value}"></div>`;
                 }
 
-                item.onclick = async (e) => {
+                item.onclick = (e) => {
                     if (e.target.closest('.bg-delete-btn')) return;
-                    await applyBackground(bg.value);
+                    applyBackground(bg.value);
                     safeSetItem(getStorageKey('chatBackground'), bg.value);
                     localforage.setItem(getStorageKey('chatBackground'), bg.value);
                     renderBackgroundGallery();
@@ -340,20 +235,9 @@ autoSendInterval: 5,
                     delBtn.className = 'bg-delete-btn';
                     delBtn.innerHTML = '<i class="fas fa-trash"></i>';
                     delBtn.title = "删除此背景";
-                    delBtn.onclick = async (e) => {
+                    delBtn.onclick = (e) => {
                         e.stopPropagation();
                         if (confirm('确定删除这张背景图吗？')) {
-                            // 阶段三B：如果有云端引用，先删云端对象（失败不阻塞本地删除）
-                            if (window.CloudMedia && bg) {
-                                const refToDelete = bg.cloudKey || (typeof bg.value === 'string' && bg.value.indexOf('oss://') === 0 ? bg.value : null);
-                                if (refToDelete) {
-                                    try {
-                                        await window.CloudMedia.delete(refToDelete);
-                                    } catch (err) {
-                                        console.warn('[cloud-media] 云端删除失败', err);
-                                    }
-                                }
-                            }
                             savedBackgrounds.splice(index, 1);
                             saveBackgroundGallery();
 
@@ -379,38 +263,9 @@ autoSendInterval: 5,
 }
 
 
-        const applyBackground = async (value) => {
+        const applyBackground = (value) => {
             if (!value || typeof value !== 'string') return;
             try {
-                // 聊天页背景本地存全尺寸 base64，直接应用，零延迟
-                // oss:// 引用只会在换设备恢复时临时出现（旧数据迁移过渡期），兜底处理
-                if (value.indexOf('oss://') === 0) {
-                    // 兜底：找本地 gallery 里有没有对应的 cloudUrl，有就用本地 base64
-                    const localItem = Array.isArray(savedBackgrounds)
-                        ? savedBackgrounds.find(function (bg) { return bg && (bg.cloudUrl === value || bg.value === value); })
-                        : null;
-                    if (localItem && localItem.value && localItem.value.indexOf('data:image') === 0) {
-                        // 本地有，直接用
-                        const cssValue = `url(${localItem.value})`;
-                        document.documentElement.style.setProperty('--chat-bg-image', cssValue);
-                        document.body.classList.add('with-background');
-                        return;
-                    }
-                    // 本地没有（换设备恢复后的旧数据）：才走云端下载，缩略图先垫底
-                    if (window.CloudMedia) {
-                        if (localItem && localItem.thumbnail) {
-                            document.documentElement.style.setProperty('--chat-bg-image', `url(${localItem.thumbnail})`);
-                            document.body.classList.add('with-background');
-                        }
-                        window.CloudMedia.fetchUrl(value).then(function (blobUrl) {
-                            document.documentElement.style.setProperty('--chat-bg-image', `url(${blobUrl})`);
-                            document.body.classList.add('with-background');
-                        }).catch(function (e) {
-                            console.warn('[cloud-media] 加载云端背景失败', e);
-                        });
-                    }
-                    return;
-                }
                 if (value.startsWith('linear-gradient') || value.startsWith('#') || value.startsWith('rgb')) {
                     document.documentElement.style.setProperty('--chat-bg-image', value);
                 } else {
@@ -450,9 +305,7 @@ const loadData = async () => {
             localforage.getItem(getStorageKey('myStickerLibrary')),
             localforage.getItem(getStorageKey('customReplyGroups')),
             localforage.getItem(getStorageKey('customPokeGroups')),
-            localforage.getItem(getStorageKey('customStatusGroups')),
-            localforage.getItem(getStorageKey('customPeriodCare')),
-            localforage.getItem(getStorageKey('myStickerGroups'))
+            localforage.getItem(getStorageKey('customStatusGroups'))
         ]);
         const getVal = (index) => results[index].status === 'fulfilled' ? results[index].value : null;
 
@@ -477,8 +330,6 @@ const loadData = async () => {
         const savedReplyGroups = getVal(18);
         const savedPokeGroups = getVal(19);
         const savedStatusGroups = getVal(20);
-        const savedPeriodCare = getVal(21);
-        const savedMyStickerGroups = getVal(22);
 
         if (savedPartnerPersonas) partnerPersonas = savedPartnerPersonas;
 
@@ -507,8 +358,6 @@ const loadData = async () => {
         
         if (savedIntros) customIntros = savedIntros;
         else customIntros = CONSTANTS.WELCOME_ANIMATIONS.map(a => `${a.line1}|${a.line2}`);
-
-        customPeriodCare = savedPeriodCare || [];  // 没有内置预设，用户没配置就是空数组
 
         if (savedMessages && Array.isArray(savedMessages)) {
             messages = savedMessages.map(m => ({
@@ -549,80 +398,6 @@ const loadData = async () => {
         if (savedAnniversaries) anniversaries = savedAnniversaries;
         if (savedStickers) stickerLibrary = savedStickers;
         if (savedMyStickers) myStickerLibrary = savedMyStickers;
-        if (savedMyStickerGroups) window.myStickerGroups = savedMyStickerGroups;
-        else window.myStickerGroups = [];
-
-        // 迁移："我的表情库"以前是纯字符串数组（元素直接是图片地址），
-        // 现在要支持分组，每一项需要有自己的身份（id）和归属（groupId），
-        // 改成对象数组。只有第一次加载到旧格式数据时才会触发，转完就直接存回去，
-        // 以后不会再重复转。
-        (function _migrateMyStickerLibrary() {
-            if (!Array.isArray(myStickerLibrary) || !myStickerLibrary.length) return;
-            var needsMigration = myStickerLibrary.some(function (s) { return typeof s === 'string'; });
-            if (!needsMigration) return;
-            var base = Date.now();
-            var n = myStickerLibrary.length;
-            myStickerLibrary = myStickerLibrary.map(function (s, i) {
-                if (typeof s === 'string') {
-                    // 这个数组从老格式（纯字符串数组）那会儿开始，加新表情就一直是 unshift 塞到最前面
-                    // （见 app.js 的 myStickerLibrary.unshift），也就是说数组第0个本来就是"最新"那张，
-                    // 不是"最老"那张——时间戳要按这个真实规律倒着算，第0个给最大的时间戳，
-                    // 不然新的排序逻辑（按 addedAt 倒序）会把老数据的先后顺序整个搞反
-                    return { id: 'stk_' + base + '_' + i, src: s, groupId: null, addedAt: base + (n - 1 - i), groupJoinedAt: base + (n - 1 - i) };
-                }
-                return s; // 已经是新格式的，原样保留
-            });
-            try { localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary); } catch (e) {}
-        })();
-
-        // 一次性补救：上面那段迁移代码上线后，已经有一批用户的老表情包被那个"方向搞反"的
-        // bug 转换过一次了（转换本身已经完成，不会再走上面那条 needsMigration 分支）。
-        // 这里专门找出"当年被那个bug处理过"的那一批，把顺序倒回来——判断依据是：
-        // 一批条目的 id 共享同一个 'stk_<base>_' 前缀，且 addedAt 严格是 base, base+1, base+2...
-        // 这种连续整数（真实世界不同时间上传的表情，时间戳几乎不可能刚好差1毫秒排成这样，
-        // 这个特征几乎只有那个bug的产物才会有），符合的话就按当前数组位置重新倒序赋值一次。
-        // 用一个开关记一下修过了，不会同一批数据被反复橄来倒去
-        (function _fixMyStickerMigrationOrderBug() {
-            try {
-                if (localStorage.getItem('myStickerOrderFixApplied') === '1') return;
-            } catch (e) { return; }
-            if (!Array.isArray(myStickerLibrary) || !myStickerLibrary.length) {
-                try { localStorage.setItem('myStickerOrderFixApplied', '1'); } catch (e) {}
-                return;
-            }
-            // 按 id 里的 base 前缀分批，逐批检查是不是"连续整数"这个特征
-            var groups = {};
-            var order = [];
-            myStickerLibrary.forEach(function (entry, idx) {
-                if (!entry || typeof entry.id !== 'string') return;
-                var m = entry.id.match(/^stk_(\d+)_\d+$/);
-                if (!m) return;
-                var base = m[1];
-                if (!groups[base]) { groups[base] = []; order.push(base); }
-                groups[base].push({ entry: entry, idx: idx });
-            });
-            var fixedCount = 0;
-            order.forEach(function (base) {
-                var members = groups[base];
-                if (members.length < 2) return; // 单独一条不构成"批量迁移"的特征，跳过，避免误伤正常数据
-                // members 已经是按数组原始顺序收集的（forEach 天然顺序），检查是不是连续整数
-                var baseNum = Number(base);
-                var isSequential = members.every(function (m, i) { return m.entry.addedAt === baseNum + i; });
-                if (!isSequential) return; // 不符合特征，可能是正常数据凑巧共享了前缀，不动它
-                var n = members.length;
-                members.forEach(function (m, i) {
-                    var newVal = baseNum + (n - 1 - i);
-                    m.entry.addedAt = newVal;
-                    m.entry.groupJoinedAt = newVal;
-                });
-                fixedCount += n;
-            });
-            if (fixedCount > 0) {
-                try { localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary); } catch (e) {}
-                console.log('[sticker-fix] 已修正 ' + fixedCount + ' 张老表情包的排序方向');
-            }
-            try { localStorage.setItem('myStickerOrderFixApplied', '1'); } catch (e) {}
-        })();
         if (savedCustomThemes) customThemes = savedCustomThemes;
         if (savedThemeSchemes) themeSchemes = savedThemeSchemes;
         try { const ce = await localforage.getItem(getStorageKey('customEmojis')); if (ce && Array.isArray(ce)) customEmojis = ce; } catch(e) {}
@@ -632,43 +407,6 @@ const loadData = async () => {
         if (DOMElements && DOMElements.partner && DOMElements.me) {
             updateAvatar(DOMElements.partner.avatar, partnerAvatarSrc);
             updateAvatar(DOMElements.me.avatar, myAvatarSrc);
-            // updateAvatar 已经把值写进 _avatarCache 了，这里不用再写一遍
-
-            // 阶段四：本地没有头像时，从云端下载（换设备恢复场景）
-            if (window.CloudMedia && window.CloudSync && window.CloudSync.isConnected()) {
-                const _tryRestoreAvatar = async (isPartner) => {
-                    const localSrc = isPartner ? partnerAvatarSrc : myAvatarSrc;
-                    // 本地 localforage 有 或 内存缓存有，都不拉
-                    const cacheVal = window._avatarCache && (isPartner ? window._avatarCache.partner : window._avatarCache.me);
-                    if (localSrc || cacheVal) return;
-
-                    const category = isPartner ? 'avatars' : 'my-avatars';
-                    const avatarId = isPartner ? 'partner' : 'me';
-                    const sid = SESSION_ID;
-                    // 只试 jpg 和 png（上传时统一用 jpg，png 做兜底）
-                    for (const ext of ['jpg', 'png']) {
-                        const ossRef = `oss://media/${sid}/${category}/${avatarId}.${ext}`;
-                        try {
-                            const blobUrl = await window.CloudMedia.fetchUrl(ossRef);
-                            const resp = await fetch(blobUrl);
-                            const buf = await resp.arrayBuffer();
-                            const b64arr = new Uint8Array(buf);
-                            let binary = '';
-                            b64arr.forEach(b => binary += String.fromCharCode(b));
-                            const base64 = `data:image/${ext};base64,` + btoa(binary);
-                            const storageKey = getStorageKey(isPartner ? 'partnerAvatar' : 'myAvatar');
-                            await localforage.setItem(storageKey, base64);
-                            const el = isPartner ? DOMElements.partner.avatar : DOMElements.me.avatar;
-                            updateAvatar(el, base64);
-                            break;
-                        } catch (e) {
-                            // 没有这个后缀，继续
-                        }
-                    }
-                };
-                _tryRestoreAvatar(true).catch(() => {});
-                _tryRestoreAvatar(false).catch(() => {});
-            }
         }
 
         if (savedChatBg) {
@@ -685,15 +423,11 @@ const loadData = async () => {
         try { await loadEnvelopeData(); } catch(e) { console.warn("信封数据加载失败", e); }
         
         displayedMessageCount = HISTORY_BATCH_SIZE;
-        msgViewMode = 'latest'; // 切换/加载会话时，重置掉"历史浏览模式"，避免带着上一个会话的浏览状态串过来
-        newMsgCountWhileBrowsing = 0;
-        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
         
         setTimeout(() => {
             applyAllAvatarFrames();
             manageAutoSendTimer(); 
             checkEnvelopeStatus(); 
-            if (typeof checkMomentsStatus === 'function') checkMomentsStatus();
             updateUI();
             if (settings.customBubbleCss) {
                 try { applyCustomBubbleCss(settings.customBubbleCss); } catch(e) {}
@@ -722,9 +456,6 @@ const LIBRARY_CONFIG = {
         tabs: [
             { id: 'pokes', name: '拍一拍', mode: 'list' },
             { id: 'statuses', name: '对方状态', mode: 'list' },
-            { id: 'surveyBank', name: '问卷题库', mode: 'list' },
-            { id: 'period', name: '经期', mode: 'list' },
-            { id: 'redpacketBank', name: '红包祝福语', mode: 'list' },
             { id: 'mottos', name: '顶部格言', mode: 'list' },
             { id: 'intros', name: '开场动画', mode: 'list' }
         ]
@@ -844,26 +575,36 @@ const saveData = async () => {
         { key: 'customStatuses',         val: () => localforage.setItem(getStorageKey('customStatuses'), customStatuses) },
         { key: 'customMottos',           val: () => localforage.setItem(getStorageKey('customMottos'), customMottos) },
         { key: 'customIntros',           val: () => localforage.setItem(getStorageKey('customIntros'), customIntros) },
-        { key: 'customPeriodCare',       val: () => localforage.setItem(getStorageKey('customPeriodCare'), customPeriodCare) },
         { key: 'stickerLibrary',         val: () => localforage.setItem(getStorageKey('stickerLibrary'), stickerLibrary) },
         { key: 'myStickerLibrary',       val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
-        { key: 'myStickerGroups',        val: () => localforage.setItem(getStorageKey('myStickerGroups'), window.myStickerGroups || []) },
         { key: 'customThemes',           val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
         { key: 'themeSchemes',           val: () => localforage.setItem(`${APP_PREFIX}themeSchemes`, themeSchemes) },
         { key: 'chatMessages',           val: () => localforage.setItem(getStorageKey('chatMessages'), messages) },
     ];
 
-    // 头像从内存缓存读（不从 DOM 读，DOM 的 img.src 不可靠：可能是 blob URL、绝对路径或空字符串）
-    const partnerAvatarSrc = window._avatarCache && window._avatarCache.partner || null;
-    const myAvatarSrc = window._avatarCache && window._avatarCache.me || null;
+    const partnerAvatarSrc = (() => {
+        try {
+            const img = DOMElements.partner.avatar.querySelector('img');
+            return img ? img.src : null;
+        } catch(e) { return null; }
+    })();
+    const myAvatarSrc = (() => {
+        try {
+            const img = DOMElements.me.avatar.querySelector('img');
+            return img ? img.src : null;
+        } catch(e) { return null; }
+    })();
 
     if (partnerAvatarSrc) {
         promises.push({ key: 'partnerAvatar', val: () => localforage.setItem(getStorageKey('partnerAvatar'), partnerAvatarSrc) });
+    } else {
+        promises.push({ key: 'partnerAvatar', val: () => localforage.removeItem(getStorageKey('partnerAvatar')) });
     }
-    // 注意：头像不做 removeItem —— 用户没改头像时 _avatarCache 可能是 null，不能误删
 
     if (myAvatarSrc) {
         promises.push({ key: 'myAvatar', val: () => localforage.setItem(getStorageKey('myAvatar'), myAvatarSrc) });
+    } else {
+        promises.push({ key: 'myAvatar', val: () => localforage.removeItem(getStorageKey('myAvatar')) });
     }
 
     const results = await Promise.allSettled(promises.map(p => {
@@ -1140,20 +881,7 @@ function manageAutoSendTimer() {
         };
 
         const updateAvatar = (element, src) => {
-            if (src) {
-                element.innerHTML = `<img src="${src}" alt="avatar">`;
-                // 同时写内存缓存，供 saveData 读取（不从 DOM img.src 读，不可靠）
-                if (!window._avatarCache) window._avatarCache = {};
-                if (element === DOMElements.partner.avatar) window._avatarCache.partner = src;
-                else if (element === DOMElements.me.avatar) window._avatarCache.me = src;
-            } else {
-                element.innerHTML = `<i class="fas fa-user"></i>`;
-                // src 为空时清缓存（用户主动删除头像）
-                if (window._avatarCache) {
-                    if (element === DOMElements.partner.avatar) window._avatarCache.partner = null;
-                    else if (element === DOMElements.me.avatar) window._avatarCache.me = null;
-                }
-            }
+            if (src) element.innerHTML = `<img src="${src}" alt="avatar">`; else element.innerHTML = `<i class="fas fa-user"></i>`;
         };
 
         const removeBackground = () => {
@@ -1167,21 +895,31 @@ function manageAutoSendTimer() {
         window.scrollToQuotedMessage = function(el) {
             const id = el.getAttribute('data-reply-id');
             if (!id) return;
-            const target = document.querySelector(`[data-msg-id="${id}"]`);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('msg-highlight');
-                setTimeout(() => target.classList.remove('msg-highlight'), 1500);
-                return;
+            const tryScroll = () => {
+                const target = document.querySelector(`[data-msg-id="${id}"]`);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.classList.add('msg-highlight');
+                    setTimeout(() => target.classList.remove('msg-highlight'), 1500);
+                    return true;
+                }
+                return false;
+            };
+            if (!tryScroll()) {
+                const msgIndex = messages.findIndex(m => String(m.id) === String(id));
+                if (msgIndex === -1) {
+                    if (typeof showNotification === 'function') showNotification('消息可能已被删除', 'info');
+                    return;
+                }
+                const needed = messages.length - msgIndex;
+                if (needed > displayedMessageCount) {
+                    displayedMessageCount = needed;
+                    renderMessages(false);
+                    setTimeout(tryScroll, 150);
+                } else {
+                    if (typeof showNotification === 'function') showNotification('消息可能已被删除', 'info');
+                }
             }
-            // 当前页面上没有这条消息（可能太老了，还没渲染到），统一走"定位到某条消息"这条路，
-            // 不管这条消息有多老，只渲染它附近一小段，不会因为聊天记录长就变慢
-            if (!window._jumpToMessage(id)) return;
-            setTimeout(() => {
-                const el2 = document.querySelector(`[data-msg-id="${id}"]`);
-                if (el2) el2.classList.add('msg-highlight');
-                setTimeout(() => { if (el2) el2.classList.remove('msg-highlight'); }, 1500);
-            }, 60);
         };
 
 function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
@@ -1320,60 +1058,47 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         messageHTML += `<div class="reply-indicator" data-reply-id="${msg.replyTo.id || ''}" style="cursor:pointer;" onclick="scrollToQuotedMessage(this)"><span class="reply-indicator-sender">${repliedSender}</span><span class="reply-indicator-text">${repliedText}</span></div>`;
     }
 
-    const isRedPacket = msg.type === 'redpacket';
     const isImageOnly = !msg.text && !!msg.image;
     let content = msg.text ? `<div>${msg.text.replace(/\n/g, '<br>')}</div>` : '';
-    if (isRedPacket) {
-        content = (window.RedPacket && typeof window.RedPacket.renderBubbleHTML === 'function') ? window.RedPacket.renderBubbleHTML(msg) : '';
-    } else if (msg.image) {
-        // 阶段三B：识别 oss:// 走懒加载；识别 pending:// 走本地 base64 + 上传中角标
-        const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
-        const isPendingImg = typeof msg.image === 'string' && msg.image.indexOf('pending://') === 0;
-        const imgAttrs = `class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')"`;
-        if (isCloudImg) {
-            content += `<img data-lazy-cloud-ref="${msg.image}" ${imgAttrs}>`;
-        } else if (isPendingImg) {
-            // 用一个包裹层放"上传中"角标
-            content += `<div class="message-image-pending-wrap" style="position:relative;display:inline-block;">`
-                + `<img data-pending-ref="${msg.image}" ${imgAttrs}>`
-                + `<div class="upload-indicator" style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;"><i class="fas fa-cloud-upload-alt"></i></div>`
-                + `</div>`;
-        } else {
-            content += `<img src="${msg.image}" ${imgAttrs}>`;
-        }
-    }
+    if (msg.image) content += `<img src="${msg.image}" class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')">`;
     messageHTML += content;
 
     const messageDiv = document.createElement('div');
-    if (isRedPacket) {
-        messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-redpacket-bubble-wrap`;
-    } else if (isImageOnly) {
+    if (isImageOnly) {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} message-image-bubble-none`;
     } else {
         messageDiv.className = `message message-${msg.sender === 'user' ? 'sent' : 'received'} ${settings.bubbleStyle}`;
     }
     messageDiv.innerHTML = messageHTML;
-    // 阶段三B：innerHTML 塞完后，找带 data-lazy-cloud-ref 的图绑定懒加载
-    if (window.CloudMedia) {
-        messageDiv.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
-            const ref = imgEl.getAttribute('data-lazy-cloud-ref');
-            window.CloudMedia.bindLazyImage(imgEl, ref);
-        });
-        // 阶段三B：pending 图从本地 base64 显示
-        messageDiv.querySelectorAll('img[data-pending-ref]').forEach(function (imgEl) {
-            const ref = imgEl.getAttribute('data-pending-ref');
-            window.CloudMedia.bindPendingImage(imgEl, ref);
-        });
-    }
 
     let actionsHTML = '';
     if (settings.replyEnabled) actionsHTML += `<button class="meta-action-btn reply-btn" title="回复"><i class="fas fa-reply"></i></button>`;
+    actionsHTML += `<button class="meta-action-btn reaction-btn" title="表情回应"><i class="far fa-grin"></i></button>`;
     const starIcon = msg.favorited ? 'fas fa-star' : 'far fa-star';
     actionsHTML += `<button class="meta-action-btn favorite-action-btn ${msg.favorited ? 'favorited' : ''}" title="${msg.favorited ? '取消收藏' : '收藏'}"><i class="${starIcon}"></i></button>`;
     actionsHTML += `<button class="meta-action-btn delete-btn" title="删除"><i class="fas fa-trash-alt"></i></button>`;
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'message-meta-actions';
     actionsDiv.innerHTML = actionsHTML;
+
+    // ── 消息反应小标签（用户反应放气泡左下角，梦角反应放气泡右下角，都贴在气泡自己身上，
+    //    这样不管用户有没有自定义气泡 CSS，标签都跟着气泡的实际形状走，不会错位）──
+    if (msg.reactions && (msg.reactions.user || msg.reactions.partner)) {
+        if (msg.reactions.user) {
+            const rUser = document.createElement('div');
+            rUser.className = 'message-reaction-badge reaction-badge-user';
+            rUser.textContent = msg.reactions.user;
+            rUser.title = '我的反应';
+            messageDiv.appendChild(rUser);
+        }
+        if (msg.reactions.partner) {
+            const rPartner = document.createElement('div');
+            rPartner.className = 'message-reaction-badge reaction-badge-partner';
+            rPartner.textContent = msg.reactions.partner;
+            rPartner.title = (settings.partnerName || '对方') + ' 的反应';
+            messageDiv.appendChild(rPartner);
+        }
+    }
 
     let metaHTML = '';
     if (showTimestamp) {
@@ -1456,27 +1181,12 @@ function _updateReadReceiptsDOM() {
 function renderMessages(preserveScroll = false) {
     const container = DOMElements.chatContainer;
     const totalMessages = messages.length;
-
-    let startIndex, endIndex, msgsToRender;
-    if (msgViewMode === 'window') {
-        // 历史浏览模式：只渲染 [msgWinStart, msgWinEnd) 这一小段，不管这段离最新消息有多远，
-        // 渲染量都是恒定的，不会因为聊天记录变长就跟着变慢
-        startIndex = Math.max(0, Math.min(msgWinStart, totalMessages));
-        endIndex = Math.max(startIndex, Math.min(msgWinEnd, totalMessages));
-        msgsToRender = messages.slice(startIndex, endIndex);
-    } else {
-        startIndex = Math.max(0, totalMessages - displayedMessageCount);
-        endIndex = totalMessages;
-        msgsToRender = messages.slice(startIndex);
-    }
+    const startIndex = Math.max(0, totalMessages - displayedMessageCount);
+    const msgsToRender = messages.slice(startIndex);
 
     const historyLoader = document.getElementById('history-loader');
     if (historyLoader) {
         historyLoader.style.display = startIndex > 0 ? 'flex' : 'none';
-    }
-    const futureLoader = document.getElementById('future-loader');
-    if (futureLoader) {
-        futureLoader.style.display = (msgViewMode === 'window' && endIndex < totalMessages) ? 'flex' : 'none';
     }
 
     DOMElements.emptyState.style.display = totalMessages === 0 ? 'flex' : 'none';
@@ -1505,186 +1215,110 @@ function renderMessages(preserveScroll = false) {
     if (preserveScroll) {
         const newScrollHeight = container.scrollHeight;
         container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
-    } else if (msgViewMode !== 'window') {
+    } else {
         requestAnimationFrame(() => {
             container.scrollTop = container.scrollHeight;
         });
     }
-    // window模式下不自动滚动到底部/顶部，滚动位置由调用方（比如跳转定位）自己处理
 }
 
-// 跳转到某一条消息（搜索结果点击、引用消息点击都可以用这个统一入口），
-// 不管这条消息离最新消息有多远，只渲染它附近一小段，不会因为聊天记录很长就卡顿
-window._jumpToMessage = function(id) {
-    const idx = messages.findIndex(m => String(m.id) === String(id));
-    if (idx === -1) {
-        if (typeof showNotification === 'function') showNotification('这条消息可能已被删除', 'info');
-        return false;
-    }
+// ── 消息反应（emoji reaction）────────────────────────────────────────
+// 常用反应表：覆盖日常聊天最常见的几种情绪反馈；不在这个列表里的，走"+"按钮调用系统自带的 emoji 输入
+window.COMMON_REACTIONS = ['❤️', '😂', '😲', '😢', '😡', '🥺', '👍🏻'];
 
-    const container = DOMElements && DOMElements.chatContainer;
-    if (!container) return false;
-
-    const HALF = 50; // 目标消息前后各带50条上下文，数量固定，不会因为消息在哪个位置而变化
-    msgViewMode = 'window';
-    msgWinStart = Math.max(0, idx - HALF);
-    msgWinEnd = Math.min(messages.length, idx + HALF + 1);
-    newMsgCountWhileBrowsing = 0;
-
-    renderMessages(false);
-
-    requestAnimationFrame(() => {
-        const el = container.querySelector('[data-msg-id="' + id + '"]');
-        if (el) {
-            // .chat-container 全局设了 scroll-behavior:smooth，scrollIntoView 的 behavior:'auto'
-            // 会被这个 CSS 接管、跟着走平滑滚动——跳转距离近（比如搜索/引用跳转，通常离得不远）
-            // 时不明显，但这次是从聊天末尾跳回一千多条之前，平滑动画跟不上，滚一半就没跟上了，
-            // 实测卡在半路（scrollTop 只挪了几百px，目标还在屏幕外几千px）。
-            // 改成直接算偏移量手动设 scrollTop，不走 scrollIntoView 那条会被 CSS 平滑滚动
-            // 接管的路径，保证不管跳多远都是瞬间到位。
-            const containerRect = container.getBoundingClientRect();
-            const elRect = el.getBoundingClientRect();
-            const offset = (elRect.top - containerRect.top) - (container.clientHeight / 2) + (elRect.height / 2);
-            const newScrollTop = container.scrollTop + offset;
-            // 直接赋值 scrollTop 在新一点的浏览器实现里，一样会被 CSS 的 scroll-behavior:smooth
-            // 接管（CSSOM View 规范里，设置 scrollTop 本身也算一次"滚动操作"，跟 scrollIntoView
-            // 是同一套受 CSS 影响的机制，不是只有 scrollIntoView 才会被смооth）。
-            // 改成显式调用 scrollTo 并传 behavior:'instant'——这个选项的优先级最高，
-            // 不管 CSS 怎么设，都会强制瞬间跳到位，不会再半路"跟丢"。
-            if (typeof container.scrollTo === 'function') {
-                container.scrollTo({ top: newScrollTop, behavior: 'instant' });
-            } else {
-                container.scrollTop = newScrollTop;
-            }
-            el.style.transition = 'background .3s ease';
-            el.style.background = 'rgba(var(--accent-color-rgb),.14)';
-            setTimeout(() => { el.style.background = ''; }, 1800);
-        }
-        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
-        if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
-    });
-    return true;
-};
-
-// 从历史浏览模式回到最新消息——切回正常模式，重置成"只看最近一批"，然后自动滚到底部
-window._backToLatestMessages = function() {
-    msgViewMode = 'latest';
-    displayedMessageCount = HISTORY_BATCH_SIZE;
-    newMsgCountWhileBrowsing = 0;
-    renderMessages(false);
-    if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
-    if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
-};
-
-// "回到最新消息"悬浮按钮的显示/隐藏——判断标准跟自动滚动是同一套：只要没追上底部就显示
-window._updateBackToLatestBtn = function() {
-    const btn = document.getElementById('back-to-latest-btn');
-    if (!btn) return;
-    btn.style.display = _isCaughtUpToLatest() ? 'none' : 'flex';
-};
-
-// "有N条新消息"提示——文案套在同一个按钮上，不额外加控件
-window._updateNewMsgIndicator = function() {
-    const btn = document.getElementById('back-to-latest-btn');
-    const label = document.getElementById('back-to-latest-label');
-    if (!btn || !label) return;
-    if (msgViewMode === 'window' && newMsgCountWhileBrowsing > 0) {
-        label.textContent = '有' + newMsgCountWhileBrowsing + '条新消息';
-        btn.classList.add('has-new-msg');
+// who: 'user' | 'partner'，每条消息每一边只保留最新一次反应（点同一个表情=取消）
+window.addReactionToMessage = function(messageId, emoji, who) {
+    const message = messages.find(m => m.id === messageId);
+    if (!message) return;
+    if (!message.reactions) message.reactions = {};
+    if (message.reactions[who] === emoji) {
+        delete message.reactions[who];
     } else {
-        label.textContent = '';
-        btn.classList.remove('has-new-msg');
+        message.reactions[who] = emoji;
     }
+    throttledSaveData();
+    renderMessages(true);
 };
 
+// 长按工具栏里点击"表情回应"弹出的小面板：常用反应 + 自定义 emoji 库 + 系统emoji输入口
+window.openReactionPicker = function(messageId, anchorEl) {
+    const existing = document.getElementById('reaction-picker-popup');
+    if (existing) existing.remove();
 
-// 判断"用户现在是不是正停在聊天最底部"——不看是通过什么方式到达当前位置的（正常聊天时手指往上划了一点、
-// 还是从搜索/引用跳转过来的历史记录），只看两件事：① 当前渲染的这一段有没有已经连到最新消息；
-// ② 滚动条实际位置离底部够不够近。两个都满足才算"追上了"，新消息来的时候才会自动帮你滚下去。
-function _isCaughtUpToLatest() {
-    if (msgViewMode === 'window' && msgWinEnd < messages.length) return false; // 当前渲染的窗口本来就没到最新，不管怎么滚都不算追上
-    const c = DOMElements && DOMElements.chatContainer;
-    if (!c) return true;
-    return (c.scrollHeight - c.scrollTop - c.clientHeight) < 100;
-}
+    const popup = document.createElement('div');
+    popup.id = 'reaction-picker-popup';
+    popup.className = 'reaction-picker-popup';
+
+    const pool = [...window.COMMON_REACTIONS];
+    (customEmojis || []).forEach(e => { if (!pool.includes(e)) pool.push(e); });
+
+    pool.forEach(emoji => {
+        const item = document.createElement('div');
+        item.className = 'reaction-picker-item';
+        item.textContent = emoji;
+        item.addEventListener('click', () => {
+            window.addReactionToMessage(messageId, emoji, 'user');
+            popup.remove();
+        });
+        popup.appendChild(item);
+    });
+
+    // "+"：唤出一个输入框，让用户用系统自带的 emoji 键盘/选择器输入任意表情
+    const moreBtn = document.createElement('div');
+    moreBtn.className = 'reaction-picker-item reaction-picker-more';
+    moreBtn.innerHTML = '<i class="fas fa-plus"></i>';
+    moreBtn.title = '更多表情';
+    moreBtn.addEventListener('click', () => {
+        popup.innerHTML = '<input type="text" class="reaction-picker-input" placeholder="输入或粘贴任意 emoji" maxlength="8">';
+        const input = popup.querySelector('.reaction-picker-input');
+        input.focus();
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && input.value.trim()) {
+                window.addReactionToMessage(messageId, input.value.trim(), 'user');
+                popup.remove();
+            }
+        });
+        input.addEventListener('blur', () => {
+            setTimeout(() => { if (document.body.contains(popup)) popup.remove(); }, 150);
+        });
+    });
+    popup.appendChild(moreBtn);
+
+    document.body.appendChild(popup);
+
+    // 定位在触发按钮附近（视口内自动避让）
+    const rect = anchorEl.getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - popupRect.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - popupRect.width - 8));
+    let top = rect.top - popupRect.height - 8;
+    if (top < 8) top = rect.bottom + 8;
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    setTimeout(() => {
+        document.addEventListener('click', function handler(e) {
+            if (!popup.contains(e.target) && e.target !== anchorEl && !anchorEl.contains(e.target)) {
+                popup.remove();
+                document.removeEventListener('click', handler);
+            }
+        });
+    }, 0);
+};
 
 const addMessage = (message) => {
     if (!(message.timestamp instanceof Date)) message.timestamp = new Date(message.timestamp);
-
+    
     const container = DOMElements.chatContainer;
     const wasEmpty = messages.length === 0;
 
     const prevMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-    // 追没追上底部，要在"往数组里塞新消息、改动滚动高度"之前就先判断好，不然滚动高度已经变了，判断就不准了
-    const wasCaughtUp = _isCaughtUpToLatest();
     messages.push(message);
     
     if (wasEmpty) {
         DOMElements.emptyState.style.display = 'none';
     }
 
-    // 用户自己发的新消息：不能让它发出去后自己却看不到，不管之前在不在底部，都直接跳回/滚到最新（所有聊天软件的通用逻辑）
-    if (message.sender === 'user') {
-        if (msgViewMode === 'window') {
-            throttledSaveData();
-            if (message.type === 'normal' && typeof window._onUserMessage === 'function') {
-                try { window._onUserMessage(message); } catch (e) { console.warn('[onUserMessage]', e); }
-            }
-            if (typeof window._backToLatestMessages === 'function') window._backToLatestMessages();
-            return;
-        }
-        // 已经在 latest 模式，走下面正常的"追加+滚动到底"逻辑即可（wasCaughtUp 对用户自己发消息没意义，永远滚底）
-    } else if (!wasCaughtUp) {
-        // 对方发来新消息，但用户当前没有停在底部（不管是因为在翻很久以前的历史记录，
-        // 还是就是正常聊天时手指往上划了一点点）——新消息不硬塞进当前视野、也不强行拽人，只悄悄计数提示
-        if (msgViewMode === 'window' && msgWinEnd < messages.length) {
-            // 窗口本来就没连到最新，DOM里没法接着往后加，直接跳过渲染这一步
-        } else {
-            // 处于 latest 模式但没在底部：消息本身仍然要能在"滚到底"之后看到，所以还是要把DOM追加上，只是不强制滚动
-            const existingWrappers = container.querySelectorAll('.message-wrapper');
-            const lastWrapper = existingWrappers.length > 0 ? existingWrappers[existingWrappers.length - 1] : null;
-            if (lastWrapper && prevMsg) {
-                const currentTs = new Date(message.timestamp).getTime();
-                const prevTs = new Date(prevMsg.timestamp).getTime();
-                if (message.sender === prevMsg.sender && message.type === 'normal' && prevMsg.type === 'normal' && (currentTs - prevTs < 60000)) {
-                    const metaEl = lastWrapper.querySelector('.message-meta');
-                    if (metaEl) metaEl.style.display = 'none';
-                    const avatarEl = lastWrapper.querySelector('.message-avatar');
-                    if (avatarEl) avatarEl.style.marginBottom = '';
-                }
-            }
-            let lastSenderRef = { current: null };
-            if (prevMsg) {
-                const prevGroupMember = (prevMsg.sender !== 'user' && typeof getGroupMemberForMessage === 'function') ? getGroupMemberForMessage(prevMsg.id) : null;
-                lastSenderRef.current = prevGroupMember ? ('group_' + prevGroupMember.name) : prevMsg.sender;
-            }
-            const newMsgFragment = createMessageFragment(message, prevMsg, null, lastSenderRef);
-            const spacer = container.querySelector('div[style*="flex: 1"]');
-            if (spacer && spacer === container.lastElementChild) {
-                spacer.before(newMsgFragment);
-            } else {
-                container.appendChild(newMsgFragment);
-            }
-            // 修复消息重复bug：这里直接把新消息插入了DOM，displayedMessageCount 必须同步+1，
-            // 否则这个计数器会跟实际显示的消息数量脱节，导致下次往上翻页时把已显示过的消息误判成"还没显示"而重复插入
-            if (msgViewMode !== 'window') displayedMessageCount++;
-        }
-        newMsgCountWhileBrowsing++;
-        if (typeof window._updateNewMsgIndicator === 'function') window._updateNewMsgIndicator();
-        if (typeof window._updateBackToLatestBtn === 'function') window._updateBackToLatestBtn();
-        throttledSaveData();
-        if (message.type === 'normal' && typeof window._onPartnerMessage === 'function') {
-            try { window._onPartnerMessage(message); } catch (e) { console.warn('[onPartnerMessage]', e); }
-        }
-        if (message.type === 'normal' && Array.isArray(window._partnerMessageListeners)) {
-            window._partnerMessageListeners.forEach(function (fn) {
-                try { fn(message); } catch (e) { console.warn('[onPartnerMessage:listener]', e); }
-            });
-        }
-        return;
-    }
-
-    // --- 正常情况：用户自己发消息、或对方发消息时用户本来就在底部 —— 追加消息并滚动到底 ---
     // --- Update previous message if needed ---
     const existingWrappers = container.querySelectorAll('.message-wrapper');
     const lastWrapper = existingWrappers.length > 0 ? existingWrappers[existingWrappers.length - 1] : null;
@@ -1715,8 +1349,6 @@ const addMessage = (message) => {
     } else {
         container.appendChild(newMsgFragment);
     }
-    // 修复消息重复bug：同上，正常追加到底部时也要同步+1，理由同前面那处注释
-    if (msgViewMode !== 'window') displayedMessageCount++;
 
     requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
@@ -1726,15 +1358,8 @@ const addMessage = (message) => {
 
     // 钩子：通知陪伴模块"梦角刚说了一句话"，让陪伴页可以同步显示气泡
     // 只对梦角的普通消息触发（不是用户消息、不是 system call-event 等）
-    // 保留原有的单函数赋值方式（陪伴模块在用，不改动，避免影响它）
     if (message.sender !== 'user' && message.type === 'normal' && typeof window._onPartnerMessage === 'function') {
         try { window._onPartnerMessage(message); } catch (e) { console.warn('[onPartnerMessage]', e); }
-    }
-    // 新增：多监听通道，供电影院等新模块注册，跟上面那个单函数钩子并行、互不覆盖
-    if (message.sender !== 'user' && message.type === 'normal' && Array.isArray(window._partnerMessageListeners)) {
-        window._partnerMessageListeners.forEach(function (fn) {
-            try { fn(message); } catch (e) { console.warn('[onPartnerMessage:listener]', e); }
-        });
     }
     // 钩子：通知陪伴模块"用户刚发了一条消息"，让陪伴页气泡同步显示
     if (message.sender === 'user' && message.type === 'normal' && typeof window._onUserMessage === 'function') {
@@ -1867,18 +1492,6 @@ const addMessage = (message) => {
             (function(){try{if(window._typingIndicatorAutoHideTimer){clearTimeout(window._typingIndicatorAutoHideTimer);window._typingIndicatorAutoHideTimer=null;}}catch(e){}var _tiW=document.getElementById('typing-indicator-wrapper');if(_tiW){var _tiInner=_tiW.querySelector('.typing-indicator');if(_tiInner){_tiInner.classList.add('hiding');setTimeout(function(){_tiW.style.display='none';if(_tiInner)_tiInner.classList.remove('hiding');},240);}else{_tiW.style.display='none';}}})();
         };
 
-        // 输入框高度动态测量——不管清空还是有内容，统一走这一个函数，不再写死具体像素值。
-        // styles.css 里 .message-input 在不同断点下 min-height 是不一样的（桌面46px/手机≤768px是
-        // 42px/更小屏幕≤480px是38px），写死一个数字在窄屏上就会跟正确值对不上，
-        // 表现出来就是"空的时候"（走写死值）比"有文字的时候"（走这里的scrollHeight动态测量）更高或更矮。
-        // 用 scrollHeight 量出来的高度，天然就是当前断点下 CSS 实际生效的那个值，不用关心断点数字本身。
-        function _syncMessageInputHeight() {
-            if (!DOMElements.messageInput) return;
-            DOMElements.messageInput.style.height = 'auto';
-            DOMElements.messageInput.style.height = `${Math.min(DOMElements.messageInput.scrollHeight, 120)}px`;
-        }
-        window._syncMessageInputHeight = _syncMessageInputHeight;
-
         function sendMessage(textOverride = null, type = 'normal') {
             const text = textOverride || DOMElements.messageInput.value.trim();
             const imageFile = DOMElements.imageInput.files[0];
@@ -1889,14 +1502,14 @@ const addMessage = (message) => {
                 const cmd = text.replace(/\s+/g, '').toLowerCase();
                 if (cmd === '/测试拍一拍' || cmd === '/testpoke') {
                     DOMElements.messageInput.value = '';
-                    _syncMessageInputHeight();
+                    DOMElements.messageInput.style.height = '46px';
                     if (typeof window._triggerPartnerPoke === 'function') window._triggerPartnerPoke();
                     if (typeof showNotification === 'function') showNotification('✦ 强制触发对方拍一拍', 'info', 1800);
                     return;
                 }
                 if (cmd === '/测试状态更新' || cmd === '/teststatus') {
                     DOMElements.messageInput.value = '';
-                    _syncMessageInputHeight();
+                    DOMElements.messageInput.style.height = '46px';
                     if (typeof window._triggerStatusChange === 'function') window._triggerStatusChange();
                     if (typeof showNotification === 'function') showNotification('✦ 强制触发状态更新', 'info', 1800);
                     return;
@@ -1904,7 +1517,7 @@ const addMessage = (message) => {
             }
 
             DOMElements.messageInput.value = '';
-            _syncMessageInputHeight();
+            DOMElements.messageInput.style.height = '46px';
             if (imageFile && imageFile.size > MAX_IMAGE_SIZE) {
                 showNotification('图片大小不能超过5MB', 'error'); DOMElements.imageInput.value = ''; return;
             }
@@ -1925,6 +1538,11 @@ const addMessage = (message) => {
                 if (type === 'system') messageData.sender = null;
 
                 addMessage(messageData);
+                if (type !== 'system' && messageData.sender === 'user') {
+                    // 记录进"这一轮"候选池，供梦角自动表情反应使用（见 _triggerDelayedReply / simulateReply）
+                    window._currentRoundMsgIds = window._currentRoundMsgIds || [];
+                    window._currentRoundMsgIds.push(messageData.id);
+                }
                 if (type !== 'system') playSound('send');
                 currentReplyTo = null;
                 updateReplyPreview();
@@ -1962,7 +1580,7 @@ if (!isBatchMode && type === 'normal') {
             batchMessages.push({
                 id: Date.now() + batchMessages.length, text: text || '', image: imageOverride || null
             });
-            DOMElements.messageInput.value = ''; _syncMessageInputHeight();
+            DOMElements.messageInput.value = ''; DOMElements.messageInput.style.height = '46px';
             updateBatchPreview();
         }
 
@@ -1971,16 +1589,9 @@ if (!isBatchMode && type === 'normal') {
             let listHTML = '';
             if (batchMessages.length > 0) {
                 listHTML = batchMessages.map((msg, index) => {
-                    // 阶段三B：识别 oss:// 走懒加载（预览不设 src，塞完 innerHTML 后绑定）
-                    let preview = '';
-                    if (msg.image) {
-                        const isCloudImg = typeof msg.image === 'string' && msg.image.indexOf('oss://') === 0;
-                        if (isCloudImg) {
-                            preview = `<img data-lazy-cloud-ref="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`;
-                        } else {
-                            preview = `<img src="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`;
-                        }
-                    }
+                    const preview = msg.image
+                        ? `<img src="${msg.image}" style="height:36px;width:36px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`
+                        : '';
                     const label = msg.text
                         ? `<span class="batch-preview-text">${msg.text}</span>`
                         : `<span class="batch-preview-text" style="color:var(--text-secondary);font-style:italic;">图片</span>`;
@@ -1998,14 +1609,6 @@ if (!isBatchMode && type === 'normal') {
         <button class="batch-action-btn batch-cancel-btn">取消</button>
         <button class="batch-action-btn batch-send-btn" ${batchMessages.length === 0 ? 'disabled': ''}>发送全部 (${batchMessages.length})</button>
         </div>`;
-
-            // 阶段三B：innerHTML 塞完后绑定云端图懒加载
-            if (window.CloudMedia) {
-                previewContainer.querySelectorAll('img[data-lazy-cloud-ref]').forEach(function (imgEl) {
-                    const ref = imgEl.getAttribute('data-lazy-cloud-ref');
-                    window.CloudMedia.bindLazyImage(imgEl, ref);
-                });
-            }
 
             const batchImgInput = document.getElementById('batch-image-input');
             if (batchImgInput) {
@@ -2116,7 +1719,7 @@ if (!isBatchMode && type === 'normal') {
                     const partnerImg = DOMElements.partner.avatar.querySelector('img');
                     tiAvatar.innerHTML = partnerImg ? `<img src="${partnerImg.src}">` : '<i class="fas fa-user"></i>';
                 }
-                if (_isCaughtUpToLatest() && DOMElements.chatContainer) DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
+                if (DOMElements.chatContainer) DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
             }
 
             // 排队回复
@@ -2144,12 +1747,9 @@ if (!isBatchMode && type === 'normal') {
                     const partnerImg = DOMElements.partner.avatar.querySelector('img');
                     tiAvatar.innerHTML = partnerImg ? `<img src="${partnerImg.src}">` : '<i class="fas fa-user"></i>';
                 }
-                // 判断标准不是"在不在历史浏览模式"，而是"用户现在实际有没有停在底部"——
-                // 哪怕没有搜索/跳转，正常聊天时手指往上划了一点，也一样不该被强行拽回去
-                if (_isCaughtUpToLatest()) {
-                    DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
-                }
+                DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
             }
+
             let changed = false;
             messages.forEach(msg => {
                 if (msg.sender === 'user' && msg.status !== 'read') {
@@ -2183,16 +1783,6 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                 return;
             }
 
-            // ── 梦角主动发红包：跟上面拍一拍是完全独立的两套判定，互不影响——
-            // 不 return，不影响这次正常回复照常生成；异步调用，不 await，不拖慢/阻塞回复流程，
-            // 红包该不该发、发不发得出去，evaluatePartnerTrigger 内部自己算完自己存，
-            // 这里只是在梦角每次要生成回复之前，顺手多"戳"它判定一次
-            if (window.RedPacket && typeof window.RedPacket.evaluatePartnerTrigger === 'function') {
-                window.RedPacket.evaluatePartnerTrigger().catch(function (e) {
-                    console.warn('[红包] 判定过程出错，这次先跳过', e);
-                });
-            }
-
             const replyCount = Math.random() < 0.75 ? 1: (Math.random() < 0.95 ? 2: 3);
             if (!customReplies || customReplies.length === 0) {
                 showNotification('回复库为空，请先到「自定义回复」中添加内容', 'info', 3500);
@@ -2224,6 +1814,24 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
             const recentUserMsgs = (settings.replyEnabled && !window._companionSilentTrigger)
                 ? messages.filter(m => m.sender === 'user' && m.text).slice(-10)
                 : [];
+
+            // ── 梦角自动表情反应：候选池只取"这一轮"（上次回复之后用户连续发的消息），
+            //    跟引用回复是各自独立摇骰子，互不影响 ──
+            const roundCandidateIds = (window._currentRoundMsgIds || []).slice();
+            window._currentRoundMsgIds = []; // 这一轮即将被回复，清空计数，下一次发消息重新开始算一轮
+            if (!window._companionSilentTrigger && roundCandidateIds.length > 0 && Math.random() < 0.2) {
+                if (!customEmojis || customEmojis.length === 0) {
+                    showNotification('自定义 Emoji 库为空，梦角暂时没法给消息加反应', 'info', 3000);
+                } else {
+                    const targetId = roundCandidateIds[Math.floor(Math.random() * roundCandidateIds.length)];
+                    const targetMsg = messages.find(m => m.id === targetId);
+                    if (targetMsg && typeof window.addReactionToMessage === 'function') {
+                        const emoji = customEmojis[Math.floor(Math.random() * customEmojis.length)];
+                        window.addReactionToMessage(targetId, emoji, 'partner');
+                    }
+                }
+            }
+
             for (let i = 0; i < replyCount; i++) {
                 const delayRange = settings.replyDelayMax - settings.replyDelayMin;
                 delay += settings.replyDelayMin + Math.random() * delayRange;
@@ -2232,22 +1840,11 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                     const replyPool = replyPoolOnce;
                     // 被屏蔽或无效项直接换下一个，尽量保证每次都产出可用回复
                     let replyText = '';
-                    if (settings.combineReplyCards) {
-                        // 拼接字卡：1 ~ combineReplyMaxCards 句随机拼接，句子间随机加标点断句
-                        const maxN = Math.max(1, Math.min(5, parseInt(settings.combineReplyMaxCards, 10) || 3));
-                        const n = 1 + Math.floor(Math.random() * maxN);
-                        for (let k = 0; k < n; k++) {
-                            const picked = replyPool[Math.floor(Math.random() * replyPool.length)];
-                            replyText += picked + (Math.random() < .2 ? '！' : Math.random() < .2 ? '……' : '。');
-                        }
-                    } else {
-                        // 开关关闭：老逻辑，只抽1句（保留原有的跳过空/无效项重试）
-                        for (let t = 0; t < 6; t++) {
-                            const picked = replyPool[Math.floor(Math.random() * replyPool.length)];
-                            if (picked && String(picked).trim()) {
-                                replyText = String(picked).trim();
-                                break;
-                            }
+                    for (let t = 0; t < 6; t++) {
+                        const picked = replyPool[Math.floor(Math.random() * replyPool.length)];
+                        if (picked && String(picked).trim()) {
+                            replyText = String(picked).trim();
+                            break;
                         }
                     }
                     if (!replyText && i === replyCount - 1) {
@@ -2399,36 +1996,14 @@ function showModal(modalElement, focusElement = null) {
             }, 300);
         }
 
-        async function viewImage(src) {
-            // 阶段三B：云端引用先下载；pending 引用从本地 base64 读
-            let displaySrc = src;
-            let downloadHref = src;
-            if (typeof src === 'string' && src.indexOf('oss://') === 0) {
-                if (!window.CloudMedia) return;
-                try {
-                    displaySrc = await window.CloudMedia.fetchUrl(src);
-                    downloadHref = displaySrc;
-                } catch (e) {
-                    if (typeof showNotification === 'function') showNotification('图片加载失败', 'error');
-                    return;
-                }
-            } else if (typeof src === 'string' && src.indexOf('pending://') === 0) {
-                if (!window.CloudMedia) return;
-                const base64 = await window.CloudMedia.getPendingBase64(src);
-                if (!base64) {
-                    if (typeof showNotification === 'function') showNotification('图片仍在准备中', 'info');
-                    return;
-                }
-                displaySrc = base64;
-                downloadHref = base64;
-            }
+        function viewImage(src) {
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;touch-action:pinch-zoom;';
             modal.innerHTML = `
                 <div style="position:relative;max-width:95vw;max-height:92vh;display:flex;align-items:center;justify-content:center;">
-                    <img src="${displaySrc}" style="max-width:95vw;max-height:88vh;object-fit:contain;display:block;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);" draggable="false">
+                    <img src="${src}" style="max-width:95vw;max-height:88vh;object-fit:contain;display:block;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);" draggable="false">
                     <button onclick="this.closest('[style*=fixed]').remove()" style="position:fixed;top:16px;right:16px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);z-index:10;line-height:1;">×</button>
-                    <a href="${downloadHref}" download style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:20px;color:#fff;font-size:13px;text-decoration:none;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;"><i class="fas fa-download"></i> 保存图片</a>
+                    <a href="${src}" download style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:20px;color:#fff;font-size:13px;text-decoration:none;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;"><i class="fas fa-download"></i> 保存图片</a>
                 </div>`;
             modal.addEventListener('click', (e) => {
                 if (e.target === modal || e.target.tagName === 'IMG') modal.remove();
@@ -2436,21 +2011,7 @@ function showModal(modalElement, focusElement = null) {
             document.body.appendChild(modal);
         }
 
-        async function exportChatHistory() {
-            // 直接从 localforage 读取日记（不依赖内存缓存，防止懒加载未就绪时为空）
-            let _diaryForExport = [];
-            let _moodForExport = null;
-            let _customMoodOptionsForExport = [];
-            try {
-                const _allKeys = await localforage.keys();
-                const _diaryKey = _allKeys.find(k => k.includes('companionDiary') && !k.includes('Bg') && !k.includes('Gallery'));
-                if (_diaryKey) _diaryForExport = (await localforage.getItem(_diaryKey)) || [];
-                const _moodKey = _allKeys.find(k => k.includes('moodCalendar'));
-                if (_moodKey) _moodForExport = (await localforage.getItem(_moodKey)) || {};
-                const _moodOptsKey = _allKeys.find(k => k.includes('customMoodOptions'));
-                if (_moodOptsKey) _customMoodOptionsForExport = (await localforage.getItem(_moodOptsKey)) || [];
-            } catch(e) { _diaryForExport = []; _moodForExport = {}; }
-
+        function exportChatHistory() {
             const overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;';
             overlay.innerHTML = `
@@ -2485,16 +2046,6 @@ function showModal(modalElement, focusElement = null) {
                             <i class="fas fa-palette" style="color:var(--accent-color);width:16px;text-align:center;"></i>
                             <span>自定义主题配色</span>
                         </label>
-                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);font-size:13px;color:var(--text-primary);transition:border-color 0.2s;">
-                            <input type="checkbox" id="_exp_diary" style="accent-color:var(--accent-color);width:15px;height:15px;">
-                            <i class="fas fa-book-open" style="color:var(--accent-color);width:16px;text-align:center;"></i>
-                            <span>陪伴日记 <span style="font-size:11px;color:var(--text-secondary);">(${_diaryForExport.length} 条)</span></span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);font-size:13px;color:var(--text-primary);transition:border-color 0.2s;">
-                            <input type="checkbox" id="_exp_mood" style="accent-color:var(--accent-color);width:15px;height:15px;">
-                            <i class="fas fa-face-smile" style="color:var(--accent-color);width:16px;text-align:center;"></i>
-                            <span>心情手账 <span style="font-size:11px;color:var(--text-secondary);">(${Object.keys(_moodForExport || {}).length} 天)</span></span>
-                        </label>
                     </div>
                     <div style="display:flex;gap:10px;">
                         <button id="_exp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2517,10 +2068,8 @@ function showModal(modalElement, focusElement = null) {
                 const inclReplies  = !!document.getElementById('_exp_replies')?.checked;
                 const inclAnn      = !!document.getElementById('_exp_ann')?.checked;
                 const inclThemes   = !!document.getElementById('_exp_themes')?.checked;
-                const inclDiary    = !!document.getElementById('_exp_diary')?.checked;
-                const inclMood     = !!document.getElementById('_exp_mood')?.checked;
 
-                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes && !inclDiary && !inclMood) {
+                if (!inclMsgs && !inclSettings && !inclReplies && !inclAnn && !inclThemes) {
                     showNotification('请至少选择一项导出内容', 'error');
                     return;
                 }
@@ -2564,29 +2113,13 @@ function showModal(modalElement, focusElement = null) {
                     if (inclReplies)  {
                         exportObj.customReplies = customReplies;
                         if (customEmojis && customEmojis.length > 0) exportObj.customEmojis = customEmojis;
-                        if (customPokes && customPokes.length > 0) exportObj.customPokes = customPokes;
-                        if (customStatuses && customStatuses.length > 0) exportObj.customStatuses = customStatuses;
-                        if (customMottos && customMottos.length > 0) exportObj.customMottos = customMottos;
-                        if (customIntros && customIntros.length > 0) exportObj.customIntros = customIntros;
-                        if (customPeriodCare && customPeriodCare.length > 0) exportObj.customPeriodCare = customPeriodCare;
-                        if (window.customReplyGroups && window.customReplyGroups.length > 0) exportObj.customReplyGroups = window.customReplyGroups;
-                        if (window.customPokeGroups && window.customPokeGroups.length > 0) exportObj.customPokeGroups = window.customPokeGroups;
-                        if (window.customStatusGroups && window.customStatusGroups.length > 0) exportObj.customStatusGroups = window.customStatusGroups;
                         exportObj.exportModules.push('customReplies');
                     }
                     if (inclAnn)      { exportObj.anniversaries = anniversaries; exportObj.exportModules.push('anniversaries'); }
                     if (inclThemes)   {
                         exportObj.customThemes = customThemes;
+                        // stickerLibrary 体积较大，这里不再随聊天备份导出
                         exportObj.exportModules.push('themes');
-                    }
-                    if (inclDiary) {
-                        exportObj.companionDiary = _diaryForExport;
-                        exportObj.exportModules.push('companionDiary');
-                    }
-                    if (inclMood && _moodForExport && Object.keys(_moodForExport).length > 0) {
-                        exportObj.moodCalendar = _moodForExport;
-                        if (_customMoodOptionsForExport.length > 0) exportObj.customMoodOptions = _customMoodOptionsForExport;
-                        exportObj.exportModules.push('moodCalendar');
                     }
 
                     const dataStr = JSON.stringify(exportObj, null, 2);
@@ -2715,10 +2248,8 @@ function showModal(modalElement, focusElement = null) {
                     const hasReplies   = importedData.customReplies && Array.isArray(importedData.customReplies);
                     const hasAnn       = importedData.anniversaries && Array.isArray(importedData.anniversaries);
                     const hasThemes    = !!importedData.customThemes || !!importedData.stickerLibrary;
-                    const hasDiary     = importedData.companionDiary && Array.isArray(importedData.companionDiary);
-                    const hasMood      = !!importedData.moodCalendar && typeof importedData.moodCalendar === 'object';
 
-                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes && !hasDiary && !hasMood) {
+                    if (!hasMessages && !hasSettings && !hasReplies && !hasAnn && !hasThemes) {
                         throw new Error('无效的聊天记录文件（未检测到可识别的数据模块）');
                     }
 
@@ -2746,8 +2277,6 @@ function showModal(modalElement, focusElement = null) {
                                 ${makeRow('_imp_replies', 'fas fa-reply', '字卡回复库', '', hasReplies, false)}
                                 ${makeRow('_imp_ann', 'fas fa-calendar-heart', '纪念日 / 倒计时', '', hasAnn, false)}
                                 ${makeRow('_imp_themes', 'fas fa-palette', '自定义主题配色', '', hasThemes, false)}
-                                ${makeRow('_imp_diary', 'fas fa-book-open', '陪伴日记', hasDiary ? `(${importedData.companionDiary.length} 条)` : '', hasDiary, false)}
-                                ${makeRow('_imp_mood', 'fas fa-face-smile', '心情手账', hasMood ? `(${Object.keys(importedData.moodCalendar).length} 天)` : '', hasMood, false)}
                             </div>
                             <div style="display:flex;gap:10px;">
                                 <button id="_imp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
@@ -2770,10 +2299,8 @@ function showModal(modalElement, focusElement = null) {
                         const doReplies  = hasReplies   && !!document.getElementById('_imp_replies')?.checked;
                         const doAnn      = hasAnn       && !!document.getElementById('_imp_ann')?.checked;
                         const doThemes   = hasThemes    && !!document.getElementById('_imp_themes')?.checked;
-                        const doDiary    = hasDiary     && !!document.getElementById('_imp_diary')?.checked;
-                        const doMood     = hasMood      && !!document.getElementById('_imp_mood')?.checked;
 
-                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes && !doDiary && !doMood) {
+                        if (!doMsgs && !doSettings && !doReplies && !doAnn && !doThemes) {
                             showNotification('请至少选择一项导入内容', 'error');
                             return;
                         }
@@ -2799,23 +2326,9 @@ function showModal(modalElement, focusElement = null) {
                         }
                         if (doReplies  && importedData.customReplies)  customReplies  = importedData.customReplies;
                         if (doReplies  && importedData.customEmojis && Array.isArray(importedData.customEmojis)) customEmojis = importedData.customEmojis;
-                        if (doReplies  && importedData.customPokes && Array.isArray(importedData.customPokes)) customPokes = importedData.customPokes;
-                        if (doReplies  && importedData.customStatuses && Array.isArray(importedData.customStatuses)) customStatuses = importedData.customStatuses;
-                        if (doReplies  && importedData.customMottos && Array.isArray(importedData.customMottos)) customMottos = importedData.customMottos;
-                        if (doReplies  && importedData.customPeriodCare && Array.isArray(importedData.customPeriodCare)) customPeriodCare = importedData.customPeriodCare;
-                        if (doReplies  && importedData.customIntros && Array.isArray(importedData.customIntros)) customIntros = importedData.customIntros;
-                        if (doReplies  && importedData.customReplyGroups) window.customReplyGroups = importedData.customReplyGroups;
-                        if (doReplies  && importedData.customPokeGroups) window.customPokeGroups = importedData.customPokeGroups;
-                        if (doReplies  && importedData.customStatusGroups) window.customStatusGroups = importedData.customStatusGroups;
                         if (doAnn      && importedData.anniversaries)   anniversaries  = importedData.anniversaries;
                         if (doThemes   && importedData.customThemes)    customThemes   = importedData.customThemes;
                         if (doThemes   && importedData.stickerLibrary)  stickerLibrary = importedData.stickerLibrary;
-                        if (doDiary    && importedData.companionDiary && typeof window._setCompanionDiaryEntries === 'function') {
-                            window._setCompanionDiaryEntries(importedData.companionDiary);
-                        }
-                        if (doMood && importedData.moodCalendar && typeof window._setMoodData === 'function') {
-                            window._setMoodData(importedData.moodCalendar, importedData.customMoodOptions || []);
-                        }
 
                         saveData();
                         if (doMsgs && typeof renderMessages === 'function') renderMessages();
@@ -2899,12 +2412,6 @@ function showModal(modalElement, focusElement = null) {
             return `${APP_PREFIX}${SESSION_ID}_${baseKey}`;
         }
 
-        // 阶段四：收藏语音键名（带 SESSION_ID 前缀，按梦角隔离）
-        function favAudioKey(messageId) {
-            return getStorageKey(`favAudio_${messageId}`);
-        }
-        window.favAudioKey = favAudioKey;
-
         async function migrateData() {
             const isMigrated = await localforage.getItem(APP_PREFIX + 'MIGRATION_V2_DONE');
             if (isMigrated) return;
@@ -2963,7 +2470,20 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
 });
 
-// 注：往上/往下翻页加载更多消息的触发，只靠 listeners.js 里那个绑定在真正可滚动容器（chat-container）
-// 上的 scroll 事件监听（检查 scrollTop 实际位置）。这里原本还有一套用 IntersectionObserver 做的重复监听，
-// 但它绑定的参照容器（.main-chat-area）本身并不会滚动，导致这套监听只要"加载提示条一显示出来"就会误触发，
-// 跟用户有没有真的滑动到顶部/底部没有关系，会引发连环自动加载、把用户拽到意料之外的位置。已确认删除，不会影响功能。
+document.addEventListener('DOMContentLoaded', function() {
+    const chatArea = document.querySelector('.main-chat-area');
+    const historyLoader = document.getElementById('history-loader');
+    
+    if (chatArea && historyLoader && typeof IntersectionObserver !== 'undefined') {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && messages.length > displayedMessageCount) {
+                loadMoreHistory();
+            }
+        }, {
+            root: chatArea,
+            rootMargin: '200px 0px 0px 0px',
+            threshold: 0.01
+        });
+        observer.observe(historyLoader);
+    }
+});

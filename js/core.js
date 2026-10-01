@@ -1386,7 +1386,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     bubbleWrap.appendChild(messageDiv);
     if (msg.reaction) {
         const reactionBadge = document.createElement('div');
-        reactionBadge.className = 'message-reaction-badge';
+        reactionBadge.className = 'message-reaction-badge ' + (_shouldUseCircleBadge(msg.reaction) ? 'reaction-badge-emoji' : 'reaction-badge-kaomoji');
         reactionBadge.textContent = msg.reaction;
         reactionBadge.title = '反应：' + msg.reaction;
         bubbleWrap.appendChild(reactionBadge);
@@ -1528,6 +1528,27 @@ function renderMessages(preserveScroll = false) {
         });
     }
     // window模式下不自动滚动到底部/顶部，滚动位置由调用方（比如跳转定位）自己处理
+    _clampReactionBadges();
+}
+
+// 反应标签默认是居中卡在气泡的左下/右下角的（见 CSS），内容长度正常的话不会跑出屏幕。
+// 但碰上特别长的自定义表情/颜文字，居中之后还是可能有一侧探出屏幕，这里量一下、
+// 超出了就用 --badge-safe-shift 往回拉一点，跟长按工具栏那个安全边距是同一个思路
+function _clampReactionBadges() {
+    requestAnimationFrame(() => {
+        const SAFE_MARGIN = 10;
+        document.querySelectorAll('.message-reaction-badge').forEach(badge => {
+            badge.style.removeProperty('--badge-safe-shift');
+            const rect = badge.getBoundingClientRect();
+            let shift = 0;
+            if (rect.left < SAFE_MARGIN) {
+                shift = SAFE_MARGIN - rect.left;
+            } else if (rect.right > window.innerWidth - SAFE_MARGIN) {
+                shift = (window.innerWidth - SAFE_MARGIN) - rect.right;
+            }
+            if (shift !== 0) badge.style.setProperty('--badge-safe-shift', shift + 'px');
+        });
+    });
 }
 
 // 跳转到某一条消息（搜索结果点击、引用消息点击都可以用这个统一入口），
@@ -1631,6 +1652,41 @@ window.COMMON_REACTIONS = ['❤️', '😂', '😲', '😢', '😡', '🥺', '�
 
 // "+"展开后的完整表情表（已去重、去掉水果类）
 window.EXTRA_REACTIONS = ['😀','🥲','☺️','😊','😍','🥰','😘','🤨','🧐','🤓','🤩','🥳','🙂‍↕️','😏','😒','🙂‍↔️','😞','😔','🙁','☹️','😫','😢','😭','😡','😑','😠','🤬','🤯','😳','😱','😨','😰','🫣','🤫','🫡','😶','😐','🙄','😯','😧','😲','🥱','🫩','😴','😪','😮‍💨','😵','🤢','🤮','😈','💩','👻','☠️','🫶','🤲🏻','🙌🏻','👏🏻','🤝🏻','👍🏻','👎🏻','👊🏻','✊🏻','✌🏻','🫰🏻','🤟🏻','🫳🏻','👌🏻','🤏🏻','👋🏻','💪🏻','🙏🏻','🖕🏻','👀','🌝','🌚','⭐️','🔥','❄️','🩷','❤️','🧡','💛','💚','🩵','💙','💜','🖤','🩶','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💓','💗','💖','💘','🉑','❌','❗️','✅','❎','✔️'];
+
+// 判断一个反应是"纯 emoji"（底用圆形）还是"颜文字/自定义拼接表情"（底用现在这种胶囊形）。
+// 做法：把零宽连接符、变体选择符、肤色修饰符这些"合法拼接用的东西"先去掉，
+// 剩下的每个字符如果都落在 Unicode 的"象形符号"范围里，就判定是纯 emoji；
+// 只要有一个不是（比如颜文字里常见的括号、片假名、ಠ_ಠ这种字母符号），就按颜文字处理。
+function _isPureEmoji(str) {
+    if (!str) return false;
+    const stripped = String(str).replace(/[‍️\u{1F3FB}-\u{1F3FF}]/gu, '');
+    if (!stripped) return true;
+    try {
+        return [...stripped].every(ch => /\p{Extended_Pictographic}/u.test(ch));
+    } catch (e) {
+        // 极老的浏览器不支持 \p{} Unicode 属性转义，退化成"看着像颜文字特征字符就不算纯emoji"
+        return !/[()（）<>^_~°òóôõ·ノДД゜ｏ∀o]/.test(stripped);
+    }
+}
+
+// 圆形底只适合"视觉上就是一个符号"的情况——哪怕这一个符号背后是好几个 unicode 码位拼出来的
+// （比如 👍🏻 是"赞"+肤色，❤️‍🔥 是"心"+ZWJ+"火"拼成的一个"燃烧的心"），也还是一个圆能装下。
+// 但如果是两个毫不相干的 emoji 连在一起（比如 😀😂），那是两个独立的字符，塞进固定大小的
+// 圆形会被挤变形/裁掉，这种该走胶囊形。Intl.Segmenter 能准确数出"一段文字里实际有几个
+// 可视字符"，不会把合法拼接出来的一个emoji误数成两个。
+function _shouldUseCircleBadge(str) {
+    if (!_isPureEmoji(str)) return false;
+    try {
+        if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+            const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+            return [...segmenter.segment(str)].length === 1;
+        }
+    } catch (e) {}
+    // 没有 Intl.Segmenter 的老浏览器兜底：按"去掉拼接符之后还剩几个码位"粗略估算，
+    // 不如 Segmenter 精确（遇到复杂合体 emoji 可能会误判成"不止一个"），但能覆盖大部分场景
+    const stripped = String(str).replace(/[‍️\u{1F3FB}-\u{1F3FF}]/gu, '');
+    return [...stripped].length === 1;
+}
 
 const RECENT_REACTIONS_KEY = 'recentReactionEmojis';
 const RECENT_REACTIONS_MAX = 8;

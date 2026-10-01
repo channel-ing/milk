@@ -1078,11 +1078,23 @@
             white-space: nowrap;
             font-size: 14px;
             line-height: 1.3;
-            background-color: var(--secondary-bg);
+            /* 鍗婇€忔槑姣涚幓鐠冨簳锛岃€屼笉鏄疄蹇冭壊鍧椻€斺€旂敤鎴锋崲浜嗗绾哥被鑳屾櫙鏃朵笉浼氭樉寰楀緢绐佸厐锛�
+               color-mix 鐩存帴鍦ㄧ幇鏈夌殑 --secondary-bg 涓婂仛閫忔槑搴︽贩鍚堬紝娴呰壊/娣辫壊妯″紡鍒囨崲鏃堕鑹蹭細鑷姩璺熺潃鎹紝
+               涓嶇敤棰濆缁存姢涓€濂� rgb 鍒嗛噺鍙橀噺 */
+            background-color: color-mix(in srgb, var(--secondary-bg) 62%, transparent);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             border-radius: 999px;
             box-shadow: var(--shadow);
             z-index: 1;
-            pointer-events: none;
+            cursor: pointer;
+        }
+        /* 鐐瑰嚮鐑尯姣旇倝鐪肩湅鍒扮殑鑳跺泭鑼冨洿鍐嶅ぇ涓€鍦堬紙寰€澶栨墿6px锛夛紝杩欐牱鎵嬫寚鐐圭殑鏃跺€欏懡涓巼鏇撮珮锛�
+           涓嶅鏄撳洜涓哄樊涓€鐐圭偣灏辨紡鐐瑰埌涓嬮潰鐨勬皵娉★紙璇煶鏉�/绾㈠寘/鍥剧墖/琛ㄦ儏鍖咃級涓� */
+        .message-reaction-badge::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
         }
         .message-wrapper.sent .message-reaction-badge {
             left: -6px;
@@ -1091,17 +1103,23 @@
             right: -6px;
         }
 
+        /* 闀挎寜闈㈡澘锛氫竴琛屽浐瀹� 8 涓牸瀛愶紙7涓父鐢ㄥ弽搴� + 涓€涓�"+"锛夈€傜偣"+"涔嬪悗鍔犱笂
+           .reaction-picker-popup-expanded锛屽彉鎴愬彲婊氬姩鐨勫畬鏁磋〃鎯呰〃锛堝惈"鏈€杩戜娇鐢ㄢ€濆垎缁勶級锛�
+           鏍煎瓙澶у皬銆佹瘡琛屼釜鏁伴兘涓嶅彉锛屽彧鏄唴瀹瑰彉澶氥€侀潰鏉垮彉楂� */
         .reaction-picker-popup {
             position: fixed;
             z-index: 99999;
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(8, 34px);
             gap: 4px;
-            max-width: 220px;
             padding: 8px;
             background-color: var(--secondary-bg);
             border-radius: 16px;
             box-shadow: var(--shadow);
+        }
+        .reaction-picker-popup-expanded {
+            max-height: min(320px, 60vh);
+            overflow-y: auto;
         }
         .reaction-picker-item {
             width: 34px;
@@ -1121,21 +1139,11 @@
             color: var(--text-secondary);
             font-size: 14px;
         }
-        .reaction-picker-hint {
-            flex: 0 0 100%;
+        .reaction-picker-section-label {
+            grid-column: 1 / -1;
             font-size: 11px;
             color: var(--text-secondary);
-            padding: 2px 2px 6px;
-        }
-        .reaction-picker-input {
-            width: 180px;
-            padding: 8px 10px;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            background-color: var(--primary-bg, transparent);
-            color: var(--text-primary);
-            font-size: 14px;
-            outline: none;
+            padding: 6px 2px 2px;
         }
 
         .meta-action-btn {

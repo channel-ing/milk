@@ -308,7 +308,8 @@
   function aimPoint(elm, itemId) {
     const c = centerOf(elm);
     if (itemId === 'bucket') return c;
-    return { x: c.x + (Math.random() - 0.5) * c.w * 0.3, y: c.y + c.h * 0.4 };
+    // 落在头像下沿外侧，爆开的中心在头像外面，头像只被边缘溅到
+    return { x: c.x + (Math.random() - 0.5) * c.w * 0.3, y: c.y + c.h * 0.5 + c.h * 0.5 + 6 };
   }
   function centerOf(elm) {
     const r = elm.getBoundingClientRect();

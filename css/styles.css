@@ -1162,7 +1162,7 @@
             padding: 6px 2px 2px;
         }
 
-        /* 婊″睆椋樿〃鎯呮晥鏋滐紙iMessage 姘旂悆椋庢牸锛夛細绾睍绀烘诞灞傦紝涓嶆嫤鎴偣鍑� */
+        /* 婊″睆椋樿〃鎯呮晥鏋滐細姘旂悆/绀艰姳/鐑熻姳涓夌椋庢牸锛岄殢鏈烘娊涓€绉嶆挱鏀撅紱绾睍绀烘诞灞傦紝涓嶆嫤鎴偣鍑� */
         .reaction-burst-container {
             position: fixed;
             inset: 0;
@@ -1172,33 +1172,84 @@
         }
         .reaction-burst-item {
             position: absolute;
-            bottom: -10vh;
             left: 0;
             opacity: 0;
             line-height: 1;
-            animation-name: reaction-burst-float;
-            animation-timing-function: ease-in;
             animation-fill-mode: forwards;
             will-change: transform, opacity;
         }
-        @keyframes reaction-burst-float {
+
+        /* 鈥斺€� 姘旂悆锛氬瀭鐩翠笂鍗囩敤銆屽灞傘€嶏紝鍖€閫熷線涓婅蛋锛坙inear锛屼笉鏄� ease-in锛夛紝涓嶄細鍑虹幇蹇藉揩蹇芥參鐨勫仠椤挎劅 鈥斺€� */
+        .reaction-burst-balloon {
+            bottom: -10vh;
+            animation-name: reaction-burst-rise;
+            animation-timing-function: linear;
+        }
+        @keyframes reaction-burst-rise {
             0% {
-                transform: translate(0, 0);
+                transform: translateY(0);
                 opacity: 0;
             }
-            12% {
+            10% {
                 opacity: 0.95;
             }
-            50% {
-                transform: translate(var(--burst-sway), -55vh);
-            }
-            82% {
+            85% {
                 opacity: 0.9;
             }
             100% {
-                transform: translate(calc(var(--burst-sway) * -1), -115vh);
+                transform: translateY(-118vh);
                 opacity: 0;
             }
+        }
+        /* 宸﹀彸鎽囨憜鍗曠嫭鏀惧湪銆屽唴灞傘€嶄竴涓嫭绔嬬殑鍔ㄧ敾涓婏紝鐢� ease-in-out + 寰幆鎾斁锛�
+           鎽嗗埌涓ょ浼氳嚜鐒跺噺閫熷啀鎶樿繑锛屽氨璺熼挓鎽嗕竴鏍烽『婊戯紝涓嶄細鍑虹幇"鍗′竴涓嬪啀缁х画"鐨勬劅瑙夈€�
+           杩欎竴灞傚姩鐢昏妭濂忚窡澶栧眰鐨勪笂鍗囧姩鐢绘槸鍚勮嚜鐙珛鐨勶紝涓よ竟鍒绘剰閿欏紑锛岀湅璧锋潵鎵嶄笉浼氬儚鍦ㄥ悓涓€鏃堕棿鐐逛竴璧�"椤�"涓€涓嬨€� */
+        .reaction-burst-emoji {
+            display: inline-block;
+            animation-name: reaction-burst-wobble;
+            animation-timing-function: ease-in-out;
+            animation-iteration-count: infinite;
+        }
+        @keyframes reaction-burst-wobble {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(var(--burst-wobble)); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(calc(var(--burst-wobble) * -1)); }
+            100% { transform: translateX(0); }
+        }
+        /* 棰滄枃瀛楁皵鐞冧笓鐢細濂椾竴灞傝窡娑堟伅鍙嶅簲灏忔爣绛惧悓娆剧殑姣涚幓鐠冭兌鍥婂簳锛宲adding 鐢� em 鑰屼笉鏄�
+           鍥哄畾 px锛屽簳鐨勫楂樹細璺熺潃鏂囧瓧鍐呭鍜屽綋鍓嶅瓧鍙疯嚜閫傚簲鎾戝紑锛屼笉浼氬嚭鐜版枃瀛楄鎸ゅ彉褰㈡垨鑰呭簳澶皬瑁呬笉涓嬬殑鎯呭喌 */
+        .reaction-burst-emoji-kaomoji {
+            padding: 0.28em 0.65em;
+            border-radius: 999px;
+            background-color: color-mix(in srgb, var(--secondary-bg) 62%, transparent);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            box-shadow: var(--shadow);
+        }
+
+        /* 鈥斺€� 绀艰姳锛氫粠椤堕儴钀戒笅锛屽甫鏃嬭浆 鈥斺€� */
+        .reaction-burst-confetti {
+            top: -10vh;
+            animation-name: reaction-burst-confetti-fall;
+            animation-timing-function: ease-in;
+        }
+        @keyframes reaction-burst-confetti-fall {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+            8% { opacity: 1; }
+            100% { transform: translate(var(--confetti-sway), 120vh) rotate(var(--confetti-spin)); opacity: .95; }
+        }
+
+        /* 鈥斺€� 鐑熻姳锛氫粠鐐稿紑鐐瑰悜鍥涘懆鏁ｅ紑 鈥斺€� */
+        .reaction-burst-firework {
+            top: 0;
+            animation-name: reaction-burst-firework-pop;
+            animation-timing-function: cubic-bezier(.2, .8, .3, 1);
+        }
+        @keyframes reaction-burst-firework-pop {
+            0% { transform: translate(0, 0) scale(.3); opacity: 0; }
+            15% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { transform: translate(var(--firework-tx), var(--firework-ty)) scale(.8); opacity: 0; }
         }
 
         .meta-action-btn {

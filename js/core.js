@@ -1714,9 +1714,43 @@ function _recordRecentReaction(emoji) {
 window.addReactionToMessage = function(messageId, emoji) {
     const message = messages.find(m => m.id === messageId);
     if (!message) return;
-    message.reaction = (message.reaction === emoji) ? null : emoji;
+    const isRemoving = message.reaction === emoji;
+    message.reaction = isRemoving ? null : emoji;
     throttledSaveData();
     renderMessages(true);
+    // 撤回反应时不放效果，只有「新加上」一个反应（不管是用户手动点的还是梦角自动给的）才满屏飘
+    if (!isRemoving && typeof window.playReactionBurst === 'function') {
+        window.playReactionBurst(emoji);
+    }
+};
+
+// 满屏飘表情的效果（iMessage「气球」风格）：数量少、往上飘、带点左右摇摆、渐隐，
+// 2-3秒内结束，纯展示用的浮层，不挡点击、用完就从 DOM 里移除。
+window.playReactionBurst = function(emoji) {
+    if (!emoji) return;
+    try {
+        const COUNT = 6 + Math.floor(Math.random() * 3); // 6~8 个
+        const container = document.createElement('div');
+        container.className = 'reaction-burst-container';
+        for (let i = 0; i < COUNT; i++) {
+            const item = document.createElement('div');
+            item.className = 'reaction-burst-item';
+            item.textContent = emoji;
+            const left = 6 + Math.random() * 88; // vw，避开太靠边
+            const delay = (Math.random() * 0.4).toFixed(2);
+            const duration = (2.2 + Math.random() * 0.9).toFixed(2);
+            const sway = Math.round(Math.random() * 50 - 25); // -25px ~ 25px 的摇摆幅度
+            const size = Math.round(24 + Math.random() * 16); // 24~40px
+            item.style.left = left + 'vw';
+            item.style.animationDelay = delay + 's';
+            item.style.animationDuration = duration + 's';
+            item.style.fontSize = size + 'px';
+            item.style.setProperty('--burst-sway', sway + 'px');
+            container.appendChild(item);
+        }
+        document.body.appendChild(container);
+        setTimeout(() => container.remove(), 3500);
+    } catch (e) {}
 };
 
 function _buildReactionGridItem(emoji, onPick) {

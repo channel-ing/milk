@@ -66,6 +66,10 @@
                 if (typeof toggleBatchMode === 'function') toggleBatchMode();
             }
         },
+        // 占位项，真正的"搞怪"逻辑（右下角道具面板：番茄/鸡蛋/蛋糕/水桶）在
+        // js/features/throw-egg.js 里，它加载后会调用 registerItem('throw-egg', ...)
+        // 把这项升级成真实功能
+        { id: 'throw-egg', iconClass: 'fas fa-face-grin-tongue-wink', label: '搞怪', ready: false },
         // 加回"位置"和"快问快答"这两个（凑够6个，两行各3个/4个，看起来不那么空），
         // 小红书/抖音还是先不加，功能都没做
         { id: 'location', iconClass: 'fas fa-location-dot', label: '位置', ready: false },

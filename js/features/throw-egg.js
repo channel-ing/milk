@@ -303,13 +303,13 @@
     try { if (typeof messages !== 'undefined' && Array.isArray(messages)) return messages; } catch (e) {}
     return Array.isArray(window.messages) ? window.messages : [];
   }
-  // 落点：番茄/鸡蛋/蛋糕不正中头像，落在头像从上往下 90% 的高度（接近下沿，头像大部分露出）并带一点左右随机；
+  // 落点：番茄/鸡蛋/蛋糕落在头像左侧（头像左边缘再往左 20px），高度在头像中部，稍有上下随机；
   // 水桶的泼水效果保持原样，仍然对准头像中心
   function aimPoint(elm, itemId) {
     const c = centerOf(elm);
     if (itemId === 'bucket') return c;
-    // 落在头像下沿外侧，爆开的中心在头像外面，头像只被边缘溅到
-    return { x: c.x + (Math.random() - 0.5) * c.w * 0.3, y: c.y + c.h * 0.5 + c.h * 0.5 + 0 };
+    // 落在头像左侧（头像左边缘再往左 20px），高度在头像中部，稍有上下随机
+    return { x: c.x - c.w * 0.5 - 20, y: c.y + (Math.random() - 0.5) * c.h * 0.3 };
   }
   function centerOf(elm) {
     const r = elm.getBoundingClientRect();

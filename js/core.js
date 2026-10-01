@@ -1722,7 +1722,14 @@ window.openReactionPicker = function(messageId, anchorEl) {
 
     setTimeout(() => {
         document.addEventListener('click', function handler(e) {
-            if (!popup.contains(e.target) && e.target !== anchorEl && !anchorEl.contains(e.target)) {
+            // 用 composedPath 而不是 popup.contains(e.target)：点"+"之后会清空面板内容重新渲染，
+            // 原来被点击的那个节点（比如"+"上的图标）在这次点击冒泡到 document 之前就已经从页面上
+            // 被移除了，这时候 popup.contains(e.target) 永远是 false（哪怕明明点在面板里），
+            // 会把刚展开的完整表情表立刻关掉。composedPath() 拿到的是点击发生那一刻的真实路径，
+            // 不受后续 DOM 变化影响，不会有这个问题。
+            const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+            const clickedInsidePopup = path.includes(popup);
+            if (!clickedInsidePopup && e.target !== anchorEl && !anchorEl.contains(e.target)) {
                 popup.remove();
                 document.removeEventListener('click', handler);
             }

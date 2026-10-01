@@ -6,7 +6,7 @@
    - 道具全部是 SVG 手绘 + GSAP（js/vendor/gsap.min.js）做的动作，
      不依赖任何图片/视频素材
    - 聊天记录：命中时插一条跟视频通话记录同款的事件气泡
-     （window._addCallEvent），文案"我向梦角扔了番茄"/"我向梦角泼水"。
+     （window._addCallEvent），文案"我 向 梦角 扔了 番茄"/"我 向 梦角 泼水"。
      连续扔同一种只保留一条：只有当上一条气泡是聊天记录的最后一条、
      同一个人扔的、同一种道具、而且是同一次打开面板时才合并；
      换道具、中间插了别的消息、关掉面板再打开，都会新起一条
@@ -303,6 +303,13 @@
     try { if (typeof messages !== 'undefined' && Array.isArray(messages)) return messages; } catch (e) {}
     return Array.isArray(window.messages) ? window.messages : [];
   }
+  // 落点：番茄/鸡蛋/蛋糕不正中头像，稍微偏下（下巴附近）并带一点左右随机；
+  // 水桶的泼水效果保持原样，仍然对准头像中心
+  function aimPoint(elm, itemId) {
+    const c = centerOf(elm);
+    if (itemId === 'bucket') return c;
+    return { x: c.x + (Math.random() - 0.5) * c.w * 0.3, y: c.y + c.h * 0.3 };
+  }
   function centerOf(elm) {
     const r = elm.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
@@ -381,7 +388,7 @@
   function labelFor(sender, item) {
     const a = sender === 'user' ? getMyName() : getPartnerName();
     const b = sender === 'user' ? getPartnerName() : getMyName();
-    return item.id === 'bucket' ? (a + '向' + b + '泼水') : (a + '向' + b + '扔了' + item.name);
+    return item.id === 'bucket' ? (a + ' 向 ' + b + ' 泼水') : (a + ' 向 ' + b + ' 扔了 ' + item.name);
   }
 
   // 返回 true 表示新起了一条气泡；false 表示合并进了上一条
@@ -441,7 +448,7 @@
     const avatar = nearestChatAvatar('received', 'partner-avatar');
     if (!item || !avatar) return;
     const from = fromEl ? centerOf(fromEl) : { x: window.innerWidth - 60, y: window.innerHeight - 120 };
-    playSequence(item.id, from, centerOf(avatar), function () {
+    playSequence(item.id, from, aimPoint(avatar, item.id), function () {
       shake(avatar);
       recordThrow('user', item);
       markReplyPending();
@@ -463,7 +470,7 @@
     const toEl = nearestChatAvatar('sent', 'my-avatar');
     const done = function () { shake(toEl); recordThrow('partner', item); };
     if (!fromEl || !toEl || toEl.getBoundingClientRect().width === 0) { done(); return; }
-    playSequence(item.id, centerOf(fromEl), centerOf(toEl), done);
+    playSequence(item.id, centerOf(fromEl), aimPoint(toEl, item.id), done);
   }
 
   // ---------- 右下角道具面板 ----------

@@ -1038,14 +1038,16 @@
             display: flex;
             padding: 4px 6px;
             opacity: 0;
-            transform: translateY(5px);
+            /* --safe-shift 鐢� JS 鍦ㄥ伐鍏锋爮蹇创鍒板睆骞曡竟缂樻椂鍔ㄦ€佸啓鍏ワ紙瑙� _clampActionsToolbar锛夛紝
+               鐢ㄨ嚜瀹氫箟灞炴€у彔鍔犺€屼笉鏄洿鎺ユ敼 transform锛岃繖鏍蜂笉浼氳窡涓嬮潰鐨勫脊鍑哄姩鐢绘墦鏋� */
+            transform: translateY(5px) translateX(var(--safe-shift, 0px));
             transition: var(--transition);
             z-index: 2;
             pointer-events: none;
         }
         .message-wrapper.actions-visible .message-meta-actions {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) translateX(var(--safe-shift, 0px));
             pointer-events: auto;
         }
         .message-wrapper.sent .message-meta-actions {
@@ -1055,39 +1057,43 @@
             right: 0;
         }
 
-        /* 娑堟伅鍙嶅簲灏忔爣绛撅細璐村湪姘旀场鑷繁韬笂锛�.message 鏄� position:relative锛夛紝
-           涓嶆槸璐村湪鍥哄畾鍍忕礌鍧愭爣锛屾墍浠ヤ笉绠℃皵娉℃槸榛樿鏍峰紡杩樻槸鐢ㄦ埛鑷畾涔� CSS 鏀硅繃褰㈢姸/鍦嗚/灏栬锛�
-           鏍囩閮戒細璺熺潃姘旀场瀹為檯娓叉煋鍑烘潵鐨勯偅涓璧帮紝涓嶄細閿欎綅銆�
-           瀹藉害鐢� padding 鎾戝紑鑰屼笉鏄啓姝诲昂瀵革紝杩欐牱鏅€� emoji 鍜岄暱涓查鏂囧瓧閮借兘瀹屾暣鏄剧ず涓嶈瑁佸垏銆� */
+        /* 娑堟伅姘旀场澶栭潰鍖呬竴灞備笉瑁佸垏鐨勫鍣細.message 鏈韩鏈� overflow:hidden锛堢粰鑷畾涔夋皵娉＄毊鑲ょ敤鐨勶級锛�
+           鍙嶅簲灏忔爣绛惧鏋滆创鍦� .message 鍐呴儴銆佸張瑕佹帰鍑烘皵娉¤竟缂橈紝浼氳杩欐潯瑙勫垯鍒囨帀锛屾墍浠ュ崟鐙寘涓€灞傘€� */
+        .message-bubble-wrap {
+            position: relative;
+            display: inline-flex;
+            max-width: 100%;
+        }
+        /* 鍙嶅簲灏忔爣绛撅細浣嶇疆璺熺潃"杩欐潯娑堟伅鏄皝鍙戠殑"璧帮紝涓嶈窡鐫€"璋佺偣鐨勫弽搴�"璧扳€斺€�
+           鐢ㄦ埛鍙戠殑娑堟伅鍥哄畾璐村湪宸︿笅瑙掞紝姊﹁鍙戠殑娑堟伅鍥哄畾璐村湪鍙充笅瑙掞紝骞朵笖寰€姘旀场澶栦晶澶氭帹涓€鐐癸紝
+           閬垮厤鍗″湪姘旀场鍐呬晶鎸′綇鏂囧瓧銆傚搴﹁窡鐫€鍐呭鎾戝紑锛堜笉鏄浐瀹氬渾鐐癸級锛屾櫘閫� emoji 鍜岄鏂囧瓧閮戒笉浼氳瑁佹帀銆� */
         .message-reaction-badge {
             position: absolute;
-            bottom: -10px;
+            bottom: -9px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             width: auto;
-            height: auto;
-            padding: 2px 6px;
-            box-sizing: content-box;
+            padding: 2px 7px;
             white-space: nowrap;
             font-size: 14px;
-            line-height: 1.2;
+            line-height: 1.3;
             background-color: var(--secondary-bg);
             border-radius: 999px;
             box-shadow: var(--shadow);
             z-index: 1;
             pointer-events: none;
         }
-        .reaction-badge-user {
-            left: 6px;
+        .message-wrapper.sent .message-reaction-badge {
+            left: -6px;
         }
-        .reaction-badge-partner {
-            right: 6px;
+        .message-wrapper.received .message-reaction-badge {
+            right: -6px;
         }
 
         .reaction-picker-popup {
             position: fixed;
-            z-index: 999;
+            z-index: 99999;
             display: flex;
             flex-wrap: wrap;
             gap: 4px;
@@ -1115,6 +1121,12 @@
             color: var(--text-secondary);
             font-size: 14px;
         }
+        .reaction-picker-hint {
+            flex: 0 0 100%;
+            font-size: 11px;
+            color: var(--text-secondary);
+            padding: 2px 2px 6px;
+        }
         .reaction-picker-input {
             width: 180px;
             padding: 8px 10px;
@@ -1136,8 +1148,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: none;
-            border: none;
+            background: none; 
+            border: none;   
         }
         
         .meta-action-btn:hover {
@@ -5401,6 +5413,22 @@
             display: none;
         }
 
+        /* "鎼滅储"杩欎釜tab锛�#search-panel锛変箣鍓嶆病閰嶅埌璺�"缁熻"tab锛�#stats-content锛変竴鏍风殑
+           flex:1+overflow-y:auto澶勭悊锛屽鑷村畠鐨勯珮搴︾畻涓嶅噯锛屾拺鐖嗕簡.modal-content鐨�
+           max-height:85vh+overflow:hidden杩欎釜鏁翠綋甯冨眬锛屽簳閮�"杩斿洖/鍏抽棴"鎸夐挳鐨勫畾浣嶈窡鐫€涔辨帀銆�
+           鐩栧湪鍐呭涓棿銆傝繖閲岃#search-panel涔熷弬涓巉lex甯冨眬銆佽嚜宸卞唴閮ㄦ粴鍔紝
+           璺�#stats-content鐢ㄧ殑鏄悓涓€濂楀啓娉曪紝淇濇寔涓€鑷� */
+        #search-panel {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #search-panel .stats-search-box {
+            flex-shrink: 0;
+        }
+
         #stats-modal .modal-buttons {
             flex-shrink: 0;
             margin-top: 0;
@@ -6358,7 +6386,7 @@
             height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
             border-radius 0.4s ease,
             opacity 0.3s ease, visibility 0.3s ease;
-            z-index: 990;
+            z-index: 1550; /* 闇€楂樹簬 #couple-space-page(1500)锛屽惁鍒欐墦寮€鎯呬荆绌洪棿鍚庢挱鏀惧櫒浼氳鐩栦綇 */
             overflow: hidden;
             cursor: grab;
             border: 1px solid rgba(var(--accent-color-rgb), 0.12);
@@ -10891,8 +10919,7 @@
 #moments-header-btn   { order: 4; }
 #settings-btn         { order: 5; }
 
-/* 搴曢儴杈撳叆鍖猴細闅愯棌璁╁鏂圭户缁銆佹壒閲忓彂閫併€佸彂閫佹寜閽� */
-#continue-btn,
+/* 搴曢儴杈撳叆鍖猴細闅愯棌鎵归噺鍙戦€併€佸彂閫佹寜閽紙璁╁鏂圭户缁宸叉敼涓烘樉绀猴紝瑙佷笅鏂�"绗笁姝�"锛� */
 #batch-btn,
 #send-btn,
 /* 涔熼殣钘�"灞曞紑"妯″紡閲岀殑鎵归噺鎸夐挳 */
@@ -10911,7 +10938,9 @@
    鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 
 /* 杈撳叆鍖鸿瑙夐噸鎺掞紙鐢� flex order锛屼笉鏀� DOM 椤哄簭锛�
-   鐩爣甯冨眬锛歔馃摴瑙嗛閫氳瘽] [杈撳叆妗哴 [馃榾琛ㄦ儏] [馃柤鍥剧墖] */
+   鐩爣甯冨眬锛歔馃摴瑙嗛閫氳瘽] [杈撳叆妗哴 [馃榾琛ㄦ儏] [馃柤鍥剧墖] [馃挰璁╁鏂圭户缁]
+   鏈€鍚庝竴涓�"缁х画璇�"鎸夐挳瀹為檯鏄� .input-buttons 瀹瑰櫒閲屽敮涓€杩樻樉绀虹殑鎸夐挳
+   锛堟壒閲忓彂閫�/鍙戦€佹寜閽凡鍦ㄤ笂闈㈤殣钘忥級锛屽鍣ㄦ暣浣� order:5 鎺掑湪鏈€鍙宠竟 */
 #videocall-btn   { order: 1; }
 .message-input   { order: 2; }
 #combo-btn       { order: 3; }
@@ -11039,11 +11068,15 @@ body.bottom-collapse-mode #collapse-expand-btn {
     opacity: 0.7;
 }
 
-/* 瀵规柟浼闊虫潯涓嬫柟璐寸殑鏂囧瓧 */
+/* 璇煶鏉′笅鏂硅创鐨勬枃瀛椻€斺€旈鑹叉敼鎴愮户鎵挎皵娉¤嚜宸辩殑鏂囧瓧鑹�(inherit)锛屼笉鍐嶅崟鐙啓姝讳竴涓彉閲忋€�
+   杩欐牱姘旀场鐨偆 CSS 鐩存帴鏀� .message-received/.message-sent 鐨� color 鏃讹紝
+   杩欐鏂囧瓧浼氳窡鐫€涓€璧峰彉锛涚敤 opacity 鍋�"姣旀鏂囨贰涓€鐐�"鐨勫急鍖栵紝鑰屼笉鏄彟澶栨寚瀹氫竴涓鑹诧紝
+   杩欐牱涓嶇姘旀场鏂囧瓧鏈€缁堟槸浠€涔堥鑹诧紝寮卞寲鐨勮鎰熼兘鑳戒繚鎸佷竴鑷达紝涓嶄細鍑虹幇鏂囧瓧鍜屾皵娉″涓嶄笂鐨勬儏鍐� */
 .voice-fake-text {
     margin-top: 4px;
     font-size: 12px;
-    color: var(--text-secondary);
+    color: inherit;
+    opacity: 0.72;
     line-height: 1.5;
     padding: 0 4px;
 }
@@ -11080,6 +11113,10 @@ body #user-sticker-picker.sticker-picker-popover.active {
     right: auto !important;
     top: auto !important;
     bottom: auto !important;
+    /* 鏈€澶栧眰鍐嶅厹涓€灞備笉閫忔槑搴曡壊鈥斺€�.combo-tabs-header 琚殣钘忎箣鍚庯紝
+       鍒嗙粍鍥炬爣琛屾槸杩欎釜闈㈡澘閲屾渶鍏堝嚭鐜扮殑涓滆タ锛屼箣鍓嶅畠鑷繁鐨勮儗鏅壊娌¤兘瀹屽叏鐩栦綇锛�
+       浼氶湶鍑哄悗闈㈢殑鑱婂ぉ鍐呭銆傜洿鎺ュ湪鏈€澶栧眰閾轰竴灞傦紝涓嶇閲岄潰浠讳綍瀛愬厓绱犺儗鏅湁娌℃湁闂閮藉厹寰椾綇 */
+    background: var(--secondary-bg) !important;
 }
 
 body #user-sticker-picker .empty-sticker-tip {
@@ -12220,6 +12257,11 @@ body #user-sticker-picker .empty-sticker-tip {
 /* 鈹€鈹€ 鐩稿唽鍒楄〃 鈹€鈹€ */
 .al-albums-grid {
     display: grid; grid-template-columns: 1fr 1fr;
+    align-content: start; /* 涓嶈鎶婂鍣ㄥ浣欑殑绌虹櫧楂樺害鎽婃淳缁欐瘡涓€琛� */
+    align-items: start;   /* 姣忓紶鍗＄墖鎸夎嚜宸卞疄闄呴渶瑕佺殑楂樺害鏄剧ず锛屼笉琚媺浼�/鍘嬬缉鎴愯窡鍚屼竴琛屽埆鐨勫崱鐗囦竴鏍烽珮 */
+    grid-auto-rows: min-content; /* 鍏抽敭淇锛氳繖涓鍣ㄤ箣鍓嶈澶栧眰闄愬埗浜嗘€婚珮搴︼紝瀵艰嚧姣忚琚揩骞冲垎杩欎釜涓嶅鐢ㄧ殑楂樺害銆佸唴瀹规孩鍑哄彔鍒颁笅涓€琛屻€�
+                                     杩欒寮哄埗"姣忎竴琛屾寜鍐呭瀹為檯闇€瑕佺殑鏈€灏忛珮搴︽潵绠�"锛屼笉浼氬啀琚€婚珮搴︿笉澶熻€屽帇缂╋紝
+                                     鐩稿唽鏁伴噺澶氱殑璇濅細姝ｅ父瑙﹀彂杩欎釜瀹瑰櫒鑷繁鐨勪笂涓嬫粴鍔紝涓嶅奖鍝嶆甯镐娇鐢� */
     gap: 12px; padding: 14px;
 }
 .al-album-card {
@@ -12231,7 +12273,15 @@ body #user-sticker-picker .empty-sticker-tip {
 }
 .al-album-card:active { transform: scale(0.97); }
 .al-new-card { border: 1.5px dashed color-mix(in srgb, var(--accent-color) 40%, transparent); background: rgba(var(--accent-color-rgb),.03); }
-.al-cover { width: 100%; aspect-ratio: 1; overflow: hidden; }
+.al-cover {
+    width: 100%; overflow: hidden; position: relative;
+}
+.al-cover::before {
+    content: ''; display: block; padding-top: 100%; /* 鐢ㄧ櫨鍒嗘瘮padding鎾戦珮搴︼紝姣� aspect-ratio 鏇寸ǔ锛岄伩鍏嶈窡缃戞牸鑷姩绠楄楂樻椂浜х敓鍐茬獊瀵艰嚧琛屼笌琛岄噸鍙� */
+}
+.al-cover > img, .al-cover > .al-cover-empty {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+}
 .al-new-cover {
     width: 100%; aspect-ratio: 1; display: flex;
     align-items: center; justify-content: center;

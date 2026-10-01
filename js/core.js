@@ -1718,40 +1718,160 @@ window.addReactionToMessage = function(messageId, emoji) {
     message.reaction = isRemoving ? null : emoji;
     throttledSaveData();
     renderMessages(true);
-    // 撤回反应时不放效果，只有「新加上」一个反应（不管是用户手动点的还是梦角自动给的）才满屏飘
+    // 撤回反应时不放效果，「新加上」一个反应（不管是用户手动点的还是梦角自动给的）才满屏飘——
+    // 纯emoji会在气球/礼花/烟花里随机抽一种；颜文字固定只用气球（带毛玻璃胶囊底），不会抽到礼花/烟花
     if (!isRemoving && typeof window.playReactionBurst === 'function') {
         window.playReactionBurst(emoji);
     }
 };
 
-// 满屏飘表情的效果（iMessage「气球」风格）：数量少、往上飘、带点左右摇摆、渐隐，
-// 2-3秒内结束，纯展示用的浮层，不挡点击、用完就从 DOM 里移除。
+// 满屏飘表情的效果：纯emoji（单个）在气球（iMessage风格）/礼花/烟花三种里随机抽一种播放，图个惊喜感；
+// 2个及以上拼在一起的emoji组合，风格仍然随机三选一，但字号和速度收窄一档（原因见 _playReactionBurstBalloon
+// 的注释）；颜文字固定只用气球——字符串长短不一，转/炸的话经常会糊成一团不好看，飘的话配上毛玻璃胶囊底还算清爽。
+// 性能上都只用 transform/opacity 做动画（GPU 合成，不触发重排），DOM 节点一次性用 DocumentFragment
+// 批量插入（只触发一次重排/重绘），纯展示浮层、不挡点击，播完自己整体移除。
 window.playReactionBurst = function(emoji) {
     if (!emoji) return;
     try {
-        const COUNT = 6 + Math.floor(Math.random() * 3); // 6~8 个
-        const container = document.createElement('div');
-        container.className = 'reaction-burst-container';
-        for (let i = 0; i < COUNT; i++) {
-            const item = document.createElement('div');
-            item.className = 'reaction-burst-item';
-            item.textContent = emoji;
-            const left = 6 + Math.random() * 88; // vw，避开太靠边
-            const delay = (Math.random() * 0.4).toFixed(2);
-            const duration = (2.2 + Math.random() * 0.9).toFixed(2);
-            const sway = Math.round(Math.random() * 50 - 25); // -25px ~ 25px 的摇摆幅度
-            const size = Math.round(24 + Math.random() * 16); // 24~40px
-            item.style.left = left + 'vw';
-            item.style.animationDelay = delay + 's';
-            item.style.animationDuration = duration + 's';
-            item.style.fontSize = size + 'px';
-            item.style.setProperty('--burst-sway', sway + 'px');
-            container.appendChild(item);
+        if (!_isPureEmoji(emoji)) {
+            _playReactionBurstBalloon(emoji, { kaomoji: true });
+            return;
         }
-        document.body.appendChild(container);
-        setTimeout(() => container.remove(), 3500);
+        // 是纯emoji，但拆出来不止一个「视觉字符」（比如 😀😂 这种两三个emoji拼在一起）——
+        // 跟单个emoji用同一套字号范围的话，画面上会比单个emoji宽不少，贴着屏幕边缘飘的时候
+        // 容易被切掉一截（跟颜文字同理，只是没那么夸张），所以也收窄一档，但风格还是正常三选一
+        const isCombo = !_shouldUseCircleBadge(emoji);
+        const styles = [_playReactionBurstBalloon, _playReactionBurstConfetti, _playReactionBurstFirework];
+        const pick = styles[Math.floor(Math.random() * styles.length)];
+        pick(emoji, isCombo ? { combo: true } : undefined);
     } catch (e) {}
 };
+
+// 气球：数量多、大小不一，2.5~4秒内陆续飘完自己消失。
+// 垂直上升和左右摇摆拆成两层独立动画（外层匀速上升 + 内层钟摆式摇摆），避免同一个动画里又要变速
+// 上升又要来回折返方向，折返的瞬间会看起来像"顿一下"；拆开之后每层都是匀速/顺滑的，就不会有停顿感了。
+// opts.kaomoji === true 时是颜文字专用的那一版：整体放慢、字号收窄一些、外面套一层跟消息反应
+// 小标签同款的毛玻璃胶囊底（宽度跟着文字内容自适应撑开），不然裸着一串颜文字飞过去不好认。
+// opts.combo === true 时是多个emoji拼接（非颜文字）：跟颜文字共用同一套「字号收窄+放慢」的参数，
+// 但不加毛玻璃底、风格也还是三选一（上面 playReactionBurst 里已经抽过了），只是传进来已经定好是气球。
+function _playReactionBurstBalloon(emoji, opts) {
+    const isKaomoji = !!(opts && opts.kaomoji);
+    const isSlow = isKaomoji || !!(opts && opts.combo); // 颜文字和emoji组合共用一套收窄参数
+    const COUNT = 28 + Math.floor(Math.random() * 14); // 28~41 个
+    const container = document.createElement('div');
+    container.className = 'reaction-burst-container';
+    const fragment = document.createDocumentFragment();
+    let maxFinish = 0;
+    for (let i = 0; i < COUNT; i++) {
+        const item = document.createElement('div');
+        item.className = 'reaction-burst-item reaction-burst-balloon';
+        const inner = document.createElement('span');
+        inner.className = 'reaction-burst-emoji' + (isKaomoji ? ' reaction-burst-emoji-kaomoji' : '');
+        inner.textContent = emoji;
+        item.appendChild(inner);
+
+        const left = 2 + Math.random() * 96; // vw，铺满全宽
+        const delay = Math.random() * 1.2; // 错开出现时间，不是齐刷刷一起冒出来
+        // 颜文字/emoji组合比单个emoji再放慢一档，字还在飘的时候好歹能看清
+        const riseDuration = isSlow ? (3.6 + Math.random() * 2.0) : (2.6 + Math.random() * 1.6); // 普通2.6~4.2s / 收窄版3.6~5.6s
+        const wobbleDuration = isSlow ? (2.3 + Math.random() * 1.1) : (1.6 + Math.random() * 1.0); // 普通1.6~2.6s / 收窄版2.3~3.4s
+        const wobble = Math.round(14 + Math.random() * 30); // 14~44px 的摇摆幅度
+        // 大小差异拉大：小的多、偶尔冒几个很大的，更有层次感（指数分布让小尺寸更常见）
+        // 颜文字/emoji组合天生就比单个emoji宽，封顶字号调低一点，不然（颜文字）胶囊底会撑得很夸张，
+        // （emoji组合）贴着屏幕边缘飘的时候容易被切掉一截
+        const size = isSlow
+            ? Math.round(13 + Math.pow(Math.random(), 1.8) * 21) // 13~34px
+            : Math.round(14 + Math.pow(Math.random(), 1.8) * 46); // 14~60px
+
+        item.style.left = left + 'vw';
+        item.style.animationDelay = delay.toFixed(2) + 's';
+        item.style.animationDuration = riseDuration.toFixed(2) + 's';
+        item.style.fontSize = size + 'px';
+        inner.style.animationDelay = (Math.random() * wobbleDuration).toFixed(2) + 's'; // 起始相位也随机，摆动不同步
+        inner.style.animationDuration = wobbleDuration.toFixed(2) + 's';
+        inner.style.setProperty('--burst-wobble', wobble + 'px');
+        fragment.appendChild(item);
+        maxFinish = Math.max(maxFinish, delay + riseDuration);
+    }
+    container.appendChild(fragment);
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), Math.ceil(maxFinish * 1000) + 300);
+}
+
+// 礼花：从顶部密集落下，带旋转，数量多、大小差异明显。opts.combo 见上面气球函数的说明。
+function _playReactionBurstConfetti(emoji, opts) {
+    const isCombo = !!(opts && opts.combo);
+    const COUNT = 40 + Math.floor(Math.random() * 16); // 40~55 个
+    const container = document.createElement('div');
+    container.className = 'reaction-burst-container';
+    const fragment = document.createDocumentFragment();
+    let maxFinish = 0;
+    for (let i = 0; i < COUNT; i++) {
+        const item = document.createElement('div');
+        item.className = 'reaction-burst-item reaction-burst-confetti';
+        item.textContent = emoji;
+
+        const delay = Math.random() * 0.6;
+        const duration = isCombo ? (2.8 + Math.random() * 1.6) : (1.8 + Math.random() * 1.2); // 普通1.8~3.0s / 组合2.8~4.4s
+        const sway = Math.round(Math.random() * 140 - 70);
+        const spin = Math.round(360 + Math.random() * 540);
+        const size = isCombo
+            ? Math.round(12 + Math.pow(Math.random(), 1.6) * 16) // 12~28px
+            : Math.round(12 + Math.pow(Math.random(), 1.6) * 34); // 12~46px
+
+        item.style.left = Math.round(Math.random() * 100) + 'vw';
+        item.style.animationDelay = delay.toFixed(2) + 's';
+        item.style.animationDuration = duration.toFixed(2) + 's';
+        item.style.fontSize = size + 'px';
+        item.style.setProperty('--confetti-sway', sway + 'px');
+        item.style.setProperty('--confetti-spin', spin + 'deg');
+        fragment.appendChild(item);
+        maxFinish = Math.max(maxFinish, delay + duration);
+    }
+    container.appendChild(fragment);
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), Math.ceil(maxFinish * 1000) + 300);
+}
+
+// 烟花：几个点同时向四周炸开，范围大、速度偏慢，更有冲击力。opts.combo 见上面气球函数的说明。
+function _playReactionBurstFirework(emoji, opts) {
+    const isCombo = !!(opts && opts.combo);
+    const BURST_COUNT = 5;
+    const RAYS = 12;
+    const container = document.createElement('div');
+    container.className = 'reaction-burst-container';
+    const fragment = document.createDocumentFragment();
+    let maxFinish = 0;
+    for (let b = 0; b < BURST_COUNT; b++) {
+        const originX = 10 + Math.random() * 80; // vw
+        const originY = 15 + Math.random() * 50; // vh
+        const burstDelay = b * 0.28 + Math.random() * 0.1;
+        for (let i = 0; i < RAYS; i++) {
+            const angle = (i / RAYS) * Math.PI * 2 + Math.random() * 0.3;
+            const dist = 90 + Math.random() * 70;
+            const duration = isCombo ? (2.4 + Math.random() * 0.9) : (1.4 + Math.random() * 0.5); // 普通1.4~1.9s / 组合2.4~3.3s
+            const size = isCombo
+                ? Math.round(16 + Math.random() * 10) // 16~26px
+                : Math.round(22 + Math.random() * 16); // 22~38px
+
+            const item = document.createElement('div');
+            item.className = 'reaction-burst-item reaction-burst-firework';
+            item.textContent = emoji;
+            item.style.left = originX + 'vw';
+            item.style.top = originY + 'vh';
+            item.style.animationDelay = burstDelay.toFixed(2) + 's';
+            item.style.animationDuration = duration.toFixed(2) + 's';
+            item.style.fontSize = size + 'px';
+            item.style.setProperty('--firework-tx', Math.round(Math.cos(angle) * dist) + 'px');
+            item.style.setProperty('--firework-ty', Math.round(Math.sin(angle) * dist) + 'px');
+            fragment.appendChild(item);
+            maxFinish = Math.max(maxFinish, burstDelay + duration);
+        }
+    }
+    container.appendChild(fragment);
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), Math.ceil(maxFinish * 1000) + 300);
+}
 
 function _buildReactionGridItem(emoji, onPick) {
     const item = document.createElement('div');

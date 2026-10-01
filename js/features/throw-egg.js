@@ -303,13 +303,15 @@
     try { if (typeof messages !== 'undefined' && Array.isArray(messages)) return messages; } catch (e) {}
     return Array.isArray(window.messages) ? window.messages : [];
   }
-  // 落点：番茄/鸡蛋/蛋糕落在头像左侧（头像左边缘再往左 20px），高度在头像中部，稍有上下随机；
+  // 落点：番茄/鸡蛋/蛋糕落在头像旁边 20px 处，高度在头像中部，稍有上下随机；
+  // 用户扔梦角 → 梦角头像右边（side='right'）；梦角扔用户 → 用户头像左边（side='left'）；
   // 水桶的泼水效果保持原样，仍然对准头像中心
-  function aimPoint(elm, itemId) {
+  function aimPoint(elm, itemId, side) {
     const c = centerOf(elm);
     if (itemId === 'bucket') return c;
     // 落在头像左侧（头像左边缘再往左 20px），高度在头像中部，稍有上下随机
-    return { x: c.x - c.w * 0.5 - 20, y: c.y + (Math.random() - 0.5) * c.h * 0.3 };
+    const dx = c.w * 0.5 + 20;
+    return { x: side === 'right' ? c.x + dx : c.x - dx, y: c.y + (Math.random() - 0.5) * c.h * 0.3 };
   }
   function centerOf(elm) {
     const r = elm.getBoundingClientRect();
@@ -449,7 +451,7 @@
     const avatar = nearestChatAvatar('received', 'partner-avatar');
     if (!item || !avatar) return;
     const from = fromEl ? centerOf(fromEl) : { x: window.innerWidth - 60, y: window.innerHeight - 120 };
-    playSequence(item.id, from, aimPoint(avatar, item.id), function () {
+    playSequence(item.id, from, aimPoint(avatar, item.id, 'right'), function () {
       shake(avatar);
       recordThrow('user', item);
       markReplyPending();
@@ -471,7 +473,7 @@
     const toEl = nearestChatAvatar('sent', 'my-avatar');
     const done = function () { shake(toEl); recordThrow('partner', item); };
     if (!fromEl || !toEl || toEl.getBoundingClientRect().width === 0) { done(); return; }
-    playSequence(item.id, centerOf(fromEl), aimPoint(toEl, item.id), done);
+    playSequence(item.id, centerOf(fromEl), aimPoint(toEl, item.id, 'left'), done);
   }
 
   // ---------- 右下角道具面板 ----------

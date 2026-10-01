@@ -2256,6 +2256,13 @@ const addMessage = (message) => {
                     if (typeof showNotification === 'function') showNotification('✦ 强制触发对方拍一拍', 'info', 1800);
                     return;
                 }
+                if (cmd === '/测试搞怪' || cmd === '/testthrow') {
+                    DOMElements.messageInput.value = '';
+                    _syncMessageInputHeight();
+                    if (window.ThrowEgg && typeof window.ThrowEgg.partnerThrow === 'function') window.ThrowEgg.partnerThrow();
+                    if (typeof showNotification === 'function') showNotification('✦ 强制触发对方搞怪', 'info', 1800);
+                    return;
+                }
                 if (cmd === '/测试状态更新' || cmd === '/teststatus') {
                     DOMElements.messageInput.value = '';
                     _syncMessageInputHeight();
@@ -2550,6 +2557,12 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
             if (Math.random() < 0.03) {
                 // ── 对方拍一拍：调用提取的通用函数（同时供 /测试拍一拍 指令使用）──
                 if (typeof window._triggerPartnerPoke === 'function') window._triggerPartnerPoke();
+                return;
+            }
+
+            // ── 梦角搞怪（朝"我"扔番茄/鸡蛋/蛋糕/泼水）：跟拍一拍同样的判定方式，3% 概率，触发后这次不再回复 ──
+            if (Math.random() < 0.03 && window.ThrowEgg && typeof window.ThrowEgg.partnerThrow === 'function') {
+                window.ThrowEgg.partnerThrow();
                 return;
             }
 

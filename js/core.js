@@ -1747,7 +1747,10 @@ window.addReactionToMessage = function(messageId, emoji) {
     }
     // 撤回反应时不放效果，「新加上」一个反应（不管是用户手动点的还是梦角自动给的）才满屏飘——
     // 纯emoji会在气球/礼花/烟花里随机抽一种；颜文字固定只用气球（带毛玻璃胶囊底），不会抽到礼花/烟花
-    if (!isRemoving && typeof window.playReactionBurst === 'function') {
+    // 满屏飘的效果只在主聊天页播：用户在弹窗/情侣空间/陪伴页/电影院或页面在后台时跳过，
+    // 不然会盖在别的页面上面飘（标签小标签本身已经更新了，回到聊天页就能看到）
+    const _awayFromChat = (typeof window._isAwayFromChat === 'function') ? window._isAwayFromChat() : false;
+    if (!isRemoving && !_awayFromChat && typeof window.playReactionBurst === 'function') {
         window.playReactionBurst(emoji);
     }
 };

@@ -1209,6 +1209,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     if (msg.type === 'system') {
         const systemMsgDiv = document.createElement('div');
         systemMsgDiv.className = 'system-message';
+        systemMsgDiv.dataset.msgId = msg.id; // 让"跳转到某条消息"能定位到拍一拍这类系统消息
         systemMsgDiv.innerHTML = msg.text;
         fragment.appendChild(systemMsgDiv);
         lastSenderRef.current = 'system';
@@ -1219,6 +1220,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         const callEvDiv = document.createElement('div');
         callEvDiv.className = 'call-event-message';
         callEvDiv.dataset.id = msg.id;
+        callEvDiv.dataset.msgId = msg.id; // 让"跳转到某条消息"能定位到搞怪/通话记录
         const icon = msg.callIcon || 'fa-video';
         // 红色样式：通话拒绝/未接 + 陪伴拒绝/错过/取消
         const isRejected = icon === 'fa-phone-slash' ||
@@ -2260,8 +2262,11 @@ const addMessage = (message) => {
                 ? window._formatPartnerPokeText(`${settings.partnerName} ${pokeAction}`)
                 : `${settings.partnerName} ${pokeAction}`;
 
-            addMessage({ id: Date.now(), text: pokeText, timestamp: new Date(), type: 'system' });
+            const _pokeMsgId = Date.now();
+            addMessage({ id: _pokeMsgId, text: pokeText, timestamp: new Date(), type: 'system' });
             if (typeof playSound === 'function') playSound('partner_poke');
+            // 不在主聊天页（后台/弹窗/情侣空间……）时提示一下：后台弹系统通知，应用内弹横条
+            if (typeof window._notifyPartnerEvent === 'function') window._notifyPartnerEvent('拍了拍你', _pokeMsgId);
             (function(){try{if(window._typingIndicatorAutoHideTimer){clearTimeout(window._typingIndicatorAutoHideTimer);window._typingIndicatorAutoHideTimer=null;}}catch(e){}var _tiW=document.getElementById('typing-indicator-wrapper');if(_tiW){var _tiInner=_tiW.querySelector('.typing-indicator');if(_tiInner){_tiInner.classList.add('hiding');setTimeout(function(){_tiW.style.display='none';if(_tiInner)_tiInner.classList.remove('hiding');},240);}else{_tiW.style.display='none';}}})();
         };
 
@@ -2658,6 +2663,10 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                     if (targetMsg && typeof window.addReactionToMessage === 'function') {
                         const emoji = customEmojis[Math.floor(Math.random() * customEmojis.length)];
                         window.addReactionToMessage(targetId, emoji);
+                        // 不在主聊天页时提示：后台弹系统通知，应用内弹横条，点一下跳到被加表情的那条消息
+                        if (typeof window._notifyPartnerEvent === 'function') {
+                            window._notifyPartnerEvent('回应了你的消息 ' + emoji, targetId);
+                        }
                     }
                 }
             }

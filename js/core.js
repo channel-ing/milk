@@ -1722,9 +1722,16 @@ window._quotePreviewLabel = function (q) {
     if (orig.type === 'redpacket') return '[红包]';
     if (orig.voice) return '语音 ' + (orig.voice.duration || 0) + '"';
     if (orig.image) {
+        // 新消息发出时带 isSticker 标记，最准；老消息没有标记，就按下面的规则判断
+        if (orig.isSticker) return '[表情]';
         if (orig.sender !== 'user') return '[表情]';
-        const mine = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
-        return mine.indexOf(orig.image) !== -1 ? '[表情]' : '[图片]';
+        // 老的、没有标记的用户消息：看这张图在不在表情库里（我的表情库的条目是 {src,...} 对象，梦角表情库是字符串）
+        const inLib = function (lib) {
+            return Array.isArray(lib) && lib.some(function (e) { return (e && typeof e === 'object' ? e.src : e) === orig.image; });
+        };
+        const mine = (typeof myStickerLibrary !== 'undefined') ? myStickerLibrary : [];
+        const theirs = (typeof stickerLibrary !== 'undefined') ? stickerLibrary : [];
+        return (inLib(mine) || inLib(theirs)) ? '[表情]' : '[图片]';
     }
     return '[消息]';
 };
@@ -2466,7 +2473,7 @@ if (!isBatchMode && type === 'normal') {
                 setTimeout(() => {
                     const batchMsgId = Date.now() + index;
                     addMessage({
-                        id: batchMsgId, sender: 'user', text: msg.text || '', image: msg.image || null, timestamp: new Date(), status: 'sent', favorited: false, type: 'normal'
+                        id: batchMsgId, sender: 'user', text: msg.text || '', image: msg.image || null, isSticker: !!msg.isSticker, timestamp: new Date(), status: 'sent', favorited: false, type: 'normal'
                     });
                     window._currentRoundMsgIds = window._currentRoundMsgIds || [];
                     window._currentRoundMsgIds.push(batchMsgId);
@@ -2772,6 +2779,7 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                                 text: '',
                                 timestamp: new Date(),
                                 image: randomSticker,
+                                isSticker: true,
                                 status: 'received',
                                 favorited: false,
                                 note: null,

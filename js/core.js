@@ -1319,7 +1319,7 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
 
     let messageHTML = '';
     if (msg.replyTo) {
-        const repliedText = msg.replyTo.text || (msg.replyTo.voice ? `语音 ${msg.replyTo.voice.duration || 0}"` : (msg.replyTo.image ? '🖼 图片' : '[消息]'));
+        const repliedText = msg.replyTo.text || window._quotePreviewLabel(msg.replyTo);
         const repliedSender = msg.replyTo.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
         messageHTML += `<div class="reply-indicator" data-reply-id="${msg.replyTo.id || ''}" style="cursor:pointer;" onclick="scrollToQuotedMessage(this)"><span class="reply-indicator-sender">${repliedSender}</span><span class="reply-indicator-text">${repliedText}</span></div>`;
     }
@@ -1709,6 +1709,25 @@ function _recordRecentReaction(emoji) {
         localStorage.setItem(RECENT_REACTIONS_KEY, JSON.stringify(arr));
     } catch (e) {}
 }
+
+// 引用（回复）一条没有文字的消息时，引用条里显示的文案：
+// 红包 → [红包]；语音 → 语音 N"；表情包 → [表情]；真正的图片 → [图片]；其他（通话记录等）→ [消息]。
+// 优先去聊天记录里按 id 找到原消息来判断（引用条里只存了 id/发送者/文字，没存类型）；找不到原消息再用引用条里带的字段。
+// 梦角发的图片只有表情包这一种来源；用户发的图片要看它是不是在"我的表情库"里，是就算表情包。
+window._quotePreviewLabel = function (q) {
+    if (!q) return '[消息]';
+    const orig = (typeof messages !== 'undefined' && Array.isArray(messages))
+        ? (messages.find(function (m) { return String(m.id) === String(q.id); }) || q)
+        : q;
+    if (orig.type === 'redpacket') return '[红包]';
+    if (orig.voice) return '语音 ' + (orig.voice.duration || 0) + '"';
+    if (orig.image) {
+        if (orig.sender !== 'user') return '[表情]';
+        const mine = (typeof myStickerLibrary !== 'undefined' && Array.isArray(myStickerLibrary)) ? myStickerLibrary : [];
+        return mine.indexOf(orig.image) !== -1 ? '[表情]' : '[图片]';
+    }
+    return '[消息]';
+};
 
 // 原地更新一条消息的反应小标签；成功返回 true，找不到对应节点返回 false 让调用方兜底重画
 function _updateReactionBadgeInPlace(messageId, reaction) {
@@ -2207,7 +2226,7 @@ const addMessage = (message) => {
                 return;
             }
             const senderName = currentReplyTo.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
-            const previewText = currentReplyTo.text ? currentReplyTo.text.slice(0, 40) : (currentReplyTo.voice ? `语音 ${currentReplyTo.voice.duration || 0}"` : '🖼 图片');
+            const previewText = currentReplyTo.text ? currentReplyTo.text.slice(0, 40) : window._quotePreviewLabel(currentReplyTo);
             container.style.display = 'flex';
             container.innerHTML = `
                 <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(var(--accent-color-rgb),0.07);border-left:3px solid var(--accent-color);border-radius:0 8px 8px 0;width:100%;">

@@ -1813,7 +1813,10 @@ window.playReactionBurst = function(emoji) {
 function _playReactionBurstBalloon(emoji, opts) {
     const isKaomoji = !!(opts && opts.kaomoji);
     const isSlow = isKaomoji || !!(opts && opts.combo); // 颜文字和emoji组合共用一套收窄参数
-    const COUNT = 28 + Math.floor(Math.random() * 14); // 28~41 个
+    // 速度倍数（越大越慢）：单个/多个 emoji 比原来慢 1.6 倍，眼睛不容易累；颜文字速度保持原样。
+    // 数量：颜文字只放原来的 70%；emoji 数量不变。
+    const SPEED = isKaomoji ? 1 : 1.6;
+    const COUNT = Math.max(6, Math.round((28 + Math.floor(Math.random() * 14)) * (isKaomoji ? 0.7 : 1))); // 28~41 个（颜文字 ×0.7）
     const container = document.createElement('div');
     container.className = 'reaction-burst-container';
     const fragment = document.createDocumentFragment();
@@ -1827,10 +1830,10 @@ function _playReactionBurstBalloon(emoji, opts) {
         item.appendChild(inner);
 
         const left = 2 + Math.random() * 96; // vw，铺满全宽
-        const delay = Math.random() * 1.2; // 错开出现时间，不是齐刷刷一起冒出来
+        const delay = Math.random() * 1.2 * SPEED; // 错开出现时间，不是齐刷刷一起冒出来
         // 颜文字/emoji组合比单个emoji再放慢一档，字还在飘的时候好歹能看清
-        const riseDuration = isSlow ? (3.6 + Math.random() * 2.0) : (2.6 + Math.random() * 1.6); // 普通2.6~4.2s / 收窄版3.6~5.6s
-        const wobbleDuration = isSlow ? (2.3 + Math.random() * 1.1) : (1.6 + Math.random() * 1.0); // 普通1.6~2.6s / 收窄版2.3~3.4s
+        const riseDuration = (isSlow ? (3.6 + Math.random() * 2.0) : (2.6 + Math.random() * 1.6)) * SPEED; // 原速：普通2.6~4.2s / 收窄版3.6~5.6s，再乘 SPEED
+        const wobbleDuration = (isSlow ? (2.3 + Math.random() * 1.1) : (1.6 + Math.random() * 1.0)) * SPEED; // 原速：普通1.6~2.6s / 收窄版2.3~3.4s，再乘 SPEED
         const wobble = Math.round(14 + Math.random() * 30); // 14~44px 的摇摆幅度
         // 大小差异拉大：小的多、偶尔冒几个很大的，更有层次感（指数分布让小尺寸更常见）
         // 颜文字/emoji组合天生就比单个emoji宽，封顶字号调低一点，不然（颜文字）胶囊底会撑得很夸张，
@@ -1857,6 +1860,7 @@ function _playReactionBurstBalloon(emoji, opts) {
 // 礼花：从顶部密集落下，带旋转，数量多、大小差异明显。opts.combo 见上面气球函数的说明。
 function _playReactionBurstConfetti(emoji, opts) {
     const isCombo = !!(opts && opts.combo);
+    const SPEED = 1.6; // 比原来慢 1.6 倍（旋转总角度不变，时长拉长后转得更慢）；数量不变
     const COUNT = 40 + Math.floor(Math.random() * 16); // 40~55 个
     const container = document.createElement('div');
     container.className = 'reaction-burst-container';
@@ -1867,8 +1871,8 @@ function _playReactionBurstConfetti(emoji, opts) {
         item.className = 'reaction-burst-item reaction-burst-confetti';
         item.textContent = emoji;
 
-        const delay = Math.random() * 0.6;
-        const duration = isCombo ? (2.8 + Math.random() * 1.6) : (1.8 + Math.random() * 1.2); // 普通1.8~3.0s / 组合2.8~4.4s
+        const delay = Math.random() * 0.6 * SPEED;
+        const duration = (isCombo ? (2.8 + Math.random() * 1.6) : (1.8 + Math.random() * 1.2)) * SPEED; // 原速：普通1.8~3.0s / 组合2.8~4.4s，再乘 SPEED
         const sway = Math.round(Math.random() * 140 - 70);
         const spin = Math.round(360 + Math.random() * 540);
         const size = isCombo
@@ -1878,6 +1882,7 @@ function _playReactionBurstConfetti(emoji, opts) {
         item.style.left = Math.round(Math.random() * 100) + 'vw';
         item.style.animationDelay = delay.toFixed(2) + 's';
         item.style.animationDuration = duration.toFixed(2) + 's';
+        item.style.animationTimingFunction = 'linear'; // 匀速下落：原来的 ease-in 越落越快，末尾那一下最晃眼
         item.style.fontSize = size + 'px';
         item.style.setProperty('--confetti-sway', sway + 'px');
         item.style.setProperty('--confetti-spin', spin + 'deg');
@@ -1892,6 +1897,7 @@ function _playReactionBurstConfetti(emoji, opts) {
 // 烟花：几个点同时向四周炸开，范围大、速度偏慢，更有冲击力。opts.combo 见上面气球函数的说明。
 function _playReactionBurstFirework(emoji, opts) {
     const isCombo = !!(opts && opts.combo);
+    const SPEED = 1.6; // 比原来慢 1.6 倍，几朵之间的间隔也一起拉长；数量不变
     const BURST_COUNT = 5;
     const RAYS = 12;
     const container = document.createElement('div');
@@ -1901,11 +1907,11 @@ function _playReactionBurstFirework(emoji, opts) {
     for (let b = 0; b < BURST_COUNT; b++) {
         const originX = 10 + Math.random() * 80; // vw
         const originY = 15 + Math.random() * 50; // vh
-        const burstDelay = b * 0.28 + Math.random() * 0.1;
+        const burstDelay = (b * 0.28 + Math.random() * 0.1) * SPEED;
         for (let i = 0; i < RAYS; i++) {
             const angle = (i / RAYS) * Math.PI * 2 + Math.random() * 0.3;
             const dist = 90 + Math.random() * 70;
-            const duration = isCombo ? (2.4 + Math.random() * 0.9) : (1.4 + Math.random() * 0.5); // 普通1.4~1.9s / 组合2.4~3.3s
+            const duration = (isCombo ? (2.4 + Math.random() * 0.9) : (1.4 + Math.random() * 0.5)) * SPEED; // 原速：普通1.4~1.9s / 组合2.4~3.3s，再乘 SPEED
             const size = isCombo
                 ? Math.round(16 + Math.random() * 10) // 16~26px
                 : Math.round(22 + Math.random() * 16); // 22~38px

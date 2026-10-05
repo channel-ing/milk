@@ -1,4 +1,4 @@
-、(function() {
+(function() {
     var MY_SYM_KEY   = 'pokeSym_my';
     var PTR_SYM_KEY  = 'pokeSym_partner';
     var MY_CUST_KEY  = 'pokeSym_my_custom';

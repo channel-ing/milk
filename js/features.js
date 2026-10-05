@@ -196,7 +196,8 @@
         if (_audio) return _audio;
         _audio = new Audio(SRC);
         _audio.loop   = true;
-        _audio.volume = 0.01;
+        _audio.volume = 0;
+        _audio.muted  = true;
         _audio.preload = 'auto';
         _audio.addEventListener('play',  function(){ _setUI(true);  });
         _audio.addEventListener('pause', function(){ _setUI(false); });
